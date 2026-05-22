@@ -34,7 +34,14 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
 
                 <div className="sl-scrollbar min-h-0 flex-1 overflow-auto overflow-x-visible rounded-[40px] bg-black/[0.03] px-6 py-6">
                     <div className="mx-auto grid max-w-[1290px] grid-cols-[repeat(5,230px)] justify-center gap-x-7 gap-y-6 overflow-visible">
-                        {filtered.map((game, index) => <GameCard key={`${game.id}-${index}`} game={game} compact />)}
+                        {filtered.map((game, index) => (
+                            <GameCard
+                                key={`${game.id}-${index}`}
+                                game={game}
+                                compact
+                                panelSide={(index + 1) % 5 === 0 ? 'left' : 'right'}
+                            />
+                        ))}
                     </div>
                     {!filtered.length && (
                         <div className="mx-auto mt-20 max-w-2xl rounded-[34px] bg-[#b7ff63] p-12 text-center text-4xl font-black shadow-xl">
