@@ -1,0 +1,125 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+@source '../**/*.tsx';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+html,
+body,
+#app {
+    min-height: 100%;
+}
+
+body {
+    background: #f2f2f2;
+    color: #050505;
+    font-family: var(--font-sans);
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+.sl-card-hover {
+    width: 250px;
+    isolation: isolate;
+    transition: transform 180ms ease, filter 180ms ease;
+}
+
+.sl-card-hover:hover,
+.sl-card-hover:focus-within {
+    z-index: 40;
+    filter: drop-shadow(0 24px 34px rgb(0 0 0 / 0.16));
+}
+
+.sl-card-hover .sl-card-panel {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-10px);
+    transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.sl-card-shell {
+    transition: border-radius 160ms ease;
+}
+
+.sl-card-hover:hover .sl-card-shell,
+.sl-card-hover:focus-within .sl-card-shell {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.sl-cover-art {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(160deg, #ffffff 0%, #e9f1ef 48%, #b7d8cf 100%);
+}
+
+.sl-cover-art::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(172deg, rgb(222 199 52 / 0.9) 0 11%, transparent 12%),
+        linear-gradient(34deg, transparent 0 45%, rgb(0 0 0 / 0.08) 46% 48%, transparent 49%),
+        linear-gradient(143deg, transparent 0 58%, rgb(0 0 0 / 0.1) 59% 61%, transparent 62%);
+}
+
+.sl-cover-art::after {
+    content: "";
+    position: absolute;
+    left: 16%;
+    right: 16%;
+    bottom: 18%;
+    height: 6px;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 0.18);
+}
+
+.sl-scrollbar {
+    scrollbar-width: none;
+}
+
+.sl-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.sl-card-hover:hover .sl-card-panel,
+.sl-card-hover:focus-within .sl-card-panel {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+.sl-mini-stat {
+    animation: sl-mini-stat 4.2s infinite;
+}
+
+.sl-card-hover:hover .sl-mini-stat,
+.sl-card-hover:focus-within .sl-mini-stat {
+    animation-play-state: paused;
+}
+
+@keyframes sl-mini-stat {
+    0%,
+    45% {
+        opacity: 1;
+    }
+    50%,
+    95% {
+        opacity: 0.55;
+    }
+    100% {
+        opacity: 1;
+    }
+}

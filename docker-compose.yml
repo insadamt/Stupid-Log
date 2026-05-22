@@ -1,0 +1,26 @@
+services:
+  app:
+    image: serversideup/php:8.4-fpm-nginx
+    working_dir: /var/www/html
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/var/www/html
+    environment:
+      AUTORUN_ENABLED: "false"
+    depends_on:
+      - pgsql
+
+  pgsql:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: stupid_log
+      POSTGRES_USER: stupid_log
+      POSTGRES_PASSWORD: stupid_log
+    volumes:
+      - pgsql-data:/var/lib/postgresql/data
+
+volumes:
+  pgsql-data:
