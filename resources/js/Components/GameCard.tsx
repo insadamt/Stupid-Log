@@ -9,7 +9,7 @@ function PlatformIcon({ platform, large = false, compact = false }: { platform: 
         <span
             className={[
                 'grid shrink-0 place-items-center rounded-full bg-black font-black text-[#b7ff63]',
-                large ? 'size-12 text-2xl' : compact ? 'size-9 text-lg' : 'size-10 text-xl',
+                large ? 'size-12 text-2xl' : compact ? 'size-10 text-xl' : 'size-10 text-xl',
             ].join(' ')}
         >
             {label}
@@ -29,7 +29,7 @@ export function CoverArt({ game, titleSize = 'text-[25px]' }: { game: GameCardDa
                 <div className="grid size-14 place-items-center rounded-3xl bg-black/10 text-black/42">
                     <ImageOff size={30} strokeWidth={3} />
                 </div>
-                <div className={`${titleSize} line-clamp-3 max-w-full break-all font-black leading-[0.95] text-black/72`}>
+                <div className={`${titleSize} line-clamp-3 max-w-full [overflow-wrap:anywhere] font-black leading-[0.95] text-black/72`}>
                     {game.title}
                 </div>
             </div>
@@ -61,13 +61,13 @@ export default function GameCard({
     const href = game.id > 0 ? `/games/${game.id}` : '/library';
     const progress = Math.min(Math.max(Number(game.progress ?? 0), 0), 100);
     const hasAchievements = Number(game.total_achievements ?? 0) > 0;
-    const shellWidth = featured ? 'w-[342px]' : homeSide ? 'w-[286px]' : compact ? 'w-[190px]' : 'w-[250px]';
-    const cardHeight = featured ? 'h-[560px]' : homeSide ? 'h-[500px]' : compact ? 'h-[286px]' : 'h-[410px]';
-    const coverHeight = featured ? 'h-[424px]' : homeSide ? 'h-[386px]' : compact ? 'h-[190px]' : 'h-[300px]';
-    const padding = featured ? 'p-4' : compact ? 'p-2.5' : 'p-3';
-    const radius = featured ? 'rounded-[28px]' : compact ? 'rounded-[22px]' : 'rounded-[24px]';
-    const panelLeft = compact ? 'left-[190px]' : 'left-[250px]';
-    const panelWidth = compact ? 'w-[330px]' : 'w-[380px]';
+    const shellWidth = featured ? 'w-[342px]' : homeSide ? 'w-[286px]' : compact ? 'w-[230px]' : 'w-[250px]';
+    const cardHeight = featured ? 'h-[560px]' : homeSide ? 'h-[500px]' : compact ? 'h-[330px]' : 'h-[410px]';
+    const coverHeight = featured ? 'h-[424px]' : homeSide ? 'h-[386px]' : compact ? 'h-[230px]' : 'h-[300px]';
+    const padding = featured ? 'p-4' : compact ? 'p-3' : 'p-3';
+    const radius = featured ? 'rounded-[28px]' : compact ? 'rounded-[24px]' : 'rounded-[24px]';
+    const panelLeft = compact ? 'left-[230px]' : 'left-[250px]';
+    const panelWidth = compact ? 'w-[350px]' : 'w-[380px]';
 
     return (
         <article className={['sl-card-hover group relative flex shrink-0 overflow-visible', shellWidth, cardHeight].join(' ')}>
@@ -82,10 +82,10 @@ export default function GameCard({
                 ].join(' ')}
             >
                 <div className={`${coverHeight} relative z-0 overflow-hidden rounded-[18px] bg-[#d9dedb]`}>
-                    <CoverArt game={game} titleSize={featured ? 'text-[32px]' : compact ? 'text-[20px]' : 'text-[24px]'} />
+                    <CoverArt game={game} titleSize={featured ? 'text-[32px]' : compact ? 'text-[24px]' : 'text-[24px]'} />
                 </div>
 
-                <span className={['relative z-20 mx-auto -mt-4 rounded-full px-6 py-2 font-black leading-none', featured ? 'text-lg' : compact ? 'text-sm' : 'text-base', statusClass(game.status)].join(' ')}>
+                <span className={['relative z-20 mx-auto -mt-4 rounded-full px-6 py-2 font-black leading-none', featured ? 'text-lg' : compact ? 'text-base' : 'text-base', statusClass(game.status)].join(' ')}>
                     {game.status}
                 </span>
 
@@ -93,13 +93,13 @@ export default function GameCard({
                     <PlatformIcon platform={game.platform} large={featured} compact={compact} />
                     {hasAchievements ? (
                         <>
-                            <div className={['flex-1 overflow-hidden rounded-full bg-[#a8d8ff]', compact ? 'h-4' : 'h-5'].join(' ')}>
+                            <div className={['flex-1 overflow-hidden rounded-full bg-[#a8d8ff]', compact ? 'h-5' : 'h-5'].join(' ')}>
                                 <div className="h-full rounded-full bg-[#4f8cf7]" style={{ width: `${progress}%` }} />
                             </div>
-                            <span className={['sl-mini-stat font-black', compact ? 'text-sm' : 'text-base'].join(' ')}>{progress}%</span>
+                            <span className={['sl-mini-stat font-black', compact ? 'text-base' : 'text-base'].join(' ')}>{progress}%</span>
                         </>
                     ) : (
-                        <span className={['font-black leading-none', compact ? 'text-base' : 'text-lg'].join(' ')}>No Achievements</span>
+                        <span className={['font-black leading-none', compact ? 'text-lg' : 'text-lg'].join(' ')}>No Achievements</span>
                     )}
                 </div>
             </Link>
