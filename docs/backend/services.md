@@ -41,6 +41,30 @@ Every result is normalized with these keys:
 
 The service returns warnings for provider failures instead of blocking manual entry.
 
+## `SteamEnrichmentService`
+
+Enriches existing `Game` records when a Steam App ID is available from provider search/import payloads.
+
+Stored fields:
+
+- `games.total_achievements`
+- `games.total_achievements_source = steam`
+- `games.base_price_default`
+- `games.base_price_source = steam`
+- `games.provider_synced_at`
+- Steam `external_game_ids`
+- Steam DLC catalog rows in `dlcs`
+
+Steam store app details are used for base price and DLC catalog. Steam user stats schema is used for total achievement count.
+
+The service is idempotent:
+
+- Steam external IDs are created once.
+- DLC rows are upserted by `steam_app_id`.
+- Re-running enrichment updates existing DLC rows instead of duplicating them.
+
+Failures are soft. Store or achievement API failures are logged and returned as warnings from the service, but they do not block manual entry or library game creation.
+
 ## Settings Credential Storage
 
 Settings updates preserve existing encrypted credential fields when incoming credential fields are blank. Non-blank values replace the existing encrypted value. Explicit credential clearing is deferred for a future control.

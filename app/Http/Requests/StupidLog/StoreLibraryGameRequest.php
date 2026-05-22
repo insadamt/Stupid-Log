@@ -21,6 +21,8 @@ class StoreLibraryGameRequest extends FormRequest
             'game.external_ids' => ['nullable', 'array'],
             'game.external_ids.igdb' => ['nullable', 'string', 'max:255'],
             'game.external_ids.steam' => ['nullable', 'string', 'max:255'],
+            'game.external_id' => ['nullable', 'string', 'max:255'],
+            'game.steam_app_id' => ['nullable', 'string', 'max:255'],
             'game.create_duplicate_anyway' => ['nullable', 'boolean'],
             'game.cover_url_original' => ['nullable', 'url', 'max:2048'],
             'game.cover_path' => ['nullable', 'string', 'max:2048'],

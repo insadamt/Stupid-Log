@@ -68,7 +68,8 @@ Build and document the V1 foundation for a single-user personal gaming archive w
 
 ### Remaining Backend Gaps
 
-- [ ] Deeper Steam enrichment for achievements, base prices, and DLC catalog beyond current fallback search.
+- [x] Deeper Steam enrichment for achievements, base prices, and DLC catalog beyond current fallback search.
+- [x] Add Steam enrichment idempotence tests.
 - [ ] Explicit clear credentials control and backend endpoint/intent, once product/UI direction is defined.
 - [ ] Edit/update flows for existing library games, if V1 scope requires them.
 
@@ -119,11 +120,11 @@ php artisan migrate:fresh --seed
 
 ## Current Status
 
-Backend contracts have been stabilized for frontend continuation. Provider search, settings credential preservation, library-game request validation, snapshot integrity, and documented TypeScript shapes are covered by tests/docs.
+Steam enrichment has been added and verified. Game creation can now enrich existing game/DLC fields from Steam App IDs without changing frontend page/component contracts.
 
 ## Next Step
 
-Frontend can continue against the documented contracts. Next backend work should be deeper Steam enrichment only if V1 needs achievements/base-price/DLC catalog automation now.
+Frontend can continue against the documented contracts. Remaining backend work should focus only on explicitly scoped V1 needs such as edit/update flows or an explicit clear-credentials control.
 
 ## Blockers
 

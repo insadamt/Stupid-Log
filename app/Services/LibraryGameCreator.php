@@ -23,6 +23,7 @@ class LibraryGameCreator
     public function __construct(
         private readonly TitleNormalizer $normalizer,
         private readonly DuplicateDetectionService $duplicates,
+        private readonly SteamEnrichmentService $steam,
     ) {}
 
     public function create(User $user, array $payload): LibraryGame
@@ -30,7 +31,7 @@ class LibraryGameCreator
         $this->validatePayload($payload);
 
         return DB::transaction(function () use ($user, $payload) {
-            $game = $this->resolveGame($payload['game']);
+            $game = $this->resolveGame($payload['game'], $user);
             $platform = Platform::findOrFail($payload['platform_id']);
             $status = Status::findOrFail($payload['progress']['status_id']);
 
@@ -103,13 +104,23 @@ class LibraryGameCreator
         }
     }
 
-    private function resolveGame(array $gamePayload): Game
+    private function resolveGame(array $gamePayload, User $user): Game
     {
+        $steamAppId = $this->steamAppId($gamePayload);
+
         foreach (['igdb', 'steam'] as $providerKey) {
             $externalId = Arr::get($gamePayload, "external_ids.$providerKey");
             if ($externalId && $existing = $this->duplicates->findByExternalId($providerKey, (string) $externalId)) {
+                $this->steam->enrich($existing, $steamAppId, $user);
+
                 return $existing;
             }
+        }
+
+        if ($steamAppId && $existing = $this->duplicates->findByExternalId('steam', $steamAppId)) {
+            $this->steam->enrich($existing, $steamAppId, $user);
+
+            return $existing;
         }
 
         if (($gamePayload['source'] ?? 'manual') === 'manual') {
@@ -142,15 +153,27 @@ class LibraryGameCreator
         foreach ($gamePayload['external_ids'] ?? [] as $providerKey => $externalId) {
             $externalProvider = Provider::where('key', $providerKey)->first();
             if ($externalProvider && $externalId) {
-                $game->externalIds()->create([
+                $game->externalIds()->firstOrCreate([
                     'provider_id' => $externalProvider->id,
                     'external_id' => (string) $externalId,
+                ], [
                     'url' => null,
                 ]);
             }
         }
 
+        $this->steam->enrich($game, $steamAppId, $user);
+
         return $game;
+    }
+
+    private function steamAppId(array $gamePayload): ?string
+    {
+        $steamAppId = Arr::get($gamePayload, 'external_ids.steam')
+            ?? Arr::get($gamePayload, 'steam_app_id')
+            ?? (($gamePayload['source'] ?? null) === 'steam' ? Arr::get($gamePayload, 'external_id') : null);
+
+        return $steamAppId ? (string) $steamAppId : null;
     }
 
     private function assertDevicesAreValid(Platform $platform, array $deviceIds): void

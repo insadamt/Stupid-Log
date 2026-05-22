@@ -18,6 +18,8 @@ The response shape is stable even when credentials are missing or providers fail
 
 Provider credentials are never returned to the frontend.
 
+If the add-game payload includes a Steam App ID, the backend may enrich the saved game with total achievements, default/base price, and DLC catalog. Frontend pages can continue reading the existing `GameCardData.total_achievements`, `GameCardData.base_price_default`, and `GameDetails.dlcs` fields.
+
 ## Settings Credentials
 
 Blank credential fields in Settings preserve existing credentials. The current V1 contract does not provide an explicit clear credentials action.

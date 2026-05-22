@@ -19,3 +19,5 @@
 - Added tests for missing provider credentials, provider failure fallback, and all-provider failure behavior.
 - Preserved existing encrypted credentials when Settings credential fields are submitted blank.
 - Fixed V1 local user lookup so renaming the local profile does not create a second user.
+- Added Steam enrichment for achievements, base/default price, Steam external IDs, and DLC catalog.
+- Added idempotent DLC/external-ID enrichment tests.

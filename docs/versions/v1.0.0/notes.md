@@ -22,10 +22,11 @@ Implemented:
 - Provider search now has a stable JSON response shape in success, missing-credential, and provider-failure cases.
 - Settings updates preserve existing encrypted credentials when credential fields are blank.
 - `POST /library-games` now has structured request-level validation before service business rules run.
+- Steam enrichment now stores total achievements, default/base price, Steam external ID, and DLC catalog when a Steam App ID is available.
 
 Partial:
 
-- Provider search covers IGDB metadata lookup and Steam store-search fallback, but deeper Steam enrichment for achievements/prices/DLC catalog remains limited.
+- Provider search covers IGDB metadata lookup and Steam store-search fallback.
 - Library creation validates create payloads, but edit/update library-game flows are not yet part of V1 backend contracts.
 
 Intentionally deferred:

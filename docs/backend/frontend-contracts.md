@@ -135,6 +135,8 @@ Props:
 
 `state` defaults to `Not Owned` when no `owned_dlcs` record exists.
 
+Steam enrichment may populate this list after a game is created with a Steam App ID. The prop shape does not change.
+
 ### `Stats`
 
 Route: `GET /stats`
@@ -222,5 +224,7 @@ Provider search always returns this top-level shape for success, missing credent
 Each result always contains all documented result keys. Nullable metadata fields are returned as `null` when unavailable.
 
 Provider credentials are never included in this response.
+
+Provider search/import may provide a Steam App ID that the backend uses for enrichment during game creation. This fills existing frontend-visible fields such as `GameCardData.total_achievements`, `GameCardData.base_price_default`, and `GameDetails.dlcs`; no extra frontend field is required.
 
 Validation errors use Laravel validation responses.

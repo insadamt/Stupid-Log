@@ -63,6 +63,7 @@ Request rules:
 - date fields must be valid dates.
 - price fields must be numeric and at least `0`.
 - `game.source`, when present, must be `manual`, `igdb`, or `steam`.
+- `game.steam_app_id`, `game.external_id`, and provider-specific `game.external_ids.*` values are nullable strings.
 
 Service-level business rules remain in `LibraryGameCreator`:
 
