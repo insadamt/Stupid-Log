@@ -79,7 +79,14 @@ export default function GameCard({
         : `${compact ? 'left-[230px]' : 'left-[250px]'} rounded-r-[28px]`;
 
     return (
-        <article className={['sl-card-hover group relative flex shrink-0 overflow-visible', shellWidth, cardHeight].join(' ')}>
+        <article
+            className={[
+                'sl-card-hover group relative flex shrink-0 overflow-visible',
+                panelSide === 'left' ? 'sl-panel-left' : 'sl-panel-right',
+                shellWidth,
+                cardHeight,
+            ].join(' ')}
+        >
             <Link
                 href={href}
                 className={[
