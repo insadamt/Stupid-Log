@@ -17,6 +17,11 @@ function PlatformIcon({ platform, large = false, compact = false }: { platform: 
     );
 }
 
+function coverTitle(title: string) {
+    const clean = title.trim();
+    return clean.length > 18 ? `${clean.slice(0, 18)}…` : clean;
+}
+
 export function CoverArt({ game, titleSize = 'text-[25px]' }: { game: GameCardData; titleSize?: string }) {
     if (game.cover_url) {
         return <img src={game.cover_url} alt={game.title} className="h-full w-full object-cover" />;
@@ -29,8 +34,8 @@ export function CoverArt({ game, titleSize = 'text-[25px]' }: { game: GameCardDa
                 <div className="grid size-14 place-items-center rounded-3xl bg-black/10 text-black/42">
                     <ImageOff size={30} strokeWidth={3} />
                 </div>
-                <div className={`${titleSize} line-clamp-3 max-w-full [overflow-wrap:anywhere] font-black leading-[0.95] text-black/72`}>
-                    {game.title}
+                <div className={`${titleSize} line-clamp-2 max-w-[92%] font-black leading-[0.96] text-black/72`}>
+                    {coverTitle(game.title)}
                 </div>
             </div>
         </div>
@@ -51,12 +56,14 @@ export default function GameCard({
     featured = false,
     homeSide = false,
     compact = false,
+    panelSide = 'right',
 }: {
     game: GameCardData;
     expanded?: boolean;
     featured?: boolean;
     homeSide?: boolean;
     compact?: boolean;
+    panelSide?: 'left' | 'right';
 }) {
     const href = game.id > 0 ? `/games/${game.id}` : '/library';
     const progress = Math.min(Math.max(Number(game.progress ?? 0), 0), 100);
@@ -66,8 +73,10 @@ export default function GameCard({
     const coverHeight = featured ? 'h-[424px]' : homeSide ? 'h-[386px]' : compact ? 'h-[230px]' : 'h-[300px]';
     const padding = featured ? 'p-4' : compact ? 'p-3' : 'p-3';
     const radius = featured ? 'rounded-[28px]' : compact ? 'rounded-[24px]' : 'rounded-[24px]';
-    const panelLeft = compact ? 'left-[230px]' : 'left-[250px]';
     const panelWidth = compact ? 'w-[350px]' : 'w-[380px]';
+    const panelPosition = panelSide === 'left'
+        ? `${compact ? 'right-[230px]' : 'right-[250px]'} rounded-l-[28px]`
+        : `${compact ? 'left-[230px]' : 'left-[250px]'} rounded-r-[28px]`;
 
     return (
         <article className={['sl-card-hover group relative flex shrink-0 overflow-visible', shellWidth, cardHeight].join(' ')}>
@@ -93,19 +102,19 @@ export default function GameCard({
                     <PlatformIcon platform={game.platform} large={featured} compact={compact} />
                     {hasAchievements ? (
                         <>
-                            <div className={['flex-1 overflow-hidden rounded-full bg-[#a8d8ff]', compact ? 'h-5' : 'h-5'].join(' ')}>
+                            <div className="h-5 flex-1 overflow-hidden rounded-full bg-[#a8d8ff]">
                                 <div className="h-full rounded-full bg-[#4f8cf7]" style={{ width: `${progress}%` }} />
                             </div>
-                            <span className={['sl-mini-stat font-black', compact ? 'text-base' : 'text-base'].join(' ')}>{progress}%</span>
+                            <span className="sl-mini-stat text-base font-black">{progress}%</span>
                         </>
                     ) : (
-                        <span className={['font-black leading-none', compact ? 'text-lg' : 'text-lg'].join(' ')}>No Achievements</span>
+                        <span className="text-lg font-black leading-none">No Achievements</span>
                     )}
                 </div>
             </Link>
 
             {!featured && !homeSide && expanded && (
-                <div className={`sl-card-panel absolute ${panelLeft} top-0 flex h-full ${panelWidth} flex-col overflow-hidden rounded-r-[28px] bg-[#b7ff63] px-7 py-6`}>
+                <div className={`sl-card-panel absolute ${panelPosition} top-0 flex h-full ${panelWidth} flex-col overflow-hidden bg-[#b7ff63] px-7 py-6`}>
                     <h3 className="line-clamp-2 border-b-4 border-black/20 pb-2 text-[28px] font-black leading-[0.98]">{game.title}</h3>
                     <p className="mt-3 truncate text-base font-black">{game.publisher || 'Unknown Publisher'}</p>
                     <div className="mt-6 space-y-4 text-center">
