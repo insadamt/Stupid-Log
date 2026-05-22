@@ -27,11 +27,13 @@ function PlatformIcon({
 
 function coverTitle(title: string) {
     const clean = title.trim();
+
     return clean.length > 18 ? `${clean.slice(0, 18)}…` : clean;
 }
 
 function panelTitle(title: string) {
     const clean = title.trim();
+
     return clean.length > 52 ? `${clean.slice(0, 52)}…` : clean;
 }
 
