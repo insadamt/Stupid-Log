@@ -2,7 +2,15 @@ import { Link } from '@inertiajs/react';
 import { ArrowUpRight, Clock3, Gamepad2, ImageOff, Trophy } from 'lucide-react';
 import { GameCardData } from '../types';
 
-function PlatformIcon({ platform, large = false, compact = false }: { platform: string; large?: boolean; compact?: boolean }) {
+function PlatformIcon({
+    platform,
+    large = false,
+    compact = false,
+}: {
+    platform: string;
+    large?: boolean;
+    compact?: boolean;
+}) {
     const label = platform === 'Steam' ? 'S' : platform === 'Xbox' ? 'X' : platform.slice(0, 1);
 
     return (
@@ -24,10 +32,16 @@ function coverTitle(title: string) {
 
 function panelTitle(title: string) {
     const clean = title.trim();
-    return clean.length > 44 ? `${clean.slice(0, 44)}…` : clean;
+    return clean.length > 52 ? `${clean.slice(0, 52)}…` : clean;
 }
 
-export function CoverArt({ game, titleSize = 'text-[25px]' }: { game: GameCardData; titleSize?: string }) {
+export function CoverArt({
+    game,
+    titleSize = 'text-[25px]',
+}: {
+    game: GameCardData;
+    titleSize?: string;
+}) {
     if (game.cover_url) {
         return <img src={game.cover_url} alt={game.title} className="h-full w-full object-cover" />;
     }
@@ -35,10 +49,12 @@ export function CoverArt({ game, titleSize = 'text-[25px]' }: { game: GameCardDa
     return (
         <div className="relative grid h-full w-full place-items-center overflow-hidden bg-[#d9dedb] p-5 text-center">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.58),transparent_62%)]" />
+
             <div className="relative z-10 grid max-w-full justify-items-center gap-3">
                 <div className="grid size-14 place-items-center rounded-3xl bg-black/10 text-black/42">
                     <ImageOff size={30} strokeWidth={3} />
                 </div>
+
                 <div className={`${titleSize} line-clamp-2 max-w-[92%] font-black leading-[0.96] text-black/72`}>
                     {coverTitle(game.title)}
                 </div>
@@ -52,6 +68,7 @@ function statusClass(status: string) {
 
     if (value === '100%') return 'bg-[#ff3131] text-black';
     if (value.includes('progress')) return 'bg-[#f4df4d] text-black';
+
     return 'bg-[#adadad] text-black';
 }
 
@@ -71,17 +88,21 @@ export default function GameCard({
     panelSide?: 'left' | 'right';
 }) {
     const href = game.id > 0 ? `/games/${game.id}` : '/library';
+
     const progress = Math.min(Math.max(Number(game.progress ?? 0), 0), 100);
     const hasAchievements = Number(game.total_achievements ?? 0) > 0;
+
     const shellWidth = featured ? 'w-[342px]' : homeSide ? 'w-[286px]' : compact ? 'w-[230px]' : 'w-[250px]';
     const cardHeight = featured ? 'h-[560px]' : homeSide ? 'h-[500px]' : compact ? 'h-[330px]' : 'h-[410px]';
     const coverHeight = featured ? 'h-[424px]' : homeSide ? 'h-[386px]' : compact ? 'h-[230px]' : 'h-[300px]';
     const padding = featured ? 'p-4' : compact ? 'p-3' : 'p-3';
     const radius = featured ? 'rounded-[28px]' : compact ? 'rounded-[24px]' : 'rounded-[24px]';
     const panelWidth = compact ? 'w-[350px]' : 'w-[380px]';
-    const panelPosition = panelSide === 'left'
-        ? `${compact ? 'right-[230px]' : 'right-[250px]'} rounded-l-[28px]`
-        : `${compact ? 'left-[230px]' : 'left-[250px]'} rounded-r-[28px]`;
+
+    const panelPosition =
+        panelSide === 'left'
+            ? `${compact ? 'right-[230px]' : 'right-[250px]'} rounded-l-[28px]`
+            : `${compact ? 'left-[230px]' : 'left-[250px]'} rounded-r-[28px]`;
 
     return (
         <article
@@ -106,17 +127,25 @@ export default function GameCard({
                     <CoverArt game={game} titleSize={featured ? 'text-[32px]' : compact ? 'text-[24px]' : 'text-[24px]'} />
                 </div>
 
-                <span className={['relative z-20 mx-auto -mt-4 rounded-full px-6 py-2 font-black leading-none', featured ? 'text-lg' : compact ? 'text-base' : 'text-base', statusClass(game.status)].join(' ')}>
+                <span
+                    className={[
+                        'relative z-20 mx-auto -mt-4 rounded-full px-6 py-2 font-black leading-none',
+                        featured ? 'text-lg' : compact ? 'text-base' : 'text-base',
+                        statusClass(game.status),
+                    ].join(' ')}
+                >
                     {game.status}
                 </span>
 
                 <div className="relative z-10 mt-auto flex items-center gap-3 pb-1">
                     <PlatformIcon platform={game.platform} large={featured} compact={compact} />
+
                     {hasAchievements ? (
                         <>
                             <div className="h-5 flex-1 overflow-hidden rounded-full bg-[#a8d8ff]">
                                 <div className="h-full rounded-full bg-[#4f8cf7]" style={{ width: `${progress}%` }} />
                             </div>
+
                             <span className="sl-mini-stat text-base font-black">{progress}%</span>
                         </>
                     ) : (
@@ -126,57 +155,58 @@ export default function GameCard({
             </Link>
 
             {!featured && !homeSide && expanded && (
-                <div className={`sl-card-panel absolute ${panelPosition} top-0 flex h-full ${panelWidth} flex-col overflow-hidden bg-black px-6 py-5 text-[#b7ff63]`}>
+                <div
+                    className={`sl-card-panel absolute ${panelPosition} top-0 flex h-full ${panelWidth} flex-col overflow-hidden bg-black px-6 py-5 text-[#b7ff63]`}
+                >
                     <div className="flex items-center justify-between gap-3">
-                        <span className="rounded-full bg-[#b7ff63]/15 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-[#b7ff63]/70">
+                        <span className="rounded-full bg-[#b7ff63]/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#b7ff63]/70">
                             Inspect
                         </span>
-                        <span className="rounded-full border border-[#b7ff63]/30 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-[#b7ff63]/70">
+
+                        <span className="max-w-[120px] truncate rounded-full border border-[#b7ff63]/30 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#b7ff63]/70">
                             {game.platform}
                         </span>
                     </div>
 
-                    <div className="mt-4 h-[58px] overflow-hidden" title={game.title}>
-                        <h3 className="line-clamp-2 text-[21px] font-black leading-[1.02] text-white [overflow-wrap:anywhere]">
+                    <div className="mt-3 h-[46px] overflow-hidden" title={game.title}>
+                        <h3 className="line-clamp-2 text-[18px] font-black leading-[1.06] text-white [overflow-wrap:anywhere]">
                             {panelTitle(game.title)}
                         </h3>
                     </div>
 
-                    <p className="mt-2 truncate text-sm font-black uppercase tracking-[0.16em] text-white/38">
+                    <p className="mt-1 truncate text-[12px] font-black uppercase tracking-[0.14em] text-white/38">
                         {game.publisher || 'Unknown Publisher'}
                     </p>
 
-                    <div className="mt-5 grid grid-cols-2 gap-3">
-                        <div className="rounded-[20px] bg-white/8 p-4 text-center ring-1 ring-white/10">
-                            <Trophy className="mx-auto mb-2 text-[#b7ff63]" size={28} fill="currentColor" />
-                            <div className="text-xl font-black text-white">
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                        <div className="rounded-[18px] bg-white/10 p-3 text-center ring-1 ring-white/10">
+                            <Trophy className="mx-auto mb-1 text-[#b7ff63]" size={24} fill="currentColor" />
+
+                            <div className="text-lg font-black text-white">
                                 {game.earned_achievements} / {game.total_achievements || 0}
                             </div>
-                            <div className="mt-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#b7ff63]/58">
+
+                            <div className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#b7ff63]/58">
                                 Achievements
                             </div>
                         </div>
 
-                        <div className="rounded-[20px] bg-white/8 p-4 text-center ring-1 ring-white/10">
-                            <Clock3 className="mx-auto mb-2 text-[#b7ff63]" size={28} />
-                            <div className="text-xl font-black text-white">
-                                {game.playtime_hours} H
-                            </div>
-                            <div className="mt-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#b7ff63]/58">
+                        <div className="rounded-[18px] bg-white/10 p-3 text-center ring-1 ring-white/10">
+                            <Clock3 className="mx-auto mb-1 text-[#b7ff63]" size={24} />
+
+                            <div className="text-lg font-black text-white">{game.playtime_hours} H</div>
+
+                            <div className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#b7ff63]/58">
                                 Playtime
                             </div>
                         </div>
                     </div>
 
-                    <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/12">
-                        <div className="h-full rounded-full bg-[#b7ff63]" style={{ width: `${progress}%` }} />
-                    </div>
-
                     <Link
                         href={href}
-                        className="mt-auto flex h-[58px] items-center justify-center gap-3 rounded-[20px] bg-[#b7ff63] text-2xl font-black text-black shadow-[inset_0_-5px_0_rgb(0_0_0/0.14)] transition hover:translate-y-[-2px]"
+                        className="mt-auto flex h-[52px] items-center justify-center gap-3 rounded-[18px] bg-[#b7ff63] text-xl font-black text-black shadow-[inset_0_-5px_0_rgb(0_0_0/0.14)] transition hover:-translate-y-0.5"
                     >
-                        Details <ArrowUpRight size={26} strokeWidth={3} />
+                        Details <ArrowUpRight size={23} strokeWidth={3} />
                     </Link>
 
                     <Gamepad2 className="sr-only" />
