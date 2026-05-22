@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Clock3, Gamepad2, ImageOff, Trophy } from 'lucide-react';
+import { ArrowUpRight, Clock3, Gamepad2, ImageOff, Trophy } from 'lucide-react';
 import { GameCardData } from '../types';
 
 function PlatformIcon({ platform, large = false, compact = false }: { platform: string; large?: boolean; compact?: boolean }) {
@@ -24,7 +24,7 @@ function coverTitle(title: string) {
 
 function panelTitle(title: string) {
     const clean = title.trim();
-    return clean.length > 32 ? `${clean.slice(0, 32)}…` : clean;
+    return clean.length > 44 ? `${clean.slice(0, 44)}…` : clean;
 }
 
 export function CoverArt({ game, titleSize = 'text-[25px]' }: { game: GameCardData; titleSize?: string }) {
@@ -126,32 +126,59 @@ export default function GameCard({
             </Link>
 
             {!featured && !homeSide && expanded && (
-                <div className={`sl-card-panel absolute ${panelPosition} top-0 flex h-full ${panelWidth} flex-col overflow-hidden bg-[#b7ff63] px-7 py-6`}>
-                    <div className="h-[50px] overflow-hidden" title={game.title}>
-                        <h3 className="line-clamp-2 text-[20px] font-black leading-[1.05] [overflow-wrap:anywhere]">
+                <div className={`sl-card-panel absolute ${panelPosition} top-0 flex h-full ${panelWidth} flex-col overflow-hidden bg-black px-6 py-5 text-[#b7ff63]`}>
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="rounded-full bg-[#b7ff63]/15 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-[#b7ff63]/70">
+                            Inspect
+                        </span>
+                        <span className="rounded-full border border-[#b7ff63]/30 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-[#b7ff63]/70">
+                            {game.platform}
+                        </span>
+                    </div>
+
+                    <div className="mt-4 h-[58px] overflow-hidden" title={game.title}>
+                        <h3 className="line-clamp-2 text-[21px] font-black leading-[1.02] text-white [overflow-wrap:anywhere]">
                             {panelTitle(game.title)}
                         </h3>
                     </div>
-                    <div className="mt-2 h-1 rounded-full bg-black/20" />
-                    <p className="mt-3 truncate text-base font-black">{game.publisher || 'Unknown Publisher'}</p>
-                    <div className="mt-6 space-y-4 text-center">
-                        <div className="flex items-center justify-center gap-4">
-                            <Trophy size={30} fill="black" />
-                            <div>
-                                <div className="text-xl font-black">{game.earned_achievements} / {game.total_achievements || 0}</div>
-                                <div className="text-lg font-black text-black/60">Achievements</div>
+
+                    <p className="mt-2 truncate text-sm font-black uppercase tracking-[0.16em] text-white/38">
+                        {game.publisher || 'Unknown Publisher'}
+                    </p>
+
+                    <div className="mt-5 grid grid-cols-2 gap-3">
+                        <div className="rounded-[20px] bg-white/8 p-4 text-center ring-1 ring-white/10">
+                            <Trophy className="mx-auto mb-2 text-[#b7ff63]" size={28} fill="currentColor" />
+                            <div className="text-xl font-black text-white">
+                                {game.earned_achievements} / {game.total_achievements || 0}
+                            </div>
+                            <div className="mt-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#b7ff63]/58">
+                                Achievements
                             </div>
                         </div>
-                        <div className="mx-auto h-1 w-56 bg-black/20" />
-                        <div className="flex items-center justify-center gap-4">
-                            <Clock3 size={30} />
-                            <div>
-                                <div className="text-xl font-black">{game.playtime_hours} H</div>
-                                <div className="text-lg font-black text-black/60">Playtime</div>
+
+                        <div className="rounded-[20px] bg-white/8 p-4 text-center ring-1 ring-white/10">
+                            <Clock3 className="mx-auto mb-2 text-[#b7ff63]" size={28} />
+                            <div className="text-xl font-black text-white">
+                                {game.playtime_hours} H
+                            </div>
+                            <div className="mt-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#b7ff63]/58">
+                                Playtime
                             </div>
                         </div>
                     </div>
-                    <Link href={href} className="mt-auto flex h-[58px] items-center justify-center rounded-[20px] bg-black text-2xl font-black text-white">Details</Link>
+
+                    <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/12">
+                        <div className="h-full rounded-full bg-[#b7ff63]" style={{ width: `${progress}%` }} />
+                    </div>
+
+                    <Link
+                        href={href}
+                        className="mt-auto flex h-[58px] items-center justify-center gap-3 rounded-[20px] bg-[#b7ff63] text-2xl font-black text-black shadow-[inset_0_-5px_0_rgb(0_0_0/0.14)] transition hover:translate-y-[-2px]"
+                    >
+                        Details <ArrowUpRight size={26} strokeWidth={3} />
+                    </Link>
+
                     <Gamepad2 className="sr-only" />
                 </div>
             )}
