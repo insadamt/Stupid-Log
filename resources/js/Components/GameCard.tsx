@@ -24,7 +24,7 @@ function coverTitle(title: string) {
 
 function panelTitle(title: string) {
     const clean = title.trim();
-    return clean.length > 34 ? `${clean.slice(0, 34)}…` : clean;
+    return clean.length > 28 ? `${clean.slice(0, 28)}…` : clean;
 }
 
 export function CoverArt({ game, titleSize = 'text-[25px]' }: { game: GameCardData; titleSize?: string }) {
@@ -127,7 +127,7 @@ export default function GameCard({
 
             {!featured && !homeSide && expanded && (
                 <div className={`sl-card-panel absolute ${panelPosition} top-0 flex h-full ${panelWidth} flex-col overflow-hidden bg-[#b7ff63] px-7 py-6`}>
-                    <h3 className="line-clamp-2 max-h-[58px] overflow-hidden border-b-4 border-black/20 pb-2 text-[28px] font-black leading-[0.98] [overflow-wrap:anywhere]" title={game.title}>{panelTitle(game.title)}</h3>
+                    <h3 className="line-clamp-2 overflow-hidden border-b-4 border-black/20 pb-2 text-[22px] font-black leading-[1.02] [overflow-wrap:anywhere]" title={game.title}>{panelTitle(game.title)}</h3>
                     <p className="mt-3 truncate text-base font-black">{game.publisher || 'Unknown Publisher'}</p>
                     <div className="mt-6 space-y-4 text-center">
                         <div className="flex items-center justify-center gap-4">
