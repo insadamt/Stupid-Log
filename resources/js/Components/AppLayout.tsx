@@ -3,7 +3,6 @@ import {
     Archive,
     BarChart3,
     BookOpen,
-    CircleUserRound,
     Home as HomeIcon,
     Settings,
 } from 'lucide-react';
@@ -32,35 +31,9 @@ export default function AppLayout({
         <main
             className={[
                 'bg-[#fbfcf7] text-[#050505]',
-                lockViewport ? 'h-screen overflow-hidden py-7' : 'min-h-screen overflow-x-hidden py-7',
+                lockViewport ? 'h-screen overflow-hidden' : 'min-h-screen overflow-x-hidden',
             ].join(' ')}
         >
-            <header className="mx-auto flex h-[78px] w-[76vw] max-w-[1340px] min-w-[980px] items-center rounded-full bg-[#b7ff63] shadow-[0_18px_35px_rgb(0_0_0/0.06)] max-lg:w-[calc(100vw-2rem)] max-lg:min-w-0">
-                <Link
-                    href="/"
-                    className="flex h-full w-[150px] items-center justify-center text-[62px] font-black leading-none tracking-[-0.08em]"
-                    aria-label="Home"
-                >
-                    S
-                </Link>
-
-                <div className="h-[50px] w-[3px] rounded-full bg-white/60" />
-
-                <div className="flex-1 text-center text-[38px] font-black leading-none tracking-[0.01em]">
-                    {title}
-                </div>
-
-                <div className="h-[50px] w-[3px] rounded-full bg-white/60" />
-
-                <Link
-                    href="/settings"
-                    className="flex h-full w-[150px] items-center justify-center"
-                    aria-label="Settings"
-                >
-                    <CircleUserRound size={58} strokeWidth={3.2} />
-                </Link>
-            </header>
-
             <nav className="fixed left-7 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-3 rounded-[28px] bg-black p-3 shadow-[0_24px_45px_rgb(0_0_0/0.22)]">
                 {nav.map((item) => {
                     const Icon = item.icon;
@@ -98,7 +71,7 @@ export default function AppLayout({
             <div
                 className={[
                     'mx-auto max-w-[1680px] px-8',
-                    lockViewport ? 'h-[calc(100vh-134px)] pt-8' : 'pt-16 pb-10',
+                    lockViewport ? 'h-screen py-8' : 'py-8 pb-10',
                 ].join(' ')}
             >
                 {children}
