@@ -10,6 +10,7 @@ use App\Models\StupidLog\OwnershipType;
 use App\Models\StupidLog\PhysicalStatus;
 use App\Models\StupidLog\Platform;
 use App\Models\StupidLog\Provider;
+use App\Models\StupidLog\SnapshotRun;
 use App\Models\StupidLog\Status;
 use App\Models\User;
 use App\Services\DuplicateDetectionService;
@@ -18,6 +19,7 @@ use App\Services\SnapshotService;
 use App\Services\StatsService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -190,6 +192,34 @@ class LibraryGameRulesTest extends TestCase
         $this->assertNull(app(StatsService::class)->confirmedYear($this->user, 2026));
         app(SnapshotService::class)->confirm($snapshot);
         $this->assertSame(1, app(StatsService::class)->confirmedYear($this->user, 2026)['library_games']);
+    }
+
+    public function test_snapshot_drafts_are_idempotent_and_only_one_snapshot_can_be_confirmed_per_year(): void
+    {
+        $creator = app(LibraryGameCreator::class);
+        $creator->create($this->user, $this->payload());
+
+        $snapshots = app(SnapshotService::class);
+        $firstDraft = $snapshots->createDraft($this->user, 2026);
+        $secondDraft = $snapshots->createDraft($this->user, 2026);
+
+        $this->assertDatabaseMissing('snapshot_runs', ['id' => $firstDraft->id]);
+        $this->assertSame(1, SnapshotRun::where('user_id', $this->user->id)->where('year', 2026)->where('status', 'draft')->count());
+        $this->assertSame(1, DB::table('library_game_snapshots')->where('snapshot_run_id', $secondDraft->id)->count());
+
+        $snapshots->confirm($secondDraft);
+        $this->assertSame('confirmed', $secondDraft->refresh()->status);
+
+        $thirdDraft = $snapshots->createDraft($this->user, 2026);
+
+        try {
+            $snapshots->confirm($thirdDraft);
+            $this->fail('A second confirmed snapshot for the same year should be blocked.');
+        } catch (ValidationException) {
+            $this->assertTrue(true);
+        }
+
+        $this->assertSame(1, SnapshotRun::where('user_id', $this->user->id)->where('year', 2026)->where('status', 'confirmed')->count());
     }
 
     private function payload(array $overrides = [], string $platform = 'Steam', string $device = 'PC', string $ownership = 'Digital', bool $includePhysicalStatus = true): array

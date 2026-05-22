@@ -6,12 +6,18 @@ use App\Models\StupidLog\LibraryGame;
 use App\Models\StupidLog\SnapshotRun;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class SnapshotService
 {
     public function createDraft(User $user, int $year): SnapshotRun
     {
         return DB::transaction(function () use ($user, $year) {
+            SnapshotRun::where('user_id', $user->id)
+                ->where('year', $year)
+                ->where('status', 'draft')
+                ->delete();
+
             $run = SnapshotRun::create([
                 'user_id' => $user->id,
                 'year' => $year,
@@ -75,6 +81,21 @@ class SnapshotService
 
     public function confirm(SnapshotRun $snapshot): SnapshotRun
     {
+        if ($snapshot->status === 'confirmed') {
+            return $snapshot;
+        }
+
+        $alreadyConfirmed = SnapshotRun::where('user_id', $snapshot->user_id)
+            ->where('year', $snapshot->year)
+            ->where('status', 'confirmed')
+            ->exists();
+
+        if ($alreadyConfirmed) {
+            throw ValidationException::withMessages([
+                'year' => 'This year already has a confirmed snapshot.',
+            ]);
+        }
+
         $snapshot->update([
             'status' => 'confirmed',
             'confirmed_at' => now(),

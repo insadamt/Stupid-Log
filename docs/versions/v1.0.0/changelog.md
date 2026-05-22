@@ -1,0 +1,16 @@
+# Stupid Log v1.0.0 Changelog
+
+## Documentation
+
+- Added required project documentation structure.
+- Added project README, specification, architecture, data model, and design system docs.
+- Added backend overview, routes, services, validation, and frontend contract docs.
+- Added frontend overview, pages, components, state/props, and integration notes.
+- Added initial architecture ADR.
+- Added v1.0.0 plan, notes, and changelog.
+
+## Backend
+
+- Made snapshot draft creation idempotent per user/year.
+- Rejected confirmation of a second snapshot for an already confirmed user/year.
+- Added feature coverage for snapshot integrity rules.
