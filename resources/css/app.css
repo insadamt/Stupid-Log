@@ -56,16 +56,26 @@ textarea {
         transform 160ms ease;
 }
 
+.sl-card-hover.sl-panel-left .sl-card-panel {
+    transform: translateX(10px);
+}
+
 .sl-card-shell {
     transition:
         border-radius 160ms ease,
         transform 160ms ease;
 }
 
-.sl-card-hover:hover .sl-card-shell,
-.sl-card-hover:focus-within .sl-card-shell {
+.sl-card-hover.sl-panel-right:hover .sl-card-shell,
+.sl-card-hover.sl-panel-right:focus-within .sl-card-shell {
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
+}
+
+.sl-card-hover.sl-panel-left:hover .sl-card-shell,
+.sl-card-hover.sl-panel-left:focus-within .sl-card-shell {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
 }
 
 .sl-card-hover:hover .sl-card-panel,
