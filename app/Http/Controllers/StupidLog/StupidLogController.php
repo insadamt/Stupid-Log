@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\StupidLog;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StupidLog\StoreLibraryGameRequest;
+use App\Http\Requests\StupidLog\UpdateSettingsRequest;
 use App\Models\StupidLog\AppSetting;
 use App\Models\StupidLog\Currency;
 use App\Models\StupidLog\Device;
@@ -132,28 +134,22 @@ class StupidLogController extends Controller
         ]);
     }
 
-    public function updateSettings(Request $request): RedirectResponse
+    public function updateSettings(UpdateSettingsRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'username' => ['required', 'string', 'max:255'],
-            'currency_code' => ['required', 'exists:currencies,code'],
-            'igdb_client_id' => ['nullable', 'string'],
-            'igdb_client_secret' => ['nullable', 'string'],
-            'steam_api_key' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
         $user = $this->localUser();
         $user->update(['username' => $validated['username']]);
         AppSetting::updateOrCreate(['user_id' => $user->id], ['currency_code' => $validated['currency_code']]);
-        $this->storeCredential($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null);
-        $this->storeCredential($user, 'steam', null, null, $validated['steam_api_key'] ?? null);
+        $this->storeCredential($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null, preserveBlankFields: true);
+        $this->storeCredential($user, 'steam', null, null, $validated['steam_api_key'] ?? null, preserveBlankFields: true);
 
         return back();
     }
 
-    public function storeLibraryGame(Request $request, LibraryGameCreator $creator): RedirectResponse
+    public function storeLibraryGame(StoreLibraryGameRequest $request, LibraryGameCreator $creator): RedirectResponse
     {
-        $libraryGame = $creator->create($this->localUser(), $request->all());
+        $libraryGame = $creator->create($this->localUser(), $request->validated());
 
         return redirect()->route('games.show', $libraryGame);
     }
@@ -178,7 +174,7 @@ class StupidLogController extends Controller
 
     private function localUser(): User
     {
-        return User::firstOrCreate(['username' => 'Player One'], ['avatar_path' => null]);
+        return User::first() ?? User::create(['username' => 'Player One', 'avatar_path' => null]);
     }
 
     private function libraryQuery(User $user)
@@ -214,19 +210,23 @@ class StupidLogController extends Controller
         ];
     }
 
-    private function storeCredential(User $user, string $providerKey, ?string $clientId, ?string $clientSecret, ?string $apiKey): void
+    private function storeCredential(User $user, string $providerKey, ?string $clientId, ?string $clientSecret, ?string $apiKey, bool $preserveBlankFields = false): void
     {
         $provider = Provider::where('key', $providerKey)->first();
         if (! $provider || (! $clientId && ! $clientSecret && ! $apiKey)) {
             return;
         }
 
+        $existing = ProviderCredential::where('user_id', $user->id)
+            ->where('provider_id', $provider->id)
+            ->first();
+
         ProviderCredential::updateOrCreate(
             ['user_id' => $user->id, 'provider_id' => $provider->id],
             [
-                'encrypted_client_id' => $clientId ? Crypt::encryptString($clientId) : null,
-                'encrypted_client_secret' => $clientSecret ? Crypt::encryptString($clientSecret) : null,
-                'encrypted_api_key' => $apiKey ? Crypt::encryptString($apiKey) : null,
+                'encrypted_client_id' => $clientId ? Crypt::encryptString($clientId) : ($preserveBlankFields ? $existing?->encrypted_client_id : null),
+                'encrypted_client_secret' => $clientSecret ? Crypt::encryptString($clientSecret) : ($preserveBlankFields ? $existing?->encrypted_client_secret : null),
+                'encrypted_api_key' => $apiKey ? Crypt::encryptString($apiKey) : ($preserveBlankFields ? $existing?->encrypted_api_key : null),
                 'is_enabled' => true,
                 'last_tested_at' => now(),
                 'last_test_status' => 'stored',

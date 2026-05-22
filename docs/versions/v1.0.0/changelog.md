@@ -14,3 +14,8 @@
 - Made snapshot draft creation idempotent per user/year.
 - Rejected confirmation of a second snapshot for an already confirmed user/year.
 - Added feature coverage for snapshot integrity rules.
+- Added structured request validation for `POST /library-games`.
+- Hardened provider search to return a stable documented JSON contract.
+- Added tests for missing provider credentials, provider failure fallback, and all-provider failure behavior.
+- Preserved existing encrypted credentials when Settings credential fields are submitted blank.
+- Fixed V1 local user lookup so renaming the local profile does not create a second user.

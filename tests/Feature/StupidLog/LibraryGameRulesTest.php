@@ -111,6 +111,28 @@ class LibraryGameRulesTest extends TestCase
         $creator->create($this->user, $this->payload([], 'Steam', 'Xbox Series X|S', 'Digital'));
     }
 
+    public function test_store_library_game_request_rejects_invalid_payload_shape(): void
+    {
+        $this->postJson('/library-games', [
+            'game' => ['title' => 'A'],
+            'platform_id' => 'not-an-id',
+            'device_ids' => [],
+            'ownership_copies' => [],
+            'progress' => [
+                'playtime_hours' => -1,
+                'earned_achievements' => -1,
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'platform_id',
+                'device_ids',
+                'ownership_copies',
+                'progress.status_id',
+                'progress.playtime_hours',
+                'progress.earned_achievements',
+            ]);
+    }
+
     public function test_physical_status_and_hundred_percent_validation(): void
     {
         $creator = app(LibraryGameCreator::class);

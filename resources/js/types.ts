@@ -41,3 +41,43 @@ export type ReferenceData = {
     physicalStatuses: Array<{ id: number; name: string }>;
     statuses: Array<{ id: number; name: string }>;
 };
+
+export type SnapshotStatus = 'draft' | 'confirmed';
+
+export type SnapshotRunData = {
+    id: number;
+    user_id: number;
+    year: number;
+    status: SnapshotStatus;
+    confirmed_at: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type ConfirmedYearStats = {
+    year: number;
+    library_games: number;
+    playtime_hours: number;
+    earned_achievements: number;
+    snapshot_id: number;
+};
+
+export type ProviderSearchResult = {
+    source: 'igdb' | 'steam';
+    external_id: string;
+    title: string;
+    cover_url_original: string | null;
+    publisher: string | null;
+    release_date: string | null;
+    description: string | null;
+    steam_app_id: string | null;
+};
+
+export type ProviderSearchResponse = {
+    query: string;
+    source_order: Array<'igdb' | 'steam' | 'manual'>;
+    results: ProviderSearchResult[];
+    manual_available: boolean;
+    warnings: string[];
+    notice: string;
+};

@@ -2,7 +2,7 @@
 
 ## Setup And Settings
 
-Validated in `StupidLogController`.
+Settings updates are validated by `UpdateSettingsRequest`.
 
 ```text
 username: required string max:255
@@ -11,6 +11,15 @@ igdb_client_id: nullable string
 igdb_client_secret: nullable string
 steam_api_key: nullable string
 ```
+
+Settings credential behavior:
+
+- blank credential fields preserve existing encrypted credentials.
+- non-blank credential fields replace the existing encrypted value.
+- blank fields do not create new credential records.
+- explicit credential clearing is deferred for a future UI/control.
+
+Setup uses the same field rules, but blank setup credentials simply mean no credential is stored.
 
 ## Provider Search
 
@@ -32,7 +41,7 @@ Snapshot integrity rules:
 
 ## Library Game Creation
 
-Validated in `LibraryGameCreator`.
+Request-level shape validation is handled by `StoreLibraryGameRequest`.
 
 Required payload sections:
 
@@ -44,10 +53,19 @@ ownership_copies
 progress
 ```
 
-Rules:
+Request rules:
 
 - `device_ids` cannot be empty.
 - `ownership_copies` cannot be empty.
+- `platform_id`, device IDs, ownership type IDs, physical status IDs, status IDs, and DLC IDs must be valid database IDs.
+- `progress.playtime_hours` must be numeric, at least `0`, and at most `999999.9`.
+- `progress.earned_achievements` must be an integer at least `0`.
+- date fields must be valid dates.
+- price fields must be numeric and at least `0`.
+- `game.source`, when present, must be `manual`, `igdb`, or `steam`.
+
+Service-level business rules remain in `LibraryGameCreator`:
+
 - selected devices must be valid for selected platform.
 - selected ownership types must be valid for selected platform.
 - ownership type cannot repeat for the same library game.

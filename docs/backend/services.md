@@ -6,9 +6,6 @@ Creates a `LibraryGame` inside a transaction.
 
 Rules enforced:
 
-- required payload sections: `game`, `platform_id`, `device_ids`, `ownership_copies`, `progress`
-- at least one device
-- at least one ownership copy
 - no duplicate `user_id + game_id + platform_id`
 - devices must be allowed for selected platform
 - ownership types must be allowed for selected platform
@@ -29,7 +26,24 @@ Search order:
 2. Steam fallback if IGDB has no results or fails.
 3. Manual entry remains available.
 
+The service returns a stable frontend JSON shape for success, missing credentials, and provider failures. Provider credentials are never returned to the frontend.
+
+Every result is normalized with these keys:
+
+- `source`
+- `external_id`
+- `title`
+- `cover_url_original`
+- `publisher`
+- `release_date`
+- `description`
+- `steam_app_id`
+
 The service returns warnings for provider failures instead of blocking manual entry.
+
+## Settings Credential Storage
+
+Settings updates preserve existing encrypted credential fields when incoming credential fields are blank. Non-blank values replace the existing encrypted value. Explicit credential clearing is deferred for a future control.
 
 ## `StatsService`
 

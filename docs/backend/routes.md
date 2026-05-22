@@ -18,3 +18,8 @@ Routes are defined in `routes/web.php`.
 | GET | `/settings` | `settings` | `settings` | Inertia `Settings` |
 | PATCH | `/settings` | `settings.update` | `updateSettings` | Redirect back |
 
+## Contract Notes
+
+- `POST /library-games` uses `StoreLibraryGameRequest` for request-shape validation, then `LibraryGameCreator` for database/business validation.
+- `GET /provider-search` always returns the documented provider search JSON shape; provider credentials are never exposed.
+- `PATCH /settings` uses `UpdateSettingsRequest`; blank credential fields preserve existing encrypted credentials.

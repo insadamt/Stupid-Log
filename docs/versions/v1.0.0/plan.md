@@ -57,14 +57,26 @@ Build and document the V1 foundation for a single-user personal gaming archive w
 - [x] Make draft snapshot creation idempotent per user/year.
 - [x] Add snapshot integrity feature tests.
 - [x] Document snapshot integrity validation and service behavior.
-- [ ] Audit provider enrichment gaps against the detailed V1 spec.
-- [ ] Audit settings credential update/clear behavior.
-- [ ] Replace ad hoc library-game payload validation with stricter structured validation.
+- [x] Audit provider enrichment gaps against the detailed V1 spec.
+- [x] Harden provider search response contract.
+- [x] Add provider search contract tests.
+- [x] Audit settings credential update/clear behavior.
+- [x] Preserve existing credentials when Settings credential fields are blank.
+- [x] Add settings credential preservation tests.
+- [x] Replace ad hoc library-game request shape validation with stricter structured validation.
+- [x] Add library-game request shape validation tests.
+
+### Remaining Backend Gaps
+
+- [ ] Deeper Steam enrichment for achievements, base prices, and DLC catalog beyond current fallback search.
+- [ ] Explicit clear credentials control and backend endpoint/intent, once product/UI direction is defined.
+- [ ] Edit/update flows for existing library games, if V1 scope requires them.
 
 ## Affected Areas/Files
 
 - `routes/web.php`
 - `app/Http/Controllers/StupidLog/StupidLogController.php`
+- `app/Http/Requests/StupidLog/*`
 - `app/Models/StupidLog/*`
 - `app/Services/SnapshotService.php`
 - `app/Services/*`
@@ -85,6 +97,11 @@ Build and document the V1 foundation for a single-user personal gaming archive w
 - Version plan tracks goal, scope, non-goals, phases, tasks, affected files, acceptance criteria, commands, status, next step, and blockers.
 - Snapshot draft creation for the same user/year does not accumulate stale duplicate draft runs.
 - Confirming a second snapshot for an already confirmed user/year is rejected.
+- Provider search returns the documented JSON shape for success, missing credentials, and provider failures.
+- Manual entry remains available when provider search fails.
+- Settings updates preserve existing credentials when credential fields are blank.
+- `POST /library-games` has structured request-level validation plus service-level business validation.
+- `resources/js/types.ts` includes the backend contract types frontend can import.
 - Relevant tests/build commands are run or clearly reported as not run.
 
 ## Commands To Run
@@ -102,11 +119,11 @@ php artisan migrate:fresh --seed
 
 ## Current Status
 
-Snapshot integrity gap has been fixed and verified. Draft creation is idempotent per user/year, and a second confirmed snapshot for the same user/year is rejected.
+Backend contracts have been stabilized for frontend continuation. Provider search, settings credential preservation, library-game request validation, snapshot integrity, and documented TypeScript shapes are covered by tests/docs.
 
 ## Next Step
 
-Audit provider enrichment gaps against the detailed V1 spec.
+Frontend can continue against the documented contracts. Next backend work should be deeper Steam enrichment only if V1 needs achievements/base-price/DLC catalog automation now.
 
 ## Blockers
 

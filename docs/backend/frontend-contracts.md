@@ -62,6 +62,32 @@ type ReferenceData = {
 };
 ```
 
+### `SnapshotRunData`
+
+```ts
+type SnapshotRunData = {
+  id: number;
+  user_id: number;
+  year: number;
+  status: 'draft' | 'confirmed';
+  confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+```
+
+### `ConfirmedYearStats`
+
+```ts
+type ConfirmedYearStats = {
+  year: number;
+  library_games: number;
+  playtime_hours: number;
+  earned_achievements: number;
+  snapshot_id: number;
+};
+```
+
 ## Inertia Pages
 
 ### `Home`
@@ -127,9 +153,9 @@ Controller/action: `StupidLogController::snapshots`
 
 Props:
 
-- `snapshots`: raw `SnapshotRun` collection
+- `snapshots: SnapshotRunData[]`
 - `currentYear: number`
-- `confirmedCurrentYear: null | { year: number; library_games: number; playtime_hours: number; earned_achievements: number; snapshot_id: number }`
+- `confirmedCurrentYear: ConfirmedYearStats | null`
 
 Snapshot status values: `draft`, `confirmed`.
 
@@ -158,6 +184,8 @@ Props:
 - `user` with `settings`
 - `currencies: string[]`
 - `providers`
+
+Credential fields are not returned. Blank credential fields submitted through Settings preserve existing encrypted credentials.
 
 ## JSON Endpoint
 
@@ -188,5 +216,11 @@ type ProviderSearchResponse = {
   notice: string;
 };
 ```
+
+Provider search always returns this top-level shape for success, missing credentials, provider failure, and empty results. `manual_available` is always `true` in V1.
+
+Each result always contains all documented result keys. Nullable metadata fields are returned as `null` when unavailable.
+
+Provider credentials are never included in this response.
 
 Validation errors use Laravel validation responses.

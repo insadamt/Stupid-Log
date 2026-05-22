@@ -11,6 +11,8 @@ use Throwable;
 
 class ProviderSearchService
 {
+    private const SOURCE_ORDER = ['igdb', 'steam', 'manual'];
+
     public function search(User $user, string $query): array
     {
         $warnings = [];
@@ -32,8 +34,8 @@ class ProviderSearchService
 
         return [
             'query' => $query,
-            'source_order' => ['igdb', 'steam', 'manual'],
-            'results' => $results,
+            'source_order' => self::SOURCE_ORDER,
+            'results' => collect($results)->map(fn (array $result) => $this->result($result))->values()->all(),
             'manual_available' => true,
             'warnings' => $warnings,
             'notice' => 'Manual entry remains available because saved user data is the source of truth.',
@@ -68,7 +70,7 @@ class ProviderSearchService
         return collect($games)->map(function (array $game) {
             $steamExternal = collect($game['external_games'] ?? [])->firstWhere('category', 1);
 
-            return [
+            return $this->result([
                 'source' => 'igdb',
                 'external_id' => (string) $game['id'],
                 'title' => $game['name'] ?? 'Untitled',
@@ -77,7 +79,7 @@ class ProviderSearchService
                 'release_date' => isset($game['first_release_date']) ? date('Y-m-d', $game['first_release_date']) : null,
                 'description' => $game['summary'] ?? null,
                 'steam_app_id' => $steamExternal['uid'] ?? null,
-            ];
+            ]);
         })->all();
     }
 
@@ -89,7 +91,7 @@ class ProviderSearchService
             'cc' => 'US',
         ])->throw()->json('items', []);
 
-        return collect($response)->take(10)->map(fn (array $item) => [
+        return collect($response)->take(10)->map(fn (array $item) => $this->result([
             'source' => 'steam',
             'external_id' => (string) $item['id'],
             'title' => $item['name'] ?? 'Untitled',
@@ -98,7 +100,23 @@ class ProviderSearchService
             'release_date' => null,
             'description' => null,
             'steam_app_id' => (string) $item['id'],
-        ])->all();
+        ]))->all();
+    }
+
+    private function result(array $result): array
+    {
+        $source = in_array($result['source'] ?? null, ['igdb', 'steam'], true) ? $result['source'] : 'steam';
+
+        return [
+            'source' => $source,
+            'external_id' => (string) ($result['external_id'] ?? ''),
+            'title' => (string) ($result['title'] ?? 'Untitled'),
+            'cover_url_original' => $result['cover_url_original'] ?? null,
+            'publisher' => $result['publisher'] ?? null,
+            'release_date' => $result['release_date'] ?? null,
+            'description' => $result['description'] ?? null,
+            'steam_app_id' => isset($result['steam_app_id']) ? (string) $result['steam_app_id'] : null,
+        ];
     }
 
     private function credential(User $user, string $providerKey): ?ProviderCredential
