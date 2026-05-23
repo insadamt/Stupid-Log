@@ -25,7 +25,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -253,7 +252,7 @@ class StupidLogController extends Controller
 
         return response()->json([
             'path' => $path,
-            'url' => Storage::disk('public')->url($path),
+            'url' => asset('storage/'.$path),
         ], 201);
     }
 

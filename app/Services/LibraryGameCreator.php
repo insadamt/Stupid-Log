@@ -35,7 +35,7 @@ class LibraryGameCreator
             $platform = Platform::findOrFail($payload['platform_id']);
             $status = Status::findOrFail($payload['progress']['status_id']);
 
-            $this->assertProgressIsValid($game, $status, $payload['progress']);
+            $this->assertProgressIsValid($game, $status, $payload['progress'], $payload['game']);
             $this->assertDevicesAreValid($platform, $payload['device_ids']);
             $this->assertOwnershipCopiesAreValid($platform, $payload['ownership_copies']);
 
@@ -211,19 +211,23 @@ class LibraryGameCreator
         }
     }
 
-    private function assertProgressIsValid(Game $game, Status $status, array $progress): void
+    private function assertProgressIsValid(Game $game, Status $status, array $progress, array $gamePayload): void
     {
         $earned = $progress['earned_achievements'] ?? null;
-        if ($game->total_achievements !== null && $earned !== null && $earned > $game->total_achievements) {
+        $totalAchievements = array_key_exists('total_achievements', $gamePayload)
+            ? $gamePayload['total_achievements']
+            : $game->total_achievements;
+
+        if ($totalAchievements !== null && $earned !== null && $earned > $totalAchievements) {
             throw ValidationException::withMessages(['progress.earned_achievements' => 'Earned achievements cannot exceed total achievements.']);
         }
 
         if ($status->name === '100%') {
-            if (! $game->total_achievements) {
+            if (! $totalAchievements) {
                 throw ValidationException::withMessages(['progress.status_id' => '100% is unavailable when the game has no achievements.']);
             }
 
-            if ((int) $earned !== (int) $game->total_achievements) {
+            if ((int) $earned !== (int) $totalAchievements) {
                 throw ValidationException::withMessages(['progress.earned_achievements' => '100% requires earned achievements to equal total achievements.']);
             }
         }

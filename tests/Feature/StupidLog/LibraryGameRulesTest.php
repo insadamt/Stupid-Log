@@ -193,6 +193,26 @@ class LibraryGameRulesTest extends TestCase
         $creator->create($this->user, $payload);
     }
 
+    public function test_earned_achievements_cannot_exceed_submitted_total_achievements(): void
+    {
+        $creator = app(LibraryGameCreator::class);
+
+        $this->expectException(ValidationException::class);
+        $creator->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Submitted Achievement Total',
+                'source' => 'manual',
+                'total_achievements' => 3,
+                'create_duplicate_anyway' => true,
+            ],
+            'progress' => [
+                'status_id' => Status::where('name', 'In Progress')->firstOrFail()->id,
+                'playtime_hours' => 1,
+                'earned_achievements' => 4,
+            ],
+        ]));
+    }
+
     public function test_dlc_pricing_stats_and_confirmed_snapshots_follow_v1_rules(): void
     {
         $creator = app(LibraryGameCreator::class);

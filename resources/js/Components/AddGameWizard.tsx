@@ -524,9 +524,7 @@ export default function AddGameWizard({
             setDraft((current) => ({
                 ...current,
                 cover_path: data.path,
-                cover_url_original: data.url,
             }));
-            setLocalCoverPreview(data.url);
         } catch (error) {
             setCoverError(error instanceof Error ? error.message : "The cover failed to upload.");
         } finally {
@@ -839,6 +837,7 @@ export default function AddGameWizard({
                                                         <button type="button" onClick={() => coverInputRef.current?.click()} disabled={uploadingCover} className="rounded-2xl bg-black px-4 py-3 text-sm font-black text-white disabled:opacity-40">{uploadingCover ? "Uploading" : "Upload"}</button>
                                                         <button type="button" onClick={() => { setLocalCoverPreview(""); setDraft((current) => ({ ...current, cover_url_original: providerCoverUrl, cover_path: "" })); }} disabled={!providerCoverUrl || (!draft.cover_path && !localCoverPreview && draft.cover_url_original === providerCoverUrl)} className="rounded-2xl bg-black/5 px-4 py-3 text-sm font-black text-black/55 disabled:opacity-35">Reset</button>
                                                     </div>
+                                                    {draft.cover_path && <div className="mt-3 rounded-2xl bg-[#b7ff63] px-4 py-3 text-sm font-black text-black">Cover uploaded</div>}
                                                     {coverError && <Notice tone="danger"><div className="flex items-center gap-2"><AlertTriangle size={18} /> {coverError}</div></Notice>}
                                                 </div>
                                                 <div className="grid gap-4 content-start">
