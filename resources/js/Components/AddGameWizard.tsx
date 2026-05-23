@@ -295,6 +295,155 @@ function CoverImage({ src, fallbackSrc = "", alt = "", className = "" }: { src: 
     );
 }
 
+function BuilderTitle({
+    eyebrow,
+    title,
+    body,
+}: {
+    eyebrow: string;
+    title: string;
+    body?: string;
+}) {
+    return (
+        <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.34em] text-[#b7ff63]">
+                {eyebrow}
+            </p>
+
+            <h3 className="mt-2 text-[52px] font-black leading-[0.88] tracking-[-0.065em] text-white">
+                {title}
+            </h3>
+
+            {body && (
+                <p className="mt-4 max-w-2xl text-base font-black leading-relaxed text-white/42">
+                    {body}
+                </p>
+            )}
+        </div>
+    );
+}
+
+function SourceSwitch({
+    providerMode,
+    setProviderMode,
+}: {
+    providerMode: ProviderMode;
+    setProviderMode: (mode: ProviderMode) => void;
+}) {
+    return (
+        <div className="grid grid-cols-2 rounded-[24px] bg-white/8 p-1.5 ring-1 ring-white/10">
+            <button
+                type="button"
+                onClick={() => setProviderMode("igdb")}
+                className={[
+                    "h-12 rounded-[18px] px-6 text-sm font-black uppercase tracking-[0.22em] transition",
+                    providerMode === "igdb"
+                        ? "bg-[#b7ff63] text-black shadow-[0_12px_24px_rgb(183_255_99/0.18)]"
+                        : "text-white/42 hover:bg-white/8 hover:text-white",
+                ].join(" ")}
+            >
+                IGDB
+            </button>
+
+            <button
+                type="button"
+                onClick={() => setProviderMode("steam")}
+                className={[
+                    "h-12 rounded-[18px] px-6 text-sm font-black uppercase tracking-[0.22em] transition",
+                    providerMode === "steam"
+                        ? "bg-[#b7ff63] text-black shadow-[0_12px_24px_rgb(183_255_99/0.18)]"
+                        : "text-white/42 hover:bg-white/8 hover:text-white",
+                ].join(" ")}
+            >
+                Steam
+            </button>
+        </div>
+    );
+}
+
+function SearchResultCard({
+    result,
+    selected,
+    onSelect,
+}: {
+    result: WizardSearchResult;
+    selected: boolean;
+    onSelect: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onSelect}
+            className={[
+                "group grid min-h-[172px] grid-cols-[104px_minmax(0,1fr)_auto] items-center gap-5 rounded-[30px] border p-3 text-left transition",
+                selected
+                    ? "border-[#b7ff63] bg-black text-white shadow-[0_22px_55px_rgb(0_0_0/0.22)]"
+                    : "border-black/8 bg-[#edf1ea] text-black hover:-translate-y-0.5 hover:border-black/20 hover:bg-white",
+            ].join(" ")}
+        >
+            <div
+                className={[
+                    "overflow-hidden rounded-[22px] p-1.5",
+                    selected ? "bg-[#b7ff63]" : "bg-[#b7ff63]",
+                ].join(" ")}
+            >
+                <CoverImage
+                    src={preferredResultCover(result)}
+                    fallbackSrc={fallbackResultCover(result)}
+                    alt={result.title}
+                    className="h-[136px] w-[92px] rounded-[17px]"
+                />
+            </div>
+
+            <div className="min-w-0">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <span
+                        className={[
+                            "rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em]",
+                            selected ? "bg-[#b7ff63] text-black" : "bg-black text-[#b7ff63]",
+                        ].join(" ")}
+                    >
+                        {sourceName(result.source)}
+                    </span>
+
+                    {result.steam_app_id && (
+                        <span
+                            className={[
+                                "rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em]",
+                                selected ? "bg-white/10 text-white/50" : "bg-black/5 text-black/42",
+                            ].join(" ")}
+                        >
+                            Steam {result.steam_app_id}
+                        </span>
+                    )}
+                </div>
+
+                <h4 className="truncate text-[28px] font-black leading-none tracking-[-0.055em]">
+                    {result.title}
+                </h4>
+
+                <p
+                    className={[
+                        "mt-3 truncate text-sm font-black uppercase tracking-[0.16em]",
+                        selected ? "text-white/38" : "text-black/38",
+                    ].join(" ")}
+                >
+                    {result.publisher || "Unknown Publisher"} · {year(result.release_date)}
+                </p>
+            </div>
+
+            <span
+                className={[
+                    "grid size-14 place-items-center rounded-full transition group-hover:rotate-45",
+                    selected ? "bg-[#b7ff63] text-black" : "bg-black text-[#b7ff63]",
+                ].join(" ")}
+            >
+                <ChevronRight size={28} strokeWidth={3.2} />
+            </span>
+        </button>
+    );
+}
+
 export default function AddGameWizard({
     references,
     buttonClassName = "fixed bottom-10 right-10 rounded-[18px] bg-[#b7ff63] px-20 py-8 text-3xl font-black shadow-[0_20px_55px_rgb(0_0_0/0.22)]",
@@ -532,8 +681,7 @@ export default function AddGameWizard({
 
     function manualEntry() {
         const title = draft.title.trim();
-        if (title.length < 2) return;
-
+    
         setDraft((current) => ({
             ...current,
             title,
@@ -553,11 +701,15 @@ export default function AddGameWizard({
             existing_game_id: null,
             create_duplicate_anyway: false,
         }));
+    
         setProviderCoverUrl("");
         setLocalCoverPreview("");
         setSteamOriginal(null);
         setSelectedResultKey("manual");
         setDlcQuery("");
+        setWarnings([]);
+        setNotice("");
+        setResults([]);
         setStepIndex(1);
     }
 
@@ -908,12 +1060,12 @@ export default function AddGameWizard({
 
             {open && (
                 <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4 py-5 backdrop-blur-md">
-                    <section className="grid max-h-[94vh] w-full max-w-[1280px] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[32px] border border-white/20 bg-[#eff1ea] shadow-[0_44px_150px_rgb(0_0_0/0.55)]">
-                        <header className="border-b border-black/10 bg-[#b7ff63] px-7 py-5">
+                    <section className="grid max-h-[94vh] w-full max-w-[1320px] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[42px] border border-white/20 bg-[#eff1ea] shadow-[0_44px_150px_rgb(0_0_0/0.55)]">
+                    <header className="border-b border-black/10 bg-[#b7ff63] px-8 py-5">
                             <div className="flex items-start justify-between gap-6">
                                 <div>
                                     <div className="text-xs font-black uppercase tracking-[0.35em] text-black/45">Stupid Log Archive Builder</div>
-                                    <h2 className="mt-1 text-4xl font-black leading-none tracking-[-0.06em] text-black">Add Game</h2>
+                                    <h2 className="mt-1 text-[46px] font-black leading-none tracking-[-0.065em] text-black">Add Game</h2>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <Pill>{step.label}</Pill>
@@ -941,41 +1093,134 @@ export default function AddGameWizard({
                                 )}
 
                                 <section className="min-w-0">
-                                    {step.key === "search" && (
-                                        <div className="grid gap-5">
-                                            <div className="rounded-[30px] border border-black/10 bg-white p-5">
-                                                <div className="flex flex-wrap items-center justify-between gap-4">
-                                                    <div className="grid grid-cols-2 rounded-2xl bg-black/5 p-1">
-                                                        <button type="button" onClick={() => setProviderMode("igdb")} className={`rounded-xl px-6 py-3 text-sm font-black uppercase tracking-[0.16em] ${providerMode === "igdb" ? "bg-black text-white" : "text-black/45"}`}>IGDB</button>
-                                                        <button type="button" onClick={() => setProviderMode("steam")} className={`rounded-xl px-6 py-3 text-sm font-black uppercase tracking-[0.16em] ${providerMode === "steam" ? "bg-black text-white" : "text-black/45"}`}>Steam</button>
-                                                    </div>
-                                                    <button type="button" onClick={manualEntry} disabled={draft.title.trim().length < 2} className="rounded-2xl bg-black px-6 py-3 text-sm font-black text-white disabled:opacity-35">Manual Entry</button>
-                                                </div>
-                                                <label className="mt-5 flex h-[68px] items-center gap-4 rounded-2xl border border-black/10 bg-[#f4f5ef] px-5 text-black">
-                                                    <Search className="size-6 shrink-0 text-black/35" />
-                                                    <input value={draft.title} onChange={(event) => update("title", event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void runSearch(); } }} placeholder={`Search ${providerMode === "igdb" ? "IGDB" : "Steam"}...`} className="min-w-0 flex-1 bg-transparent text-2xl font-black tracking-[-0.04em] outline-none placeholder:text-black/25" autoFocus />
-                                                    <button type="button" onClick={() => void runSearch()} disabled={searching || draft.title.trim().length < 2} className="grid size-12 place-items-center rounded-xl bg-black text-white disabled:opacity-40">{searching ? <Loader2 className="animate-spin" /> : <ChevronRight />}</button>
-                                                </label>
-                                            </div>
+                                {step.key === "search" && (
+    <div className="grid gap-5">
+        <section className="relative overflow-hidden rounded-[38px] bg-black p-6 text-white shadow-[0_28px_80px_rgb(0_0_0/0.24)]">
+            <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-[#b7ff63]/18 blur-3xl" />
+            <div className="pointer-events-none absolute bottom-0 left-1/4 h-28 w-[520px] rounded-full bg-[#b7ff63]/10 blur-3xl" />
 
-                                            {notice && <Notice>{notice}</Notice>}
-                                            {warnings.length > 0 && <Notice tone="danger"><div className="flex gap-3"><AlertTriangle className="mt-0.5 size-5 shrink-0" /><div className="space-y-1">{warnings.slice(0, 3).map((warning) => <p key={warning}>{warning}</p>)}</div></div></Notice>}
-                                            {results.length === 0 && draft.title.trim().length >= 2 && !searching && <EmptyCard title="No result selected yet." body="Results show cover, title, publisher, and release year only. Switch provider if the results are wrong." />}
+<div className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-center">
+<BuilderTitle
+    eyebrow="Archive Builder"
+    title="Find the game file."
+/>
 
-                                            <div className="grid gap-3">
-                                                {results.map((result) => (
-                                                    <button key={resultKey(result)} type="button" onClick={() => void selectResult(result)} className="group grid gap-4 rounded-3xl border border-black/10 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-black sm:grid-cols-[82px_1fr_auto] sm:items-center">
-                                                        <CoverImage src={preferredResultCover(result)} fallbackSrc={fallbackResultCover(result)} className="h-[106px] w-[82px] rounded-2xl" />
-                                                        <div className="min-w-0">
-                                                            <div className="truncate text-2xl font-black tracking-[-0.045em]">{result.title}</div>
-                                                            <div className="mt-1 truncate text-sm font-bold text-black/45">{result.publisher || "Unknown publisher"} · {year(result.release_date)}</div>
-                                                        </div>
-                                                        <span className="rounded-full bg-black px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-white group-hover:bg-[#b7ff63] group-hover:text-black">Select</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
+<SourceSwitch providerMode={providerMode} setProviderMode={setProviderMode} />
+</div>
+
+            <div className="relative z-10 mt-7 grid gap-4 rounded-[30px] bg-white/[0.08] p-3 ring-1 ring-white/10 md:grid-cols-[1fr_auto]">
+                <label className="flex h-[76px] items-center gap-4 rounded-[24px] bg-[#eef2ed] px-6 text-black">
+                    <Search className="size-7 shrink-0 text-black/35" strokeWidth={3} />
+
+                    <input
+                        value={draft.title}
+                        onChange={(event) => update("title", event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                                event.preventDefault();
+                                void runSearch();
+                            }
+                        }}
+                        placeholder={`Search ${providerMode === "igdb" ? "IGDB" : "Steam"}...`}
+                        className="min-w-0 flex-1 bg-transparent text-[30px] font-black tracking-[-0.055em] outline-none placeholder:text-black/25"
+                        autoFocus
+                    />
+                </label>
+
+                <button
+                    type="button"
+                    onClick={() => void runSearch()}
+                    disabled={searching || draft.title.trim().length < 2}
+                    className="flex h-[76px] items-center justify-center gap-3 rounded-[24px] bg-[#b7ff63] px-8 text-lg font-black text-black transition hover:-translate-y-0.5 disabled:opacity-40"
+                >
+                    {searching ? (
+                        <>
+                            <Loader2 className="animate-spin" size={22} />
+                            Scanning
+                        </>
+                    ) : (
+                        <>
+                            Scan
+                            <ChevronRight size={24} strokeWidth={3} />
+                        </>
+                    )}
+                </button>
+            </div>
+        </section>
+
+
+        {warnings.length > 0 && (
+            <div className="rounded-[24px] border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-black text-red-700">
+                <div className="flex gap-3">
+                    <AlertTriangle className="mt-0.5 size-5 shrink-0" />
+                    <div className="space-y-1">
+                        {warnings.slice(0, 3).map((warning) => (
+                            <p key={warning}>{warning}</p>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        )}
+
+{results.length === 0 && !searching && (
+    <div className="grid min-h-[300px] place-items-center rounded-[34px] border border-dashed border-black/15 bg-[#eef2ed] p-8 text-center shadow-[inset_0_0_0_1px_rgb(255_255_255/0.45)]">
+        <div className="max-w-xl">
+            <div className="mx-auto grid size-16 place-items-center rounded-[22px] bg-black text-[#b7ff63] shadow-[0_18px_34px_rgb(0_0_0/0.16)]">
+                <Package size={26} strokeWidth={3} />
+            </div>
+
+            <h4 className="mt-5 text-3xl font-black tracking-[-0.05em]">
+                Start manually.
+            </h4>
+
+            <p className="mx-auto mt-2 max-w-md text-sm font-black leading-relaxed text-black/42">
+                Skip provider search and build the game record yourself.
+            </p>
+
+            <button
+                type="button"
+                onClick={manualEntry}
+                className="mt-6 inline-flex h-[58px] items-center justify-center gap-3 rounded-[22px] bg-black px-8 text-base font-black text-[#b7ff63] shadow-[0_18px_34px_rgb(0_0_0/0.18)] transition hover:-translate-y-0.5"
+            >
+                Manual Entry
+                <ChevronRight size={22} strokeWidth={3} />
+            </button>
+        </div>
+    </div>
+)}
+
+        {results.length > 0 && (
+            <section className="rounded-[38px] bg-[#dfe5df] p-5 shadow-[inset_0_0_0_1px_rgb(0_0_0/0.05)]">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                    <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.32em] text-black/36">
+                            Search Results
+                        </p>
+
+                        <h4 className="mt-1 text-3xl font-black leading-none tracking-[-0.05em]">
+                            Pick the correct file.
+                        </h4>
+                    </div>
+
+                    <span className="rounded-full bg-black px-5 py-2 text-sm font-black text-[#b7ff63]">
+                        {results.length} loaded
+                    </span>
+                </div>
+
+                <div className="grid max-h-[460px] gap-3 overflow-y-auto pr-2">
+                    {results.map((result) => (
+                        <SearchResultCard
+                            key={resultKey(result)}
+                            result={result}
+                            selected={selectedResultKey === resultKey(result)}
+                            onSelect={() => void selectResult(result)}
+                        />
+                    ))}
+                </div>
+            </section>
+        )}
+    </div>
+)}
 
                                     {step.key === "basics" && (
                                         <div className="grid gap-6">

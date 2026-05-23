@@ -1,0 +1,507 @@
+/*
+ * Stupid Log Archive Builder — V4 rebalance
+ * This is a visual rebuild skin for the existing AddGameWizard logic.
+ * Goals: more room for real work, readable text, compact controls, and calm game UI.
+ */
+
+.fixed.inset-0.z-50.grid.place-items-center {
+    --sl-lime: #b7ff63;
+    --sl-ink: #050909;
+    --sl-paper: #e8eee7;
+    --sl-soft: #f5f8f3;
+    background:
+        radial-gradient(circle at 52% 38%, rgb(183 255 99 / 0.12), transparent 34%),
+        linear-gradient(rgb(4 7 7 / 0.76), rgb(4 7 7 / 0.82)) !important;
+    padding: 22px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section {
+    width: min(1460px, calc(100vw - 44px)) !important;
+    max-width: 1460px !important;
+    height: min(900px, calc(100vh - 44px)) !important;
+    max-height: calc(100vh - 44px) !important;
+    grid-template-rows: 118px minmax(0, 1fr) 82px !important;
+    overflow: hidden !important;
+    border-radius: 42px !important;
+    border: 1px solid rgb(255 255 255 / 0.14) !important;
+    background:
+        linear-gradient(rgb(0 0 0 / 0.034) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(0 0 0 / 0.034) 1px, transparent 1px),
+        linear-gradient(180deg, #e9eee8, #dde5dd) !important;
+    background-size: 38px 38px, 38px 38px, auto !important;
+    box-shadow: 0 52px 160px rgb(0 0 0 / 0.64) !important;
+}
+
+/* Header: compact, readable, no wasted height. */
+.fixed.inset-0.z-50.grid.place-items-center > section > header {
+    position: relative;
+    border-bottom: 0 !important;
+    background:
+        radial-gradient(circle at 92% -55%, rgb(255 255 255 / 0.18), transparent 40%),
+        linear-gradient(135deg, #b7ff63 0%, #94df4d 100%) !important;
+    padding: 20px 32px 14px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > header h2 {
+    margin-top: 4px !important;
+    font-size: 48px !important;
+    line-height: 0.88 !important;
+    letter-spacing: -0.075em !important;
+    color: var(--sl-ink) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > header .text-xs {
+    color: rgb(5 9 9 / 0.54) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > header .grid.grid-cols-9 {
+    margin-top: 16px !important;
+    gap: 8px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > header .grid.grid-cols-9 button {
+    height: 5px !important;
+    border-radius: 999px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > header .grid.grid-cols-9 button.bg-black {
+    background: var(--sl-ink) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > header .grid.grid-cols-9 button.bg-white\/65 {
+    background: rgb(5 9 9 / 0.16) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > header button.grid.size-11 {
+    background: var(--sl-ink) !important;
+    color: white !important;
+    box-shadow: 0 14px 26px rgb(0 0 0 / 0.22) !important;
+}
+
+/* Main shell */
+.fixed.inset-0.z-50.grid.place-items-center > section > main {
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 24px 26px !important;
+    background: transparent !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > main > div,
+.fixed.inset-0.z-50.grid.place-items-center > section > main section.min-w-0 {
+    height: 100% !important;
+    min-height: 0 !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > main > div.grid.gap-7 {
+    grid-template-columns: 286px minmax(0, 1fr) !important;
+    gap: 24px !important;
+    align-items: stretch !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6,
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-5 {
+    align-content: start !important;
+}
+
+/* Global type + form comfort */
+.fixed.inset-0.z-50.grid.place-items-center > section > main h3 {
+    color: var(--sl-ink) !important;
+    font-size: 40px !important;
+    line-height: 0.92 !important;
+    letter-spacing: -0.065em !important;
+    text-shadow: none !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > main h4,
+.fixed.inset-0.z-50.grid.place-items-center > section > main .text-2xl,
+.fixed.inset-0.z-50.grid.place-items-center > section > main .text-3xl,
+.fixed.inset-0.z-50.grid.place-items-center > section > main .text-4xl {
+    color: var(--sl-ink) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > main .text-xs.font-black.uppercase,
+.fixed.inset-0.z-50.grid.place-items-center > section > main .text-\[11px\].font-black.uppercase,
+.fixed.inset-0.z-50.grid.place-items-center > section > main label > span {
+    color: rgb(5 9 9 / 0.48) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center input,
+.fixed.inset-0.z-50.grid.place-items-center select,
+.fixed.inset-0.z-50.grid.place-items-center textarea {
+    border-radius: 19px !important;
+    border: 1px solid rgb(5 9 9 / 0.1) !important;
+    background: rgb(247 250 245 / 0.9) !important;
+    color: var(--sl-ink) !important;
+    font-weight: 850 !important;
+    box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.62) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center input::placeholder,
+.fixed.inset-0.z-50.grid.place-items-center textarea::placeholder {
+    color: rgb(5 9 9 / 0.32) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center input:focus,
+.fixed.inset-0.z-50.grid.place-items-center select:focus,
+.fixed.inset-0.z-50.grid.place-items-center textarea:focus {
+    border-color: var(--sl-ink) !important;
+    box-shadow:
+        0 0 0 4px rgb(183 255 99 / 0.28),
+        inset 0 2px 0 rgb(255 255 255 / 0.62) !important;
+}
+
+/* Draft side panel */
+.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 {
+    display: grid !important;
+    grid-template-rows: auto auto !important;
+    gap: 16px !important;
+    align-content: start !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:first-child {
+    border-radius: 31px !important;
+    background: var(--sl-ink) !important;
+    padding: 10px !important;
+    box-shadow: 0 24px 58px rgb(0 0 0 / 0.2) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:first-child img,
+.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:first-child > div {
+    height: 350px !important;
+    border-radius: 24px !important;
+    object-fit: cover !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child {
+    border: 1px solid rgb(255 255 255 / 0.08) !important;
+    border-radius: 30px !important;
+    background:
+        radial-gradient(circle at 100% 0%, rgb(183 255 99 / 0.16), transparent 30%),
+        var(--sl-ink) !important;
+    color: white !important;
+    padding: 22px !important;
+    box-shadow: 0 20px 44px rgb(0 0 0 / 0.14) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child h3 {
+    color: white !important;
+    font-size: 26px !important;
+    line-height: 0.96 !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child .text-black\/35,
+.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child .text-\[11px\] {
+    color: rgb(183 255 99 / 0.76) !important;
+}
+
+/* STEP 1 — Search: smaller scanner, larger result area. */
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-5:has(section.relative.overflow-hidden.rounded-\[38px\].bg-black) {
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: auto auto minmax(0, 1fr) !important;
+    gap: 14px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black {
+    border-radius: 36px !important;
+    padding: 20px !important;
+    border: 1px solid rgb(183 255 99 / 0.18) !important;
+    background:
+        radial-gradient(circle at 90% 15%, rgb(183 255 99 / 0.14), transparent 30%),
+        linear-gradient(135deg, #050909 0%, #0b1210 58%, #17220f 100%) !important;
+    box-shadow: 0 24px 60px rgb(0 0 0 / 0.24) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black h3 {
+    color: #f5f7f1 !important;
+    max-width: 640px !important;
+    font-size: clamp(38px, 3.5vw, 50px) !important;
+    line-height: 0.9 !important;
+    letter-spacing: -0.07em !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black p {
+    color: rgb(255 255 255 / 0.45) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black .mt-7 {
+    margin-top: 18px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black label {
+    height: 62px !important;
+    border-radius: 22px !important;
+    background: #eef2ed !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black input {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 25px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black button.bg-\[\#b7ff63\] {
+    height: 62px !important;
+    border-radius: 22px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] {
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    overflow: hidden !important;
+    border-radius: 34px !important;
+    background: rgb(223 230 223 / 0.82) !important;
+    padding: 16px !important;
+    box-shadow:
+        inset 0 0 0 1px rgb(0 0 0 / 0.05),
+        0 16px 36px rgb(0 0 0 / 0.07) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] > div:last-child {
+    min-height: 0 !important;
+    max-height: none !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-content: start !important;
+    gap: 12px !important;
+    overflow-y: auto !important;
+    padding-right: 8px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group {
+    min-height: 132px !important;
+    grid-template-columns: 82px minmax(0, 1fr) 48px !important;
+    gap: 14px !important;
+    border-radius: 27px !important;
+    border: 1px solid rgb(5 9 9 / 0.08) !important;
+    background: rgb(247 250 245 / 0.92) !important;
+    color: var(--sl-ink) !important;
+    box-shadow: 0 12px 26px rgb(0 0 0 / 0.055) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group > div:first-child {
+    width: 82px !important;
+    height: 104px !important;
+    border-radius: 22px !important;
+    background: var(--sl-lime) !important;
+    padding: 6px !important;
+    box-shadow: 0 13px 22px rgb(0 0 0 / 0.12) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group img,
+.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group div:first-child > div {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 16px !important;
+    object-fit: cover !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group h4 {
+    color: var(--sl-ink) !important;
+    font-size: 23px !important;
+    line-height: 0.95 !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group p {
+    color: rgb(5 9 9 / 0.48) !important;
+}
+
+/* STEP 2 — Basics: clean form, portrait 600x800 cover ratio. */
+.fixed.inset-0.z-50.grid.place-items-center .xl\:grid-cols-\[280px_1fr\] {
+    grid-template-columns: 270px minmax(0, 1fr) !important;
+    align-items: start !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .xl\:grid-cols-\[280px_1fr\] .h-\[360px\] {
+    width: 100% !important;
+    height: 360px !important;
+    aspect-ratio: 3 / 4 !important;
+    object-fit: cover !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .xl\:grid-cols-\[280px_1fr\] textarea {
+    min-height: 132px !important;
+}
+
+/* Generic white panels: softer, but readable. */
+.fixed.inset-0.z-50.grid.place-items-center [class~='bg-white\/70'],
+.fixed.inset-0.z-50.grid.place-items-center .rounded-\[28px\].border.border-black\/10.bg-white\/70,
+.fixed.inset-0.z-50.grid.place-items-center .rounded-\[30px\].border.border-black\/10.bg-white {
+    border: 1px solid rgb(5 9 9 / 0.075) !important;
+    border-radius: 31px !important;
+    background: rgb(239 244 238 / 0.68) !important;
+    box-shadow:
+        0 16px 34px rgb(0 0 0 / 0.045),
+        inset 0 0 0 1px rgb(255 255 255 / 0.46) !important;
+}
+
+/* STEPS 3–5: keep content at the top; make search/results compact and scrollable. */
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.rounded-\[28px\],
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.grid.gap-2.rounded-\[28px\],
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.grid.max-h-\[500px\] {
+    margin-top: 0 !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > input + div.grid.gap-2.rounded-\[28px\],
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.grid.max-h-\[500px\] {
+    max-height: 430px !important;
+    overflow-y: auto !important;
+    align-content: start !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > input + div.grid.gap-2.rounded-\[28px\] button,
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.grid.max-h-\[500px\] button {
+    min-height: 54px !important;
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+}
+
+/* STEP 6 — Ownership: restore compact pill selector + better copy cards. */
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.flex.flex-wrap.gap-2 button {
+    min-width: 0 !important;
+    min-height: 48px !important;
+    height: 48px !important;
+    border-radius: 18px !important;
+    padding: 0 20px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[24px\]'][class~='border'][class~='bg-white\/70'] {
+    border-radius: 30px !important;
+    padding: 18px !important;
+    background: rgb(239 244 238 / 0.72) !important;
+    box-shadow: 0 16px 34px rgb(0 0 0 / 0.045) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[24px\]'][class~='border'][class~='bg-white\/70'] > div:first-child {
+    margin-bottom: 14px !important;
+    padding-bottom: 12px !important;
+    border-bottom: 1px solid rgb(5 9 9 / 0.08) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[24px\]'][class~='border'][class~='bg-white\/70'] .text-2xl {
+    color: var(--sl-ink) !important;
+    font-size: 26px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[24px\]'][class~='border'][class~='bg-white\/70'] .xl\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center button.bg-red-500\/10 {
+    background: rgb(199 30 52 / 0.09) !important;
+    color: #b91c1c !important;
+}
+
+/* STEP 7 — DLCs: no spreadsheet feeling, compact readable rows. */
+.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] {
+    grid-template-columns: 94px minmax(0, 1fr) minmax(450px, auto) !important;
+    min-height: 82px !important;
+    border-radius: 25px !important;
+    border: 1px solid rgb(5 9 9 / 0.07) !important;
+    background: rgb(247 250 245 / 0.9) !important;
+    box-shadow: 0 10px 22px rgb(0 0 0 / 0.04) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] img {
+    height: 56px !important;
+    border-radius: 15px !important;
+    object-fit: cover !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] > div:nth-child(2) > div:first-child {
+    color: var(--sl-ink) !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] > div:nth-child(2) > div:last-child {
+    color: rgb(5 9 9 / 0.5) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] .sm\:grid-cols-\[150px_120px_150px_auto\] {
+    grid-template-columns: 150px 112px 144px 74px !important;
+    align-items: center !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] select,
+.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] input,
+.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] button {
+    height: 46px !important;
+    border-radius: 16px !important;
+}
+
+/* STEP 8 — Progress: statuses are chips, not giant cards. */
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6:has(button) > div.flex.flex-wrap.gap-2 button {
+    min-width: 0 !important;
+    width: auto !important;
+    min-height: 46px !important;
+    height: 46px !important;
+    border-radius: 18px !important;
+    padding: 0 18px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* STEP 9 — Review: restore icon dashboard clarity. */
+.fixed.inset-0.z-50.grid.place-items-center .rounded-2xl.border.border-black\/10.bg-white.p-4 {
+    border-radius: 26px !important;
+    background: var(--sl-ink) !important;
+    color: white !important;
+    border-color: rgb(255 255 255 / 0.08) !important;
+    box-shadow: 0 16px 34px rgb(0 0 0 / 0.12) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .rounded-2xl.border.border-black\/10.bg-white.p-4 .text-black,
+.fixed.inset-0.z-50.grid.place-items-center .rounded-2xl.border.border-black\/10.bg-white.p-4 .text-black\/35,
+.fixed.inset-0.z-50.grid.place-items-center .rounded-2xl.border.border-black\/10.bg-white.p-4 svg {
+    color: white !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > main .rounded-\[30px\].border.border-black\/10.bg-white.p-6 h4 {
+    color: var(--sl-ink) !important;
+}
+
+/* Footer */
+.fixed.inset-0.z-50.grid.place-items-center > section > footer {
+    border-top: 0 !important;
+    background: rgb(232 238 231 / 0.94) !important;
+    backdrop-filter: blur(20px);
+    padding: 16px 30px !important;
+    box-shadow: 0 -20px 44px rgb(0 0 0 / 0.08) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > footer button {
+    min-width: 128px !important;
+    height: 52px !important;
+    border-radius: 20px !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > footer button:last-child {
+    background: var(--sl-ink) !important;
+    color: white !important;
+    box-shadow: 0 16px 30px rgb(0 0 0 / 0.18) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > footer .rounded-full.bg-red-500\/10 {
+    background: rgb(199 30 52 / 0.08) !important;
+    color: #991b1b !important;
+}
+
+@media (max-width: 1200px) {
+    .fixed.inset-0.z-50.grid.place-items-center > section > main > div.grid.gap-7 {
+        grid-template-columns: 250px minmax(0, 1fr) !important;
+    }
+
+    .fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] > div:last-child {
+        grid-template-columns: 1fr !important;
+    }
+
+    .fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] {
+        grid-template-columns: 86px minmax(0, 1fr) !important;
+    }
+}
