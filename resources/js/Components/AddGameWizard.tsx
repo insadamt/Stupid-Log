@@ -145,6 +145,26 @@ function csrfToken() {
     return document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? "";
 }
 
+function steamPortraitUrl(appId: string | null | undefined) {
+    return appId ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg` : "";
+}
+
+function preferredResultCover(result: WizardSearchResult) {
+    if (result.source === "steam" && result.steam_app_id) return steamPortraitUrl(result.steam_app_id);
+    return result.cover_url_original ?? "";
+}
+
+function fallbackResultCover(result: WizardSearchResult) {
+    const preferred = preferredResultCover(result);
+    return result.cover_url_original && result.cover_url_original !== preferred ? result.cover_url_original : "";
+}
+
+function uploadErrorMessage(payload: unknown) {
+    if (!payload || typeof payload !== "object") return "The cover failed to upload.";
+    const data = payload as { message?: string; errors?: Record<string, string[]> };
+    return data.errors?.cover?.[0] ?? data.message ?? "The cover failed to upload.";
+}
+
 function Pill({ children, active = false, muted = false }: { children: ReactNode; active?: boolean; muted?: boolean }) {
     return (
         <span className={`inline-flex items-center rounded-full px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] ${active ? "bg-[#b7ff63] text-black" : muted ? "bg-black/5 text-black/45" : "bg-black text-white"}`}>
@@ -176,7 +196,7 @@ function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
 
 function Notice({ children, tone = "default" }: { children: ReactNode; tone?: "default" | "warning" | "danger" }) {
     return (
-        <div className={`rounded-2xl border px-4 py-3 text-sm font-bold leading-relaxed ${tone === "danger" ? "border-red-500/20 bg-red-500/10 text-red-700" : tone === "warning" ? "border-black/10 bg-[#fff4c8] text-black/70" : "border-black/10 bg-white text-black/55"}`}>
+        <div className={`rounded-2xl border px-4 py-3 text-sm font-bold leading-relaxed ${tone === "danger" ? "border-red-500/30 bg-red-500/10 text-red-700" : tone === "warning" ? "border-black/10 bg-[#fff4c8] text-black/70" : "border-black/10 bg-white text-black/55"}`}>
             {children}
         </div>
     );
@@ -203,6 +223,35 @@ function EmptyCard({ title, body }: { title: string; body: string }) {
                 <p className="mx-auto mt-2 max-w-xl text-sm font-bold text-black/45">{body}</p>
             </div>
         </div>
+    );
+}
+
+function CoverImage({ src, fallbackSrc = "", alt = "", className = "" }: { src: string; fallbackSrc?: string; alt?: string; className?: string }) {
+    const [current, setCurrent] = useState(src);
+    const [failed, setFailed] = useState(false);
+
+    useEffect(() => {
+        setCurrent(src);
+        setFailed(false);
+    }, [src, fallbackSrc]);
+
+    if (!current || failed) {
+        return <div className={`grid place-items-center bg-black text-xs font-black uppercase tracking-[0.18em] text-white/35 ${className}`}>No Cover</div>;
+    }
+
+    return (
+        <img
+            src={current}
+            alt={alt}
+            className={`bg-black object-contain ${className}`}
+            onError={() => {
+                if (fallbackSrc && current !== fallbackSrc) {
+                    setCurrent(fallbackSrc);
+                    return;
+                }
+                setFailed(true);
+            }}
+        />
     );
 }
 
@@ -255,6 +304,7 @@ export default function AddGameWizard({
     const [draft, setDraft] = useState<Draft>(makeDraft);
     const [steamOriginal, setSteamOriginal] = useState<SteamOriginal | null>(null);
     const [providerCoverUrl, setProviderCoverUrl] = useState("");
+    const [localCoverPreview, setLocalCoverPreview] = useState("");
     const [results, setResults] = useState<WizardSearchResult[]>([]);
     const [selectedResultKey, setSelectedResultKey] = useState("");
     const [warnings, setWarnings] = useState<string[]>([]);
@@ -281,7 +331,8 @@ export default function AddGameWizard({
     const selectedOwnerships = draft.ownership_copies.map((copy) => ownershipById.get(copy.ownership_type_id)).filter(Boolean) as string[];
     const filteredPlatforms = references.platforms.filter((item) => item.name.toLowerCase().includes(platformQuery.trim().toLowerCase()));
     const filteredDevices = (platform?.devices ?? []).filter((item) => item.name.toLowerCase().includes(deviceQuery.trim().toLowerCase()));
-    const coverPreview = draft.cover_url_original;
+    const coverPreview = localCoverPreview || draft.cover_url_original;
+    const showSidePanel = !["search", "basics"].includes(step.key);
 
     function update<K extends keyof Draft>(key: K, value: Draft[K]) {
         setDraft((current) => ({ ...current, [key]: value }));
@@ -293,6 +344,7 @@ export default function AddGameWizard({
         setProviderMode("igdb");
         setSteamOriginal(null);
         setProviderCoverUrl("");
+        setLocalCoverPreview("");
         setResults([]);
         setSelectedResultKey("");
         setWarnings([]);
@@ -349,7 +401,6 @@ export default function AddGameWizard({
     function setOriginalFromResult(result: WizardSearchResult) {
         const basePrice = result.base_price_default === null || result.base_price_default === undefined ? "" : String(result.base_price_default);
         const totalAchievements = result.total_achievements === null || result.total_achievements === undefined ? "" : String(result.total_achievements);
-
         if (!result.steam_app_id && !basePrice && !totalAchievements) return;
 
         setSteamOriginal({
@@ -362,9 +413,10 @@ export default function AddGameWizard({
     function applyResult(result: WizardSearchResult) {
         const basePrice = result.base_price_default === null || result.base_price_default === undefined ? "" : String(result.base_price_default);
         const totalAchievements = result.total_achievements === null || result.total_achievements === undefined ? "" : String(result.total_achievements);
-        const cover = result.cover_url_original ?? "";
+        const cover = preferredResultCover(result);
 
         setProviderCoverUrl(cover);
+        setLocalCoverPreview("");
         setOriginalFromResult(result);
         setDraft((current) => ({
             ...current,
@@ -436,19 +488,26 @@ export default function AddGameWizard({
             ownership_copies: current.ownership_copies.map((copy) => ({ ...copy, base_price: "" })),
         }));
         setProviderCoverUrl("");
+        setLocalCoverPreview("");
         setSteamOriginal(null);
         setSelectedResultKey("manual");
         setStepIndex(1);
     }
 
     async function uploadCover(file: File) {
+        const previewUrl = URL.createObjectURL(file);
+        setLocalCoverPreview(previewUrl);
+
         const body = new FormData();
         body.append("cover", file);
         setUploadingCover(true);
         setCoverError("");
 
         try {
-            const headers: Record<string, string> = { Accept: "application/json" };
+            const headers: Record<string, string> = {
+                Accept: "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+            };
             const token = csrfToken();
             if (token) headers["X-CSRF-TOKEN"] = token;
 
@@ -456,18 +515,20 @@ export default function AddGameWizard({
                 method: "POST",
                 headers,
                 body,
+                credentials: "same-origin",
             });
 
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message ?? "Cover upload failed.");
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(uploadErrorMessage(data));
 
             setDraft((current) => ({
                 ...current,
                 cover_path: data.path,
                 cover_url_original: data.url,
             }));
+            setLocalCoverPreview(data.url);
         } catch (error) {
-            setCoverError(error instanceof Error ? error.message : "Cover upload failed.");
+            setCoverError(error instanceof Error ? error.message : "The cover failed to upload.");
         } finally {
             setUploadingCover(false);
         }
@@ -677,7 +738,6 @@ export default function AddGameWizard({
 
     const resetButtons = steamOriginal && (
         <div className="flex flex-wrap gap-2">
-            {draft.steam_app_id !== steamOriginal.steam_app_id && steamOriginal.steam_app_id && <button type="button" onClick={() => update("steam_app_id", steamOriginal.steam_app_id)} className="rounded-full bg-black/5 px-4 py-2 text-xs font-black text-black/55">Reset App ID</button>}
             {draft.base_price_default !== steamOriginal.base_price_default && steamOriginal.base_price_default && <button type="button" onClick={() => update("base_price_default", steamOriginal.base_price_default)} className="rounded-full bg-black/5 px-4 py-2 text-xs font-black text-black/55">Reset Price</button>}
             {draft.total_achievements !== steamOriginal.total_achievements && steamOriginal.total_achievements && <button type="button" onClick={() => update("total_achievements", steamOriginal.total_achievements)} className="rounded-full bg-black/5 px-4 py-2 text-xs font-black text-black/55">Reset Achievements</button>}
         </div>
@@ -714,11 +774,11 @@ export default function AddGameWizard({
                         </header>
 
                         <main className="overflow-y-auto p-7">
-                            <div className={step.key === "search" ? "grid gap-5" : "grid gap-7 lg:grid-cols-[280px_1fr]"}>
-                                {step.key !== "search" && (
+                            <div className={showSidePanel ? "grid gap-7 lg:grid-cols-[280px_1fr]" : "grid gap-5"}>
+                                {showSidePanel && (
                                     <aside className="space-y-4">
                                         <div className="rounded-[28px] bg-black p-2.5 shadow-[0_18px_60px_rgb(0_0_0/0.18)]">
-                                            {coverPreview ? <img src={coverPreview} alt="" className="h-[360px] w-full rounded-[22px] object-cover" /> : <div className="grid h-[360px] place-items-center rounded-[22px] bg-[#171a17] text-center"><div><div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#b7ff63] text-3xl font-black text-black">SL</div><div className="mt-4 text-xs font-black uppercase tracking-[0.24em] text-white/35">No Cover</div></div></div>}
+                                            <CoverImage src={coverPreview} className="h-[360px] w-full rounded-[22px]" />
                                         </div>
                                         <div className="rounded-3xl border border-black/10 bg-white p-5">
                                             <div className="text-[11px] font-black uppercase tracking-[0.22em] text-black/35">Current Draft</div>
@@ -747,13 +807,13 @@ export default function AddGameWizard({
                                             </div>
 
                                             {notice && <Notice>{notice}</Notice>}
-                                            {warnings.length > 0 && <Notice tone="warning"><div className="flex gap-3"><AlertTriangle className="mt-0.5 size-5 shrink-0" /><div className="space-y-1">{warnings.slice(0, 3).map((warning) => <p key={warning}>{warning}</p>)}</div></div></Notice>}
+                                            {warnings.length > 0 && <Notice tone="danger"><div className="flex gap-3"><AlertTriangle className="mt-0.5 size-5 shrink-0" /><div className="space-y-1">{warnings.slice(0, 3).map((warning) => <p key={warning}>{warning}</p>)}</div></div></Notice>}
                                             {results.length === 0 && draft.title.trim().length >= 2 && !searching && <EmptyCard title="No result selected yet." body="Results show cover, title, publisher, and release year only. Switch provider if the results are wrong." />}
 
                                             <div className="grid gap-3">
                                                 {results.map((result) => (
                                                     <button key={resultKey(result)} type="button" onClick={() => void selectResult(result)} className="group grid gap-4 rounded-3xl border border-black/10 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-black sm:grid-cols-[82px_1fr_auto] sm:items-center">
-                                                        {result.cover_url_original ? <img src={result.cover_url_original} alt="" className="h-[106px] w-[82px] rounded-2xl object-cover" /> : <div className="grid h-[106px] w-[82px] place-items-center rounded-2xl bg-black/10 text-[10px] font-black uppercase tracking-[0.14em] text-black/35">No Cover</div>}
+                                                        <CoverImage src={preferredResultCover(result)} fallbackSrc={fallbackResultCover(result)} className="h-[106px] w-[82px] rounded-2xl" />
                                                         <div className="min-w-0">
                                                             <div className="truncate text-2xl font-black tracking-[-0.045em]">{result.title}</div>
                                                             <div className="mt-1 truncate text-sm font-bold text-black/45">{result.publisher || "Unknown publisher"} · {year(result.release_date)}</div>
@@ -772,14 +832,14 @@ export default function AddGameWizard({
                                             <div className="grid gap-6 rounded-[28px] border border-black/10 bg-white/70 p-5 xl:grid-cols-[280px_1fr]">
                                                 <div>
                                                     <div className="rounded-[24px] bg-black p-2">
-                                                        {coverPreview ? <img src={coverPreview} alt="" className="h-[360px] w-full rounded-[18px] object-cover" /> : <div className="grid h-[360px] place-items-center rounded-[18px] bg-black/20 text-white/45">No cover</div>}
+                                                        <CoverImage src={coverPreview} className="h-[360px] w-full rounded-[18px]" />
                                                     </div>
                                                     <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadCover(file); event.currentTarget.value = ""; }} />
                                                     <div className="mt-3 grid grid-cols-2 gap-2">
                                                         <button type="button" onClick={() => coverInputRef.current?.click()} disabled={uploadingCover} className="rounded-2xl bg-black px-4 py-3 text-sm font-black text-white disabled:opacity-40">{uploadingCover ? "Uploading" : "Upload"}</button>
-                                                        <button type="button" onClick={() => setDraft((current) => ({ ...current, cover_url_original: providerCoverUrl, cover_path: "" }))} disabled={!providerCoverUrl || (!draft.cover_path && draft.cover_url_original === providerCoverUrl)} className="rounded-2xl bg-black/5 px-4 py-3 text-sm font-black text-black/55 disabled:opacity-35">Reset</button>
+                                                        <button type="button" onClick={() => { setLocalCoverPreview(""); setDraft((current) => ({ ...current, cover_url_original: providerCoverUrl, cover_path: "" })); }} disabled={!providerCoverUrl || (!draft.cover_path && !localCoverPreview && draft.cover_url_original === providerCoverUrl)} className="rounded-2xl bg-black/5 px-4 py-3 text-sm font-black text-black/55 disabled:opacity-35">Reset</button>
                                                     </div>
-                                                    {coverError && <div className="mt-3 text-sm font-black text-red-600">{coverError}</div>}
+                                                    {coverError && <Notice tone="danger"><div className="flex items-center gap-2"><AlertTriangle size={18} /> {coverError}</div></Notice>}
                                                 </div>
                                                 <div className="grid gap-4 content-start">
                                                     <div className="grid gap-4 md:grid-cols-2"><Field label="Title"><TextInput value={draft.title} onChange={(event) => update("title", event.target.value)} /></Field><Field label="Publisher"><TextInput value={draft.publisher} onChange={(event) => update("publisher", event.target.value)} placeholder="Unknown" /></Field><Field label="Release Date"><TextInput value={draft.release_date} onChange={(event) => update("release_date", event.target.value)} type="date" /></Field></div>
@@ -792,9 +852,7 @@ export default function AddGameWizard({
                                     {step.key === "steam" && (
                                         <div className="grid gap-6">
                                             <div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Steam Data</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Verify store fields.</h3></div>
-                                            <Notice tone="warning">Steam is the source for base price and achievements. IGDB does not provide these fields. You can edit them, then reset back to Steam values when available.</Notice>
-                                            <div className="grid gap-4 rounded-[28px] border border-black/10 bg-white/70 p-5 md:grid-cols-3">
-                                                <Field label="Steam App ID"><TextInput value={draft.steam_app_id} onChange={(event) => update("steam_app_id", event.target.value)} placeholder="Unknown" /></Field>
+                                            <div className="grid gap-4 rounded-[28px] border border-black/10 bg-white/70 p-5 md:grid-cols-2">
                                                 <Field label="Base Price"><TextInput value={draft.base_price_default} onChange={(event) => update("base_price_default", event.target.value)} type="number" step="0.01" placeholder="Unknown" /></Field>
                                                 <Field label="Total Achievements"><TextInput value={draft.total_achievements} onChange={(event) => update("total_achievements", event.target.value)} type="number" placeholder="Unknown" /></Field>
                                             </div>
@@ -811,7 +869,7 @@ export default function AddGameWizard({
                                     )}
 
                                     {step.key === "ownership" && (
-                                        <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Ownership</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Select your copies.</h3></div><div className="flex flex-wrap gap-2">{platform?.ownership_types.map((type) => { const selected = draft.ownership_copies.some((copy) => copy.ownership_type_id === type.id); return <button key={type.id} type="button" onClick={() => selected ? removeCopy(draft.ownership_copies.find((copy) => copy.ownership_type_id === type.id)?.local_id ?? "") : addCopy(type.id)} className={`rounded-2xl px-5 py-3 text-sm font-black ${selected ? "bg-black text-white" : "bg-white text-black/55"}`}>{type.name}</button>; })}</div><div className="grid gap-3">{draft.ownership_copies.map((copy, index) => { const name = ownershipById.get(copy.ownership_type_id); const needsPhysical = !!name && physicalLike.includes(name); return <div key={copy.local_id} className="rounded-[24px] border border-black/10 bg-white/70 p-4"><div className="mb-4 flex items-center justify-between"><div><div className="text-[11px] font-black uppercase tracking-[0.2em] text-black/35">Copy {index + 1}</div><div className="text-2xl font-black tracking-[-0.04em]">{name || "Ownership"}</div></div><button type="button" onClick={() => removeCopy(copy.local_id)} disabled={draft.ownership_copies.length === 1} className="rounded-xl bg-red-500/10 px-4 py-2 text-xs font-black text-red-700 disabled:opacity-35">Remove</button></div><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Field label="Type"><Select value={copy.ownership_type_id} onChange={(event) => updateCopy(copy.local_id, { ownership_type_id: Number(event.target.value), physical_status_id: null })}>{platform?.ownership_types.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field><Field label="Edition"><TextInput value={copy.edition_name} onChange={(event) => updateCopy(copy.local_id, { edition_name: event.target.value })} placeholder="Standard" /></Field><Field label="Base Price"><TextInput value={copy.base_price} onChange={(event) => updateCopy(copy.local_id, { base_price: event.target.value })} type="number" step="0.01" placeholder="Unknown" /></Field><Field label="Paid"><TextInput value={copy.purchased_price} onChange={(event) => updateCopy(copy.local_id, { purchased_price: event.target.value })} type="number" step="0.01" placeholder="Unknown" /></Field>{needsPhysical && <Field label="Physical Status"><Select value={copy.physical_status_id ?? ""} onChange={(event) => updateCopy(copy.local_id, { physical_status_id: Number(event.target.value) || null })}><option value="">Required</option>{references.physicalStatuses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field>}<Field label="Purchased At"><TextInput value={copy.purchased_at} onChange={(event) => updateCopy(copy.local_id, { purchased_at: event.target.value })} type="date" /></Field></div></div>; })}</div></div>
+                                        <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Ownership</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Select your copies.</h3></div><div className="flex flex-wrap gap-2">{platform?.ownership_types.map((type) => { const selected = draft.ownership_copies.some((copy) => copy.ownership_type_id === type.id); return <button key={type.id} type="button" onClick={() => selected ? removeCopy(draft.ownership_copies.find((copy) => copy.ownership_type_id === type.id)?.local_id ?? "") : addCopy(type.id)} className={`rounded-2xl px-5 py-3 text-sm font-black ${selected ? "bg-black text-white" : "bg-white text-black/55"}`}>{type.name}</button>; })}</div><div className="grid gap-3">{draft.ownership_copies.map((copy, index) => { const name = ownershipById.get(copy.ownership_type_id); const needsPhysical = !!name && physicalLike.includes(name); return <div key={copy.local_id} className="rounded-[24px] border border-black/10 bg-white/70 p-4"><div className="mb-4 flex items-center justify-between"><div><div className="text-[11px] font-black uppercase tracking-[0.2em] text-black/35">Copy {index + 1}</div><div className="text-2xl font-black tracking-[-0.04em]">{name || "Ownership"}</div></div><button type="button" onClick={() => removeCopy(copy.local_id)} disabled={draft.ownership_copies.length === 1} className="rounded-xl bg-red-500/10 px-4 py-2 text-xs font-black text-red-700 disabled:opacity-35">Remove</button></div><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Field label="Edition"><TextInput value={copy.edition_name} onChange={(event) => updateCopy(copy.local_id, { edition_name: event.target.value })} placeholder="Standard" /></Field><Field label="Base Price"><TextInput value={copy.base_price} onChange={(event) => updateCopy(copy.local_id, { base_price: event.target.value })} type="number" step="0.01" placeholder="Unknown" /></Field><Field label="Paid"><TextInput value={copy.purchased_price} onChange={(event) => updateCopy(copy.local_id, { purchased_price: event.target.value })} type="number" step="0.01" placeholder="Unknown" /></Field>{needsPhysical && <Field label="Physical Status"><Select value={copy.physical_status_id ?? ""} onChange={(event) => updateCopy(copy.local_id, { physical_status_id: Number(event.target.value) || null })}><option value="">Required</option>{references.physicalStatuses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field>}<Field label="Purchased At"><TextInput value={copy.purchased_at} onChange={(event) => updateCopy(copy.local_id, { purchased_at: event.target.value })} type="date" /></Field></div></div>; })}</div></div>
                                     )}
 
                                     {step.key === "dlcs" && <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">DLCs</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Coming soon.</h3></div><EmptyCard title="DLC ownership is coming soon." body="The backend DLC catalog work is not finished yet. Continue now; DLC ownership will be handled after backend support is complete." /></div>}
@@ -829,7 +887,7 @@ export default function AddGameWizard({
 
                         <footer className="flex items-center justify-between gap-5 border-t border-black/10 bg-white px-7 py-5">
                             <button type="button" onClick={previous} disabled={stepIndex === 0} className="flex items-center gap-3 rounded-2xl bg-black/[0.06] px-7 py-3.5 text-base font-black disabled:opacity-35"><ChevronLeft size={18} /> Back</button>
-                            <div className="hidden min-w-0 flex-1 text-center text-xs font-black uppercase tracking-[0.18em] text-black/35 md:block">{currentError ? currentError : `${stepIndex + 1} / ${steps.length}`}</div>
+                            <div className={`hidden min-w-0 flex-1 text-center text-xs font-black uppercase tracking-[0.18em] md:block ${currentError ? "rounded-full bg-red-500/10 px-4 py-2 text-red-700" : "text-black/35"}`}>{currentError ? currentError : `${stepIndex + 1} / ${steps.length}`}</div>
                             {stepIndex < steps.length - 1 ? <button type="button" onClick={next} disabled={!!currentError} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">Next <ChevronRight size={18} /></button> : <button type="button" onClick={submit} disabled={!!currentError || saving} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">{saving ? <><Loader2 className="animate-spin" size={18} /> Saving</> : <><Check size={18} /> Save Game</>}</button>}
                         </footer>
                     </section>
