@@ -11,12 +11,12 @@ import {
     Trophy,
     WalletCards,
 } from 'lucide-react';
+import { ComponentType } from 'react';
 import AddGameWizard from '../Components/AddGameWizard';
 import AppLayout from '../Components/AppLayout';
 import { CoverArt } from '../Components/GameCard';
 import { GameCardData, ReferenceData, StatsData } from '../types';
 
-const accent = '#b7ff63';
 
 function numberFormat(value: number | string | null | undefined, maximumFractionDigits = 0) {
     return Number(value ?? 0).toLocaleString(undefined, { maximumFractionDigits });
@@ -54,7 +54,7 @@ function StatTile({
 }: {
     label: string;
     value: string | number;
-    icon: typeof Trophy;
+    icon: ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
     dark?: boolean;
 }) {
     return (
@@ -75,21 +75,31 @@ function StatTile({
     );
 }
 
+function HeaderChip({ label, value }: { label: string; value: string | number }) {
+    return (
+        <div className="rounded-full border border-black/7 bg-white/10/78 px-5 py-3 shadow-[0_12px_26px_rgb(0_0_0/0.06)] backdrop-blur">
+            <span className="mr-3 text-[10px] font-black uppercase tracking-[0.24em] text-black/36">{label}</span>
+            <span className="font-black">{value}</span>
+        </div>
+    );
+}
+
 function MiniGameSlab({ game, side }: { game: GameCardData; side: 'left' | 'right' }) {
     const progress = Math.min(Math.max(Number(game.progress ?? 0), 0), 100);
+    const laneLabel = side === 'left' ? 'Previous File' : 'Next File';
 
     return (
         <a
             href={game.id > 0 ? `/games/${game.id}` : '/library'}
             className={[
-                'absolute top-1/2 z-10 flex h-[350px] w-[230px] -translate-y-1/2 flex-col overflow-hidden rounded-[34px] bg-[#b7ff63] p-3 shadow-[0_28px_55px_rgb(0_0_0/0.16)] transition duration-300 hover:z-30 hover:scale-105',
-                side === 'left' ? 'left-[3%] -rotate-6' : 'right-[3%] rotate-6',
+                'absolute top-[52%] z-10 flex h-[342px] w-[226px] -translate-y-1/2 flex-col overflow-hidden rounded-[34px] bg-[#b7ff63] p-3 shadow-[0_28px_55px_rgb(0_0_0/0.16)] transition duration-300 hover:z-30 hover:scale-105',
+                side === 'left' ? 'left-[4%] -rotate-5' : 'right-[4%] rotate-5',
             ].join(' ')}
         >
             <div className="relative h-[235px] overflow-hidden rounded-[24px] bg-[#d8ddda]">
                 <CoverArt game={game} titleSize="text-[22px]" />
                 <div className="absolute left-3 top-3 rounded-full bg-black/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-[#b7ff63]">
-                    Recent
+                    {laneLabel}
                 </div>
             </div>
 
@@ -100,8 +110,8 @@ function MiniGameSlab({ game, side }: { game: GameCardData; side: 'left' | 'righ
             <div className="mt-auto flex items-center gap-3">
                 <PlatformMark platform={game.platform} />
                 <div className="min-w-0 flex-1">
-                    <div className="mb-2 flex items-center justify-between text-[11px] font-black uppercase tracking-[0.18em] text-black/55">
-                        <span>{game.platform}</span>
+                    <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.12em] text-black/52">
+                        <span className="truncate">{game.platform}</span>
                         <span>{progress}%</span>
                     </div>
                     <div className="h-4 overflow-hidden rounded-full bg-black/12">
@@ -133,7 +143,7 @@ function FeaturedGamePanel({ game }: { game: GameCardData }) {
                     Active File
                 </div>
 
-                <div className="absolute bottom-4 left-4 right-4 rounded-[30px] border border-white/40 bg-[#fbfcf7]/94 p-4 backdrop-blur">
+                <div className="absolute bottom-4 left-4 right-4 rounded-[30px] border border-white/40 bg-white/10/94 p-4 backdrop-blur">
                     <div className="mb-4 flex items-start justify-between gap-4">
                         <div className="min-w-0">
                             <h2 className="line-clamp-2 text-[31px] font-black leading-[0.94] tracking-[-0.04em]">{game.title}</h2>
@@ -247,20 +257,20 @@ function BriefPanel({ stats, references }: { stats: StatsData; references: Refer
                 </div>
             </section>
 
-            <section className="grid flex-1 min-h-0 content-between rounded-[36px] border border-black/8 bg-[#eef2ed] p-5 shadow-[0_18px_36px_rgb(0_0_0/0.06)]">
+            <section className="grid flex-1 min-h-0 content-between rounded-[36px] bg-black p-5 text-white shadow-[0_18px_36px_rgb(0_0_0/0.16)]">
                 <div>
-                    <p className="text-[11px] font-black uppercase tracking-[0.28em] text-black/38">Archive Pulse</p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]">Archive Pulse</p>
                     <div className="mt-4 space-y-3">
-                        <div className="flex items-center justify-between rounded-[22px] bg-[#fbfcf7] px-4 py-3">
-                            <span className="text-sm font-black text-black/48">Top platform</span>
+                        <div className="flex items-center justify-between rounded-[22px] bg-white/10 px-4 py-3">
+                            <span className="text-sm font-black text-white/48">Top platform</span>
                             <span className="font-black">{topPlatform?.label ?? 'No data'}</span>
                         </div>
-                        <div className="flex items-center justify-between rounded-[22px] bg-[#fbfcf7] px-4 py-3">
-                            <span className="text-sm font-black text-black/48">Unique titles</span>
+                        <div className="flex items-center justify-between rounded-[22px] bg-white/10 px-4 py-3">
+                            <span className="text-sm font-black text-white/48">Unique titles</span>
                             <span className="font-black">{stats.unique_titles ?? 0}</span>
                         </div>
-                        <div className="flex items-center justify-between rounded-[22px] bg-[#fbfcf7] px-4 py-3">
-                            <span className="text-sm font-black text-black/48">Ownership copies</span>
+                        <div className="flex items-center justify-between rounded-[22px] bg-white/10 px-4 py-3">
+                            <span className="text-sm font-black text-white/48">Ownership copies</span>
                             <span className="font-black">{stats.ownership_copies ?? 0}</span>
                         </div>
                     </div>
@@ -268,13 +278,13 @@ function BriefPanel({ stats, references }: { stats: StatsData; references: Refer
 
                 <AddGameWizard
                     references={references}
-                    buttonClassName="group mt-5 h-[72px] w-full rounded-[999px] bg-black px-5 text-left shadow-[0_18px_30px_rgb(0_0_0/0.18)] transition hover:-translate-y-1 hover:scale-[1.01]"
+                    buttonClassName="group mt-5 h-[72px] w-full rounded-[999px] bg-[#b7ff63] px-5 text-left shadow-[0_18px_30px_rgb(0_0_0/0.18)] transition hover:-translate-y-1 hover:scale-[1.01]"
                     buttonContent={
                         <span className="flex h-full w-full items-center justify-center gap-4">
-                            <span className="grid size-[44px] place-items-center rounded-full bg-[#b7ff63] text-black transition group-hover:rotate-90">
+                            <span className="grid size-[44px] place-items-center rounded-full bg-black text-[#b7ff63] transition group-hover:rotate-90">
                                 <Plus size={30} strokeWidth={4} />
                             </span>
-                            <span className="text-[24px] font-black text-[#b7ff63]">Add Game</span>
+                            <span className="text-[24px] font-black text-black">Add Game</span>
                         </span>
                     }
                 />
@@ -301,6 +311,11 @@ export default function Home({ stats, recentGames, references }: { stats: StatsD
                         <div>
                             <p className="text-[12px] font-black uppercase tracking-[0.34em] text-black/38">Stupid Log Command Deck</p>
                             <h1 className="mt-2 text-[64px] font-black leading-[0.88] tracking-[-0.06em]">Home Base</h1>
+                            <div className="mt-5 flex flex-wrap gap-3">
+                                <HeaderChip label="Games" value={stats.library_games ?? 0} />
+                                <HeaderChip label="Hours" value={`${numberFormat(stats.playtime_hours, 1)}H`} />
+                                <HeaderChip label="Complete" value={stats.completed ?? 0} />
+                            </div>
                         </div>
 
                         <div className="flex items-center gap-3 rounded-full bg-black px-4 py-3 text-white shadow-[0_18px_36px_rgb(0_0_0/0.16)]">
@@ -314,10 +329,10 @@ export default function Home({ stats, recentGames, references }: { stats: StatsD
                         </div>
                     </header>
 
-                    <div className="relative z-10 mt-4 grid flex-1 grid-rows-[minmax(0,1fr)_auto]">
+                    <div className="relative z-10 mt-0 grid flex-1 grid-rows-[minmax(0,1fr)_auto]">
                         <div className="relative flex min-h-0 items-center justify-center">
-                            <div className="absolute left-[9%] top-1/2 hidden size-[74px] -translate-y-1/2 place-items-center rounded-full bg-black text-white shadow-[0_18px_28px_rgb(0_0_0/0.18)] transition hover:scale-105 xl:grid" aria-hidden="true">
-                                <ChevronLeft size={44} strokeWidth={3.2} />
+                            <div className="absolute left-[8%] top-[52%] hidden size-[66px] -translate-y-1/2 place-items-center rounded-full bg-black text-white shadow-[0_18px_28px_rgb(0_0_0/0.18)] transition hover:scale-105 xl:grid" aria-hidden="true">
+                                <ChevronLeft size={39} strokeWidth={3.2} />
                             </div>
 
                             {featuredGame ? (
@@ -330,12 +345,12 @@ export default function Home({ stats, recentGames, references }: { stats: StatsD
                                 <EmptyArchiveCard />
                             )}
 
-                            <div className="absolute right-[9%] top-1/2 hidden size-[74px] -translate-y-1/2 place-items-center rounded-full bg-black text-white shadow-[0_18px_28px_rgb(0_0_0/0.18)] transition hover:scale-105 xl:grid" aria-hidden="true">
-                                <ChevronRight size={44} strokeWidth={3.2} />
+                            <div className="absolute right-[8%] top-[52%] hidden size-[66px] -translate-y-1/2 place-items-center rounded-full bg-black text-white shadow-[0_18px_28px_rgb(0_0_0/0.18)] transition hover:scale-105 xl:grid" aria-hidden="true">
+                                <ChevronRight size={39} strokeWidth={3.2} />
                             </div>
                         </div>
 
-                        <footer className="relative z-20 mx-auto -mt-1 grid w-full max-w-[980px] grid-cols-[1fr_auto_1fr] items-center gap-5 rounded-[34px] bg-black p-4 text-white shadow-[0_24px_50px_rgb(0_0_0/0.22)]">
+                        <footer className="relative z-20 mx-auto -mt-1 grid w-full max-w-[940px] grid-cols-[1fr_auto_1fr] items-center gap-5 rounded-[30px] bg-black p-3 text-white shadow-[0_24px_50px_rgb(0_0_0/0.22)]">
                             <div className="rounded-[24px] bg-white/8 px-5 py-4">
                                 <p className="text-[10px] font-black uppercase tracking-[0.26em] text-white/36">Library Energy</p>
                                 <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/12">
@@ -345,7 +360,7 @@ export default function Home({ stats, recentGames, references }: { stats: StatsD
 
                             <div className="px-4 text-center">
                                 <p className="text-[11px] font-black uppercase tracking-[0.36em] text-[#b7ff63]">Recent Games</p>
-                                <h2 className="mt-1 text-[36px] font-black leading-none tracking-[0.12em]">Save Files</h2>
+                                <h2 className="mt-1 text-[32px] font-black leading-none tracking-[0.12em]">Save Files</h2>
                             </div>
 
                             <a href="/library" className="group flex items-center justify-between rounded-[24px] bg-[#b7ff63] px-5 py-4 text-black transition hover:-translate-y-0.5">
