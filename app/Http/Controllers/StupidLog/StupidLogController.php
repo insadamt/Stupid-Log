@@ -21,11 +21,12 @@ use App\Services\LibraryGameCreator;
 use App\Services\ProviderSearchService;
 use App\Services\SnapshotService;
 use App\Services\StatsService;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
@@ -61,7 +62,7 @@ class StupidLogController extends Controller
 
         return Inertia::render('GameDetails', [
             'libraryGame' => $this->card($libraryGame),
-            'dlcs' => $libraryGame->game->dlcs->map(fn($dlc) => [
+            'dlcs' => $libraryGame->game->dlcs->map(fn ($dlc) => [
                 'id' => $dlc->id,
                 'title' => $dlc->title,
                 'base_price' => $dlc->base_price,
@@ -152,7 +153,6 @@ class StupidLogController extends Controller
     public function updateSettings(UpdateSettingsRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-
         $user = $this->localUser();
 
         $user->update(['username' => $validated['username']]);
@@ -214,7 +214,7 @@ class StupidLogController extends Controller
 
             Http::withHeaders([
                 'Client-ID' => $clientId,
-                'Authorization' => 'Bearer ' . $token,
+                'Authorization' => 'Bearer '.$token,
             ])->withBody('fields name; limit 1;', 'text/plain')
                 ->post('https://api.igdb.com/v4/games')
                 ->throw();
@@ -230,7 +230,7 @@ class StupidLogController extends Controller
 
             return response()->json([
                 'ok' => false,
-                'message' => 'IGDB test failed: ' . $exception->getMessage(),
+                'message' => 'IGDB test failed: '.$exception->getMessage(),
             ], 422);
         }
     }
@@ -244,9 +244,20 @@ class StupidLogController extends Controller
 
     public function providerSearch(Request $request, ProviderSearchService $providers): JsonResponse
     {
-        $validated = $request->validate(['query' => ['required', 'string', 'min:2']]);
+        $validated = $request->validate([
+            'query' => ['required', 'string', 'min:2'],
+            'provider' => ['nullable', 'string', Rule::in(['igdb', 'steam'])],
+            'enrich' => ['nullable', 'boolean'],
+            'steam_app_id' => ['nullable', 'string', 'max:255'],
+        ]);
 
-        return response()->json($providers->search($this->localUser(), $validated['query']));
+        return response()->json($providers->search(
+            $this->localUser(),
+            $validated['query'],
+            $validated['provider'] ?? 'igdb',
+            (bool) ($validated['enrich'] ?? false),
+            $validated['steam_app_id'] ?? null,
+        ));
     }
 
     private function references(): array
@@ -273,7 +284,7 @@ class StupidLogController extends Controller
 
     private function cards($libraryGames)
     {
-        return $libraryGames->map(fn(LibraryGame $libraryGame) => $this->card($libraryGame))->values();
+        return $libraryGames->map(fn (LibraryGame $libraryGame) => $this->card($libraryGame))->values();
     }
 
     private function card(LibraryGame $libraryGame): array
@@ -285,14 +296,14 @@ class StupidLogController extends Controller
             'title' => $game->title,
             'publisher' => $game->publisher,
             'description' => $game->description,
-            'cover_url' => $game->cover_path ? asset('storage/' . $game->cover_path) : $game->cover_url_original,
+            'cover_url' => $game->cover_path ? asset('storage/'.$game->cover_path) : $game->cover_url_original,
             'platform' => $libraryGame->platform->name,
             'status' => $libraryGame->status->name,
             'playtime_hours' => (float) $libraryGame->playtime_hours,
             'earned_achievements' => $libraryGame->earned_achievements ?? 0,
             'total_achievements' => $game->total_achievements ?? 0,
             'progress' => $game->total_achievements ? round((($libraryGame->earned_achievements ?? 0) / $game->total_achievements) * 100) : 0,
-            'ownership' => $libraryGame->ownershipCopies->map(fn($copy) => $copy->ownershipType?->name ?? OwnershipType::find($copy->ownership_type_id)?->name)->filter()->values(),
+            'ownership' => $libraryGame->ownershipCopies->map(fn ($copy) => $copy->ownershipType?->name ?? OwnershipType::find($copy->ownership_type_id)?->name)->filter()->values(),
             'devices' => $libraryGame->devices->pluck('name')->values(),
             'base_price_default' => $game->base_price_default,
         ];
