@@ -1,8 +1,5 @@
 import {
-    Archive,
     BarChart3,
-    ChevronLeft,
-    ChevronRight,
     Clock3,
     Copy,
     DollarSign,
@@ -172,7 +169,7 @@ function DonutChart({
                 </div>
             </div>
 
-            <div className="grid min-h-0 gap-6 pt-5 lg:grid-cols-[300px_minmax(0,1fr)] lg:items-center">
+            <div className="grid min-h-0 gap-6 pt-5 xl:grid-cols-[300px_minmax(0,1fr)] xl:items-center">
                 <div className="grid place-items-center">
                     <div className="relative size-[282px]">
                         <svg viewBox="0 0 220 220" className="size-full drop-shadow-[0_18px_24px_rgb(0_0_0/0.28)]">
@@ -208,9 +205,9 @@ function DonutChart({
                     </div>
                 </div>
 
-                <div className="grid max-h-[420px] content-center gap-3 overflow-hidden">
+                <div className="grid min-h-0 content-start gap-3 overflow-y-auto pr-2">
                     {slices.length === 0 && <div className="rounded-[24px] border border-dashed border-white/10 bg-white/[0.045] p-6 text-sm font-black text-white/35">No data yet</div>}
-                    {slices.slice(0, 8).map((slice) => {
+                    {slices.map((slice) => {
                         const percent = totalValue > 0 ? (slice.value / totalValue) * 100 : 0;
                         return (
                             <div key={slice.label} className="rounded-[22px] border border-white/10 bg-white/[0.055] p-3">
@@ -252,7 +249,7 @@ function ProgressModule({ stats, previousStats }: { stats: StatView; previousSta
                 </div>
             </div>
 
-            <div className="min-h-0 pt-5">
+            <div className="min-h-0 overflow-y-auto pt-5 pr-2">
                 <div className="rounded-[28px] border border-white/10 bg-white/[0.055] p-5">
                     <div className="flex items-start justify-between gap-4">
                         <div>
@@ -273,7 +270,7 @@ function ProgressModule({ stats, previousStats }: { stats: StatView; previousSta
                     </div>
                 </div>
 
-                <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                <div className="mt-5 grid gap-4 xl:grid-cols-2">
                     {platforms.map((platform) => {
                         const previous = previousStats?.breakdowns.platforms.find((item) => item.label === platform.label);
                         return (
@@ -346,7 +343,7 @@ function Insights({ stats, previousStats }: { stats: StatView; previousStats?: S
         : null;
 
     return (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 xl:grid-cols-3">
             <InsightCard label="Biggest platform" value={biggestPlatform ? biggestPlatform.label : 'No data'} detail={biggestPlatform ? `${formatNumber(biggestPlatform.library_games)} games` : 'Add games to build this insight.'} />
             <InsightCard label="Highest value platform" value={highestValue ? highestValue.label : 'No data'} detail={highestValue ? formatMoney(highestValue.base_value) : 'Value appears after prices are saved.'} />
             <InsightCard label="Biggest yearly growth" value={fastestGrowth?.label ?? 'No prior year'} detail={fastestGrowth?.growth ? `${fastestGrowth.growth.delta >= 0 ? '+' : ''}${formatNumber(fastestGrowth.growth.delta)} games` : 'Select a year with a previous snapshot.'} />
@@ -391,7 +388,7 @@ function YearBestGames({ year }: { year: ConfirmedYearStats }) {
                 </div>
                 <div className="rounded-full bg-black px-4 py-2 text-sm font-black text-[#b7ff63]">{year.best_games.length} / 5</div>
             </div>
-            <div className="mt-5 grid min-h-0 gap-4 overflow-hidden md:grid-cols-2 xl:grid-cols-5">
+            <div className="mt-5 grid min-h-0 gap-4 overflow-y-auto pr-2 md:grid-cols-2 xl:grid-cols-5">
                 {year.best_games.length === 0 && (
                     <div className="rounded-[28px] border border-dashed border-black/15 bg-white/58 p-6 text-sm font-bold text-black/45 md:col-span-2 xl:col-span-5">
                         No best games were selected for this confirmed year.
@@ -511,20 +508,14 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
         if (next) setSelectedView(String(next.year));
     }
 
-    function shiftDeck(delta: number) {
-        const index = decks.findIndex((deck) => deck.key === activeDeck);
-        const next = decks[(index + delta + decks.length) % decks.length];
-        setActiveDeck(next.key);
-    }
-
     return (
         <AppLayout title="Stats" lockViewport>
             <section className="relative isolate h-full overflow-hidden px-4 pb-4 pt-5 md:pl-[88px] md:pr-6">
                 <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_50%_12%,rgba(183,255,99,0.18),transparent_24%),linear-gradient(rgba(0,0,0,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.035)_1px,transparent_1px)] bg-[length:auto,38px_38px,38px_38px]" />
 
-                <div className="grid h-full grid-rows-[140px_minmax(0,1fr)_82px] gap-4">
-                    <header className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-                        <Panel className="grid min-h-0 grid-cols-[minmax(0,1fr)_auto] items-center overflow-hidden p-6">
+                <div className="grid h-full grid-rows-[132px_minmax(0,1fr)_78px] gap-4">
+                    <header className="min-h-0">
+                        <Panel className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(420px,0.82fr)] items-center overflow-hidden p-6">
                             <div className="min-w-0">
                                 <div className="text-[11px] font-black uppercase tracking-[0.34em] text-[#b7ff63]/70">{viewLabel}</div>
                                 <div className="mt-2 flex items-end gap-5">
@@ -535,75 +526,50 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                                 </div>
                             </div>
 
-                            <div className="flex max-w-[560px] flex-wrap justify-end gap-2">
-                                <button
-                                    onClick={() => setSelectedView('all-time')}
-                                    className={[
-                                        'rounded-[18px] px-5 py-3 text-sm font-black uppercase tracking-[0.14em] transition',
-                                        selectedView === 'all-time' ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-white/55 hover:text-white',
-                                    ].join(' ')}
-                                >
-                                    All Time
-                                </button>
-                                {orderedYears.map((year) => (
+                            <div className="grid min-w-0 gap-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-white/35">Timeline</div>
+                                    {selectedYear && (
+                                        <div className="flex gap-2">
+                                            <button type="button" onClick={() => shiftYear(-1)} className="rounded-full bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/55 transition hover:bg-white/15 hover:text-white">
+                                                Previous Year
+                                            </button>
+                                            <button type="button" onClick={() => shiftYear(1)} className="rounded-full bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/55 transition hover:bg-white/15 hover:text-white">
+                                                Next Year
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex min-w-0 gap-2 overflow-x-auto rounded-[24px] bg-white/[0.06] p-2">
                                     <button
-                                        key={year.snapshot_id}
-                                        onClick={() => setSelectedView(String(year.year))}
+                                        onClick={() => setSelectedView('all-time')}
                                         className={[
-                                            'rounded-[18px] px-5 py-3 text-sm font-black uppercase tracking-[0.14em] transition',
-                                            selectedView === String(year.year) ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-white/55 hover:text-white',
+                                            'shrink-0 rounded-[18px] px-6 py-4 text-sm font-black uppercase tracking-[0.14em] transition',
+                                            selectedView === 'all-time' ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-white/55 hover:text-white',
                                         ].join(' ')}
                                     >
-                                        {year.year}
+                                        All Time
                                     </button>
-                                ))}
-                                {selectedYear && (
-                                    <div className="flex rounded-[18px] bg-white/10 p-1 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.08)]">
-                                        <button type="button" onClick={() => shiftYear(-1)} className="grid size-10 place-items-center rounded-[15px] bg-black text-white ring-1 ring-white/10">
-                                            <ChevronLeft size={18} />
+                                    {orderedYears.map((year) => (
+                                        <button
+                                            key={year.snapshot_id}
+                                            onClick={() => setSelectedView(String(year.year))}
+                                            className={[
+                                                'shrink-0 rounded-[18px] px-6 py-4 text-sm font-black uppercase tracking-[0.14em] transition',
+                                                selectedView === String(year.year) ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-white/55 hover:text-white',
+                                            ].join(' ')}
+                                        >
+                                            {year.year}
                                         </button>
-                                        <button type="button" onClick={() => shiftYear(1)} className="grid size-10 place-items-center rounded-[15px] bg-black text-white ring-1 ring-white/10">
-                                            <ChevronRight size={18} />
-                                        </button>
-                                    </div>
-                                )}
+                                    ))}
+                                </div>
                             </div>
                         </Panel>
-
-                        <article className="hidden min-h-0 rounded-[34px] border border-black/10 bg-white/72 p-5 shadow-[0_18px_44px_rgb(0_0_0/0.07)] backdrop-blur xl:block">
-                            <div className="flex items-start justify-between gap-4">
-                                <div>
-                                    <div className="text-[11px] font-black uppercase tracking-[0.24em] text-black/38">Latest official year</div>
-                                    <div className="mt-3 text-5xl font-black leading-none tracking-[-0.07em] text-black">{latest?.year ?? 'None'}</div>
-                                </div>
-                                <div className="grid size-14 place-items-center rounded-[20px] bg-black text-[#b7ff63] shadow-[0_16px_34px_rgb(0_0_0/0.18)]">
-                                    <Archive size={28} strokeWidth={3} />
-                                </div>
-                            </div>
-                            {latest ? (
-                                <div className="mt-5 grid grid-cols-3 gap-2">
-                                    <MiniMetric label="Games" value={formatNumber(latest.library_games)} growth={latest.growth?.library_games} />
-                                    <MiniMetric label="Hours" value={formatNumber(latest.playtime_hours, 1)} growth={latest.growth?.playtime_hours} />
-                                    <MiniMetric label="Value" value={formatMoney(latest.base_value)} growth={latest.growth?.base_value} />
-                                </div>
-                            ) : (
-                                <p className="mt-5 rounded-[22px] border border-dashed border-black/15 bg-white/58 p-4 text-sm font-bold text-black/48">
-                                    Confirm a snapshot to start official yearly stats.
-                                </p>
-                            )}
-                        </article>
                     </header>
 
                     <main className="relative min-h-0 overflow-hidden rounded-[42px] border border-black/10 bg-white/36 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.55)] backdrop-blur">
-                        <button type="button" onClick={() => shiftDeck(-1)} className="absolute left-5 top-1/2 z-20 grid size-14 -translate-y-1/2 place-items-center rounded-full bg-black text-[#b7ff63] shadow-[0_18px_36px_rgb(0_0_0/0.22)] transition hover:scale-105">
-                            <ChevronLeft size={28} strokeWidth={3} />
-                        </button>
-                        <button type="button" onClick={() => shiftDeck(1)} className="absolute right-5 top-1/2 z-20 grid size-14 -translate-y-1/2 place-items-center rounded-full bg-black text-[#b7ff63] shadow-[0_18px_36px_rgb(0_0_0/0.22)] transition hover:scale-105">
-                            <ChevronRight size={28} strokeWidth={3} />
-                        </button>
-
                         {activeDeck === 'command' && (
-                            <div className="grid h-full min-h-0 gap-4 px-16 py-2 xl:grid-rows-[minmax(0,1fr)_150px]">
+                            <div className="grid h-full min-h-0 gap-4 overflow-y-auto px-2 py-2 xl:grid-rows-[minmax(0,1fr)_150px]">
                                 <div className="grid min-h-0 grid-cols-2 gap-4 xl:grid-cols-4">
                                     {summaryCards.map((item) => <SummaryCard key={item.key} item={item} stats={activeStats} previousStats={previousStats} />)}
                                 </div>
@@ -612,13 +578,13 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                         )}
 
                         {activeDeck === 'charts' && (
-                            <div className="grid h-full min-h-0 gap-4 px-16 py-2 xl:grid-cols-[310px_minmax(0,1fr)]">
+                            <div className="grid h-full min-h-0 gap-4 px-2 py-2 xl:grid-cols-[310px_minmax(0,1fr)]">
                                 <Panel className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] p-5">
                                     <div>
                                         <div className="text-[10px] font-black uppercase tracking-[0.28em] text-[#b7ff63]/70">Chart Bay</div>
                                         <h2 className="mt-2 text-4xl font-black leading-none tracking-[-0.06em]">Select Graph</h2>
                                     </div>
-                                    <div className="mt-5 grid min-h-0 content-start gap-2 overflow-hidden">
+                                    <div className="mt-5 grid min-h-0 content-start gap-2 overflow-y-auto pr-2">
                                         {chartSpecs.map((chart, index) => (
                                             <button
                                                 key={chart.id}
@@ -654,13 +620,13 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                         )}
 
                         {activeDeck === 'progress' && (
-                            <div className="h-full min-h-0 px-16 py-2">
+                            <div className="h-full min-h-0 px-2 py-2">
                                 <ProgressModule stats={activeStats} previousStats={previousStats} />
                             </div>
                         )}
 
                         {activeDeck === 'archive' && (
-                            <div className="grid h-full min-h-0 gap-4 px-16 py-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                            <div className="grid h-full min-h-0 gap-4 px-2 py-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                                 <article className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] rounded-[34px] border border-black/10 bg-white/62 p-6 shadow-[0_18px_44px_rgb(0_0_0/0.06)] backdrop-blur">
                                     <div className="mb-5 flex items-center justify-between gap-4">
                                         <div>
@@ -669,7 +635,7 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                                         </div>
                                         <div className="rounded-full bg-black px-4 py-2 text-sm font-black text-[#b7ff63]">{confirmedYears.length} confirmed</div>
                                     </div>
-                                    <div className="grid min-h-0 content-start gap-3 overflow-auto pr-2">
+                                    <div className="grid min-h-0 content-start gap-3 overflow-y-auto pr-2">
                                         {confirmedYears.length === 0 && (
                                             <div className="rounded-[28px] border border-dashed border-black/15 bg-white/60 p-7 text-center text-sm font-bold text-black/45">
                                                 No confirmed yearly snapshots yet.
@@ -694,11 +660,8 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                         )}
                     </main>
 
-                    <footer className="grid min-h-0 grid-cols-[70px_minmax(0,1fr)_70px] items-center gap-4">
-                        <button type="button" onClick={() => shiftDeck(-1)} className="grid size-14 place-items-center justify-self-end rounded-full bg-black text-[#b7ff63] shadow-[0_18px_34px_rgb(0_0_0/0.22)] transition hover:scale-105">
-                            <ChevronLeft size={26} strokeWidth={3} />
-                        </button>
-                        <nav className="mx-auto flex max-w-full gap-2 overflow-hidden rounded-[28px] bg-black p-2 shadow-[0_18px_34px_rgb(0_0_0/0.25)]">
+                    <footer className="grid min-h-0 place-items-center">
+                        <nav className="mx-auto flex max-w-full gap-2 overflow-x-auto rounded-[28px] bg-black p-2 shadow-[0_18px_34px_rgb(0_0_0/0.25)]">
                             {decks.map((deck) => (
                                 <DeckButton
                                     key={deck.key}
@@ -709,24 +672,9 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                                 />
                             ))}
                         </nav>
-                        <button type="button" onClick={() => shiftDeck(1)} className="grid size-14 place-items-center rounded-full bg-black text-[#b7ff63] shadow-[0_18px_34px_rgb(0_0_0/0.22)] transition hover:scale-105">
-                            <ChevronRight size={26} strokeWidth={3} />
-                        </button>
                     </footer>
                 </div>
             </section>
         </AppLayout>
-    );
-}
-
-function MiniMetric({ label, value, growth }: { label: string; value: string; growth?: GrowthMetric }) {
-    return (
-        <div className="min-w-0 rounded-[20px] bg-black p-3 text-white shadow-[0_14px_30px_rgb(0_0_0/0.12)]">
-            <div className="truncate text-[9px] font-black uppercase tracking-[0.18em] text-[#b7ff63]/70">{label}</div>
-            <div className="mt-2 flex items-end justify-between gap-2">
-                <div className="truncate text-lg font-black leading-none">{value}</div>
-                <DeltaBadge growth={growth} compact />
-            </div>
-        </div>
     );
 }
