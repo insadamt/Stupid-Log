@@ -29,6 +29,7 @@ export type StatsData = {
     base_value: number;
     purchased_value: number;
     breakdowns: StatsBreakdowns;
+    archive: StatsArchive;
 };
 
 export type PlatformBreakdown = {
@@ -41,6 +42,11 @@ export type PlatformBreakdown = {
     achievement_progress: number;
     base_value: number;
     purchased_value: number;
+    base_value_without_dlcs?: number;
+    purchased_value_without_dlcs?: number;
+    dlc_base_value?: number;
+    dlc_purchased_value?: number;
+    statuses?: StatusBreakdown[];
 };
 
 export type StatusBreakdown = {
@@ -60,6 +66,24 @@ export type StatsBreakdowns = {
     platforms: PlatformBreakdown[];
     statuses: StatusBreakdown[];
     ownership_types: OwnershipTypeBreakdown[];
+};
+
+export type StatsArchiveGame = {
+    library_game_id: number;
+    game_id: number;
+    title: string;
+    cover_url?: string | null;
+    platform: string;
+    status: string;
+    playtime_hours: number;
+    base_value: number;
+    purchased_value: number;
+};
+
+export type StatsArchive = {
+    most_played: StatsArchiveGame[];
+    biggest_base_price: StatsArchiveGame[];
+    biggest_paid_price: StatsArchiveGame[];
 };
 
 export type GrowthMetric = {
@@ -111,6 +135,7 @@ export type ConfirmedYearStats = {
     base_value: number;
     purchased_value: number;
     breakdowns: StatsBreakdowns;
+    archive: StatsArchive;
     best_games: SnapshotBestGame[];
     growth: Record<string, GrowthMetric>;
 };
