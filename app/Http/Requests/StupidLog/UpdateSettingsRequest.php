@@ -18,7 +18,6 @@ class UpdateSettingsRequest extends FormRequest
             'currency_code' => ['required', 'exists:currencies,code'],
             'igdb_client_id' => ['nullable', 'string'],
             'igdb_client_secret' => ['nullable', 'string'],
-            'steam_api_key' => ['nullable', 'string'],
         ];
     }
 }

@@ -71,6 +71,8 @@ export type ProviderSearchResult = {
     release_date: string | null;
     description: string | null;
     steam_app_id: string | null;
+    base_price_default: number | string | null;
+    total_achievements: number | null;
 };
 
 export type ProviderSearchResponse = {

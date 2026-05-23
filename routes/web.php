@@ -17,3 +17,4 @@ Route::post('/snapshots', [StupidLogController::class, 'createSnapshot'])->name(
 Route::patch('/snapshots/{snapshotRun}/confirm', [StupidLogController::class, 'confirmSnapshot'])->name('snapshots.confirm');
 Route::get('/settings', [StupidLogController::class, 'settings'])->name('settings');
 Route::patch('/settings', [StupidLogController::class, 'updateSettings'])->name('settings.update');
+Route::post('/settings/igdb/test', [StupidLogController::class, 'testIgdbCredentials'])->name('settings.igdb.test');

@@ -25,8 +25,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class StupidLogController extends Controller
 {
@@ -114,23 +116,29 @@ class StupidLogController extends Controller
             'currency_code' => ['required', 'exists:currencies,code'],
             'igdb_client_id' => ['nullable', 'string'],
             'igdb_client_secret' => ['nullable', 'string'],
-            'steam_api_key' => ['nullable', 'string'],
         ]);
 
         $user = User::updateOrCreate(['id' => $this->localUser()->id], ['username' => $validated['username']]);
         AppSetting::updateOrCreate(['user_id' => $user->id], ['currency_code' => $validated['currency_code']]);
         $this->storeCredential($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null);
-        $this->storeCredential($user, 'steam', null, null, $validated['steam_api_key'] ?? null);
 
         return redirect()->route('home');
     }
 
     public function settings(): Response
     {
+        $igdb = $this->credential($this->localUser(), 'igdb');
+
         return Inertia::render('Settings', [
             'user' => $this->localUser()->load('settings'),
             'currencies' => Currency::orderBy('code')->pluck('code'),
             'providers' => Provider::orderBy('name')->get(),
+            'igdbCredential' => [
+                'has_client_id' => (bool) $igdb?->encrypted_client_id,
+                'has_client_secret' => (bool) $igdb?->encrypted_client_secret,
+                'last_tested_at' => $igdb?->last_tested_at?->toIso8601String(),
+                'last_test_status' => $igdb?->last_test_status,
+            ],
         ]);
     }
 
@@ -142,9 +150,60 @@ class StupidLogController extends Controller
         $user->update(['username' => $validated['username']]);
         AppSetting::updateOrCreate(['user_id' => $user->id], ['currency_code' => $validated['currency_code']]);
         $this->storeCredential($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null, preserveBlankFields: true);
-        $this->storeCredential($user, 'steam', null, null, $validated['steam_api_key'] ?? null, preserveBlankFields: true);
 
         return back();
+    }
+
+    public function testIgdbCredentials(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'igdb_client_id' => ['nullable', 'string'],
+            'igdb_client_secret' => ['nullable', 'string'],
+        ]);
+
+        $user = $this->localUser();
+        $credential = $this->credential($user, 'igdb');
+        $clientId = ($validated['igdb_client_id'] ?? null) ?: ($credential?->encrypted_client_id ? Crypt::decryptString($credential->encrypted_client_id) : null);
+        $clientSecret = ($validated['igdb_client_secret'] ?? null) ?: ($credential?->encrypted_client_secret ? Crypt::decryptString($credential->encrypted_client_secret) : null);
+
+        if (! $clientId || ! $clientSecret) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Add both IGDB Client ID and Client Secret before testing.',
+            ], 422);
+        }
+
+        try {
+            $token = Http::asForm()
+                ->post('https://id.twitch.tv/oauth2/token', [
+                    'client_id' => $clientId,
+                    'client_secret' => $clientSecret,
+                    'grant_type' => 'client_credentials',
+                ])
+                ->throw()
+                ->json('access_token');
+
+            Http::withHeaders([
+                'Client-ID' => $clientId,
+                'Authorization' => 'Bearer '.$token,
+            ])->withBody('fields name; limit 1;', 'text/plain')
+                ->post('https://api.igdb.com/v4/games')
+                ->throw();
+
+            $this->markCredentialTest($credential, 'ok');
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'IGDB credentials work.',
+            ]);
+        } catch (Throwable $exception) {
+            $this->markCredentialTest($credential, 'failed');
+
+            return response()->json([
+                'ok' => false,
+                'message' => 'IGDB test failed: '.$exception->getMessage(),
+            ], 422);
+        }
     }
 
     public function storeLibraryGame(StoreLibraryGameRequest $request, LibraryGameCreator $creator): RedirectResponse
@@ -232,5 +291,29 @@ class StupidLogController extends Controller
                 'last_test_status' => 'stored',
             ],
         );
+    }
+
+    private function credential(User $user, string $providerKey): ?ProviderCredential
+    {
+        $provider = Provider::where('key', $providerKey)->first();
+        if (! $provider) {
+            return null;
+        }
+
+        return ProviderCredential::where('user_id', $user->id)
+            ->where('provider_id', $provider->id)
+            ->first();
+    }
+
+    private function markCredentialTest(?ProviderCredential $credential, string $status): void
+    {
+        if (! $credential) {
+            return;
+        }
+
+        $credential->update([
+            'last_tested_at' => now(),
+            'last_test_status' => $status,
+        ]);
     }
 }

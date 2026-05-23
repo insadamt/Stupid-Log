@@ -8,7 +8,11 @@ import {
     X,
 } from "lucide-react";
 import { ReactNode, useMemo, useState } from "react";
-import { ReferenceData } from "../types";
+import {
+    ProviderSearchResponse,
+    ProviderSearchResult,
+    ReferenceData,
+} from "../types";
 
 type OwnershipCopyDraft = {
     ownership_type_id: number;
@@ -21,6 +25,10 @@ type OwnershipCopyDraft = {
 
 type Draft = {
     title: string;
+    source: "manual" | "igdb" | "steam";
+    external_id: string;
+    steam_app_id: string;
+    cover_url_original: string;
     publisher: string;
     release_date: string;
     description: string;
@@ -79,6 +87,10 @@ export default function AddGameWizard({
     const [step, setStep] = useState(0);
     const [draft, setDraft] = useState<Draft>(() => ({
         title: "",
+        source: "manual",
+        external_id: "",
+        steam_app_id: "",
+        cover_url_original: "",
         publisher: "",
         release_date: "",
         description: "",
@@ -105,6 +117,13 @@ export default function AddGameWizard({
         last_played_at: "",
         completed_at: "",
     }));
+    const [providerResults, setProviderResults] = useState<
+        ProviderSearchResult[]
+    >([]);
+    const [providerWarnings, setProviderWarnings] = useState<string[]>([]);
+    const [providerNotice, setProviderNotice] = useState("");
+    const [searchingProviders, setSearchingProviders] = useState(false);
+    const [searchError, setSearchError] = useState("");
 
     const platform = useMemo(
         () =>
@@ -131,6 +150,82 @@ export default function AddGameWizard({
 
     function update<K extends keyof Draft>(key: K, value: Draft[K]) {
         setDraft((current) => ({ ...current, [key]: value }));
+    }
+
+    async function searchProviders() {
+        const query = draft.title.trim();
+        if (query.length < 2) return;
+
+        setSearchingProviders(true);
+        setSearchError("");
+
+        try {
+            const response = await fetch(
+                `/provider-search?query=${encodeURIComponent(query)}`,
+            );
+            if (!response.ok) {
+                throw new Error("Provider search failed.");
+            }
+
+            const data = (await response.json()) as ProviderSearchResponse;
+            setProviderResults(data.results);
+            setProviderWarnings(data.warnings);
+            setProviderNotice(data.notice);
+        } catch (error) {
+            setProviderResults([]);
+            setProviderWarnings([]);
+            setProviderNotice("");
+            setSearchError(
+                error instanceof Error
+                    ? error.message
+                    : "Provider search failed.",
+            );
+        } finally {
+            setSearchingProviders(false);
+        }
+    }
+
+    function selectProviderResult(result: ProviderSearchResult) {
+        const basePrice =
+            result.base_price_default === null ||
+            result.base_price_default === undefined
+                ? ""
+                : String(result.base_price_default);
+        const totalAchievements =
+            result.total_achievements === null ||
+            result.total_achievements === undefined
+                ? "0"
+                : String(result.total_achievements);
+
+        setDraft((current) => ({
+            ...current,
+            title: result.title,
+            source: result.source,
+            external_id: result.external_id,
+            steam_app_id: result.steam_app_id ?? "",
+            cover_url_original: result.cover_url_original ?? "",
+            publisher: result.publisher ?? "",
+            release_date: result.release_date ?? "",
+            description: result.description ?? "",
+            total_achievements: totalAchievements,
+            base_price_default: basePrice,
+            ownership_copies: current.ownership_copies.map((copy) => ({
+                ...copy,
+                base_price: copy.base_price || basePrice,
+            })),
+        }));
+        setStep(1);
+    }
+
+    function useManualEntry() {
+        setDraft((current) => ({
+            ...current,
+            source: "manual",
+            external_id: "",
+            steam_app_id: "",
+            cover_url_original: "",
+        }));
+        setStep(1);
     }
 
     function choosePlatform(platformId: number) {
@@ -250,13 +345,27 @@ export default function AddGameWizard({
     }
 
     function submit() {
+        const externalIds: Record<string, string> = {};
+        if (draft.source === "igdb" && draft.external_id) {
+            externalIds.igdb = draft.external_id;
+        }
+        if (draft.source === "steam" && draft.external_id) {
+            externalIds.steam = draft.external_id;
+        }
+        if (draft.steam_app_id) {
+            externalIds.steam = draft.steam_app_id;
+        }
+
         router.post("/library-games", {
             game: {
                 title: draft.title,
                 publisher: draft.publisher || null,
                 release_date: draft.release_date || null,
                 description: draft.description || null,
-                source: "manual",
+                source: draft.source,
+                external_ids: externalIds,
+                steam_app_id: draft.steam_app_id || null,
+                cover_url_original: draft.cover_url_original || null,
                 total_achievements: Number(draft.total_achievements || 0),
                 base_price_default:
                     draft.base_price_default === ""
@@ -356,25 +465,178 @@ export default function AddGameWizard({
                                                     event.target.value,
                                                 )
                                             }
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Enter") {
+                                                    event.preventDefault();
+                                                    void searchProviders();
+                                                }
+                                            }}
                                             placeholder="Search or type game title"
                                             className="min-w-0 flex-1 bg-transparent outline-none"
                                             autoFocus
                                         />
-                                        <Search size={52} />
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                void searchProviders()
+                                            }
+                                            disabled={
+                                                searchingProviders ||
+                                                draft.title.trim().length < 2
+                                            }
+                                            className="grid size-14 place-items-center rounded-full bg-black text-white disabled:opacity-40"
+                                            aria-label="Search providers"
+                                        >
+                                            <Search size={34} />
+                                        </button>
                                     </label>
-                                    <div className="rounded-[28px] bg-white/45 p-7 text-2xl font-black">
-                                        IGDB and Steam search are wired on the
-                                        backend. This wizard currently saves
-                                        manual entries while preserving the
-                                        provider-first data shape.
+
+                                    <div className="grid grid-cols-[1fr_auto] items-center gap-5 rounded-[28px] bg-white/45 p-6">
+                                        <div>
+                                            <div className="text-2xl font-black">
+                                                IGDB search runs first. Steam is
+                                                used as fallback and enrichment.
+                                            </div>
+                                            <div className="mt-2 text-lg font-black text-black/55">
+                                                Manual entry stays available
+                                                because your saved data is final.
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={useManualEntry}
+                                            className="rounded-[20px] bg-black px-7 py-4 text-xl font-black text-white"
+                                        >
+                                            Manual Entry
+                                        </button>
                                     </div>
+
+                                    {searchingProviders && (
+                                        <div className="rounded-[24px] bg-black px-7 py-5 text-2xl font-black text-white">
+                                            Searching providers...
+                                        </div>
+                                    )}
+
+                                    {searchError && (
+                                        <div className="rounded-[24px] bg-[#ff3038] px-7 py-5 text-2xl font-black text-white">
+                                            {searchError}
+                                        </div>
+                                    )}
+
+                                    {providerWarnings.length > 0 && (
+                                        <div className="grid gap-2 rounded-[24px] bg-white/55 px-7 py-5 text-lg font-black text-black/65">
+                                            {providerWarnings.map(
+                                                (warning) => (
+                                                    <div key={warning}>
+                                                        {warning}
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {providerResults.length > 0 && (
+                                        <div className="grid max-h-[430px] gap-4 overflow-auto pr-2">
+                                            {providerResults.map((result) => (
+                                                <button
+                                                    key={`${result.source}-${result.external_id}`}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        selectProviderResult(
+                                                            result,
+                                                        )
+                                                    }
+                                                    className="grid grid-cols-[92px_1fr_auto] items-center gap-5 rounded-[24px] bg-white/70 p-4 text-left shadow-[0_12px_26px_rgb(0_0_0/0.08)] transition hover:-translate-y-0.5 hover:bg-white"
+                                                >
+                                                    {result.cover_url_original ? (
+                                                        <img
+                                                            src={
+                                                                result.cover_url_original
+                                                            }
+                                                            alt=""
+                                                            className="h-[124px] w-[92px] rounded-[16px] object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="grid h-[124px] w-[92px] place-items-center rounded-[16px] bg-black/10 text-sm font-black text-black/45">
+                                                            No Cover
+                                                        </div>
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <div className="truncate text-3xl font-black">
+                                                            {result.title}
+                                                        </div>
+                                                        <div className="mt-2 truncate text-lg font-black text-black/55">
+                                                            {result.publisher ||
+                                                                "Unknown Publisher"}
+                                                            {result.release_date
+                                                                ? ` | ${result.release_date}`
+                                                                : ""}
+                                                        </div>
+                                                        {result.steam_app_id && (
+                                                            <div className="mt-2 text-base font-black text-black/45">
+                                                                Steam App{" "}
+                                                                {
+                                                                    result.steam_app_id
+                                                                }
+                                                            </div>
+                                                        )}
+                                                        {(result.base_price_default !==
+                                                            null ||
+                                                            result.total_achievements !==
+                                                                null) && (
+                                                            <div className="mt-2 text-base font-black text-black/45">
+                                                                {result.base_price_default !==
+                                                                null
+                                                                    ? `$${result.base_price_default}`
+                                                                    : "Price unknown"}
+                                                                {" | "}
+                                                                {result.total_achievements ??
+                                                                    0}{" "}
+                                                                achievements
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <span className="rounded-full bg-black px-5 py-3 text-lg font-black uppercase text-white">
+                                                        {result.source}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {!searchingProviders &&
+                                        providerNotice &&
+                                        providerResults.length === 0 && (
+                                            <div className="rounded-[24px] bg-white/55 px-7 py-5 text-xl font-black text-black/60">
+                                                {providerNotice}
+                                            </div>
+                                        )}
                                 </div>
                             )}
 
                             {step === 1 && (
                                 <div className="grid grid-cols-[260px_1fr] gap-7">
-                                    <div className="sl-cover-art h-[370px] rounded-[26px] bg-white shadow-xl" />
+                                    {draft.cover_url_original ? (
+                                        <img
+                                            src={draft.cover_url_original}
+                                            alt=""
+                                            className="h-[370px] rounded-[26px] bg-white object-cover shadow-xl"
+                                        />
+                                    ) : (
+                                        <div className="sl-cover-art h-[370px] rounded-[26px] bg-white shadow-xl" />
+                                    )}
                                     <div className="grid gap-5">
+                                        <div className="flex items-center gap-3">
+                                            <span className="rounded-full bg-black px-5 py-2 text-sm font-black uppercase text-white">
+                                                {draft.source}
+                                            </span>
+                                            {draft.steam_app_id && (
+                                                <span className="rounded-full bg-white/65 px-5 py-2 text-sm font-black text-black/55">
+                                                    Steam App{" "}
+                                                    {draft.steam_app_id}
+                                                </span>
+                                            )}
+                                        </div>
                                         <input
                                             value={draft.title}
                                             onChange={(event) =>
@@ -750,8 +1012,27 @@ export default function AddGameWizard({
 
                             {step === 6 && (
                                 <div className="grid grid-cols-[260px_1fr] gap-7">
-                                    <div className="sl-cover-art h-[370px] rounded-[26px] bg-white shadow-xl" />
+                                    {draft.cover_url_original ? (
+                                        <img
+                                            src={draft.cover_url_original}
+                                            alt=""
+                                            className="h-[370px] rounded-[26px] bg-white object-cover shadow-xl"
+                                        />
+                                    ) : (
+                                        <div className="sl-cover-art h-[370px] rounded-[26px] bg-white shadow-xl" />
+                                    )}
                                     <div className="rounded-[28px] bg-white/45 p-7 text-2xl font-black">
+                                        <div className="mb-4 flex items-center gap-3">
+                                            <span className="rounded-full bg-black px-5 py-2 text-sm font-black uppercase text-white">
+                                                {draft.source}
+                                            </span>
+                                            {draft.steam_app_id && (
+                                                <span className="rounded-full bg-white/65 px-5 py-2 text-sm font-black text-black/55">
+                                                    Steam App{" "}
+                                                    {draft.steam_app_id}
+                                                </span>
+                                            )}
+                                        </div>
                                         <h3 className="text-5xl font-black">
                                             {draft.title}
                                         </h3>

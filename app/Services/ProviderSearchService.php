@@ -32,6 +32,12 @@ class ProviderSearchService
             }
         }
 
+        try {
+            $results = $this->withSteamMetadata($results);
+        } catch (Throwable $exception) {
+            $warnings[] = 'Steam auto-fill unavailable: '.$exception->getMessage();
+        }
+
         return [
             'query' => $query,
             'source_order' => self::SOURCE_ORDER,
@@ -103,6 +109,56 @@ class ProviderSearchService
         ]))->all();
     }
 
+    private function withSteamMetadata(array $results): array
+    {
+        $steamAppIds = collect($results)
+            ->pluck('steam_app_id')
+            ->filter(fn ($appId) => is_scalar($appId) && (string) $appId !== '')
+            ->map(fn ($appId) => (string) $appId)
+            ->unique()
+            ->values();
+
+        if ($steamAppIds->isEmpty()) {
+            return $results;
+        }
+
+        $details = Http::get('https://store.steampowered.com/api/appdetails', [
+            'appids' => $steamAppIds->implode(','),
+            'cc' => 'US',
+            'l' => 'english',
+        ])->throw()->json() ?? [];
+
+        $achievementCounts = [];
+        foreach ($steamAppIds as $steamAppId) {
+            try {
+                $schema = Http::get('https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/', [
+                    'appid' => $steamAppId,
+                ])->throw()->json('game.availableGameStats.achievements', []);
+
+                $achievementCounts[$steamAppId] = is_array($schema) ? count($schema) : null;
+            } catch (Throwable) {
+                $achievementCounts[$steamAppId] = null;
+            }
+        }
+
+        return collect($results)->map(function (array $result) use ($details, $achievementCounts) {
+            $steamAppId = isset($result['steam_app_id']) ? (string) $result['steam_app_id'] : null;
+            $data = $steamAppId ? ($details[$steamAppId]['data'] ?? null) : null;
+
+            if (! is_array($data)) {
+                return $result;
+            }
+
+            return array_merge($result, [
+                'cover_url_original' => $result['cover_url_original'] ?? $data['header_image'] ?? null,
+                'publisher' => $result['publisher'] ?? ($data['publishers'][0] ?? null),
+                'description' => $result['description'] ?? ($data['short_description'] ?? null),
+                'base_price_default' => $this->price($data),
+                'total_achievements' => $achievementCounts[$steamAppId] ?? null,
+            ]);
+        })->all();
+    }
+
     private function result(array $result): array
     {
         $source = in_array($result['source'] ?? null, ['igdb', 'steam'], true) ? $result['source'] : 'steam';
@@ -116,7 +172,20 @@ class ProviderSearchService
             'release_date' => $result['release_date'] ?? null,
             'description' => $result['description'] ?? null,
             'steam_app_id' => isset($result['steam_app_id']) ? (string) $result['steam_app_id'] : null,
+            'base_price_default' => $result['base_price_default'] ?? null,
+            'total_achievements' => $result['total_achievements'] ?? null,
         ];
+    }
+
+    private function price(array $data): ?float
+    {
+        if (($data['is_free'] ?? false) === true) {
+            return 0.0;
+        }
+
+        $price = $data['price_overview']['initial'] ?? null;
+
+        return is_numeric($price) ? round(((float) $price) / 100, 2) : null;
     }
 
     private function credential(User $user, string $providerKey): ?ProviderCredential

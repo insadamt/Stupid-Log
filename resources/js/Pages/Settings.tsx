@@ -1,11 +1,60 @@
 import { router } from '@inertiajs/react';
-import { FormEvent } from 'react';
+import { FormEvent, MouseEvent, useState } from 'react';
 import AppLayout from '../Components/AppLayout';
 
-export default function Settings({ user, currencies }: { user: { username: string; settings?: { currency_code: string } }; currencies: string[] }) {
+type IgdbCredential = {
+    has_client_id: boolean;
+    has_client_secret: boolean;
+    last_tested_at?: string | null;
+    last_test_status?: string | null;
+};
+
+export default function Settings({
+    user,
+    currencies,
+    igdbCredential,
+}: {
+    user: { username: string; settings?: { currency_code: string } };
+    currencies: string[];
+    igdbCredential: IgdbCredential;
+}) {
+    const [testingIgdb, setTestingIgdb] = useState(false);
+    const [igdbTest, setIgdbTest] = useState<{ ok: boolean; message: string } | null>(null);
+
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         router.patch('/settings', Object.fromEntries(new FormData(event.currentTarget)));
+    }
+
+    async function testIgdb(event: MouseEvent<HTMLButtonElement>) {
+        const form = event.currentTarget.form;
+        if (!form) return;
+
+        setTestingIgdb(true);
+        setIgdbTest(null);
+
+        const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        const formData = new FormData(form);
+
+        try {
+            const response = await fetch('/settings/igdb/test', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrf,
+                    Accept: 'application/json',
+                },
+                body: formData,
+            });
+            const data = (await response.json()) as { ok: boolean; message: string };
+            setIgdbTest({ ok: response.ok && data.ok, message: data.message });
+        } catch (error) {
+            setIgdbTest({
+                ok: false,
+                message: error instanceof Error ? error.message : 'IGDB test failed.',
+            });
+        } finally {
+            setTestingIgdb(false);
+        }
     }
 
     return (
@@ -30,16 +79,34 @@ export default function Settings({ user, currencies }: { user: { username: strin
                     </label>
                     <label className="grid gap-2 text-sm font-black uppercase tracking-[0.18em] text-black/45">
                         IGDB Client ID
-                        <input name="igdb_client_id" placeholder="IGDB client ID" className="rounded-2xl border-4 border-black/10 bg-white px-5 py-4 text-2xl font-black normal-case tracking-normal outline-none focus:border-black" />
+                        <input name="igdb_client_id" placeholder={igdbCredential.has_client_id ? 'Saved - enter a new ID to replace' : 'IGDB client ID'} className="rounded-2xl border-4 border-black/10 bg-white px-5 py-4 text-2xl font-black normal-case tracking-normal outline-none focus:border-black" />
                     </label>
                     <label className="grid gap-2 text-sm font-black uppercase tracking-[0.18em] text-black/45">
                         IGDB Client Secret
-                        <input name="igdb_client_secret" placeholder="IGDB client secret" className="rounded-2xl border-4 border-black/10 bg-white px-5 py-4 text-2xl font-black normal-case tracking-normal outline-none focus:border-black" />
+                        <input name="igdb_client_secret" type="password" placeholder={igdbCredential.has_client_secret ? 'Saved - enter a new secret to replace' : 'IGDB client secret'} className="rounded-2xl border-4 border-black/10 bg-white px-5 py-4 text-2xl font-black normal-case tracking-normal outline-none focus:border-black" />
                     </label>
-                    <label className="col-span-2 grid gap-2 text-sm font-black uppercase tracking-[0.18em] text-black/45">
-                        Steam API Key
-                        <input name="steam_api_key" placeholder="Steam API key" className="rounded-2xl border-4 border-black/10 bg-white px-5 py-4 text-2xl font-black normal-case tracking-normal outline-none focus:border-black" />
-                    </label>
+                    <div className="col-span-2 grid gap-4 rounded-[26px] bg-white/45 p-5">
+                        <div className="flex flex-wrap items-center gap-3 text-lg font-black">
+                            <span className={`rounded-full px-5 py-2 ${igdbCredential.has_client_id && igdbCredential.has_client_secret ? 'bg-black text-[#b7ff63]' : 'bg-white text-black/55'}`}>
+                                {igdbCredential.has_client_id && igdbCredential.has_client_secret ? 'IGDB saved' : 'IGDB not saved'}
+                            </span>
+                            {igdbCredential.last_test_status && (
+                                <span className="rounded-full bg-white px-5 py-2 text-black/55">
+                                    Last test: {igdbCredential.last_test_status}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <button type="button" onClick={testIgdb} disabled={testingIgdb} className="rounded-[20px] bg-white px-8 py-4 text-xl font-black text-black shadow-sm disabled:opacity-45">
+                                {testingIgdb ? 'Testing IGDB...' : 'Test IGDB API'}
+                            </button>
+                            {igdbTest && (
+                                <div className={`text-xl font-black ${igdbTest.ok ? 'text-black' : 'text-[#b00020]'}`}>
+                                    {igdbTest.message}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                     <button className="col-span-2 rounded-[24px] bg-black px-8 py-5 text-2xl font-black text-[#b7ff63] shadow-xl transition hover:-translate-y-1">Save Settings</button>
                 </form>
             </section>

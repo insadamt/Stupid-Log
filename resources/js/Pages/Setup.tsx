@@ -18,7 +18,6 @@ export default function Setup({ currencies }: { currencies: string[] }) {
                     </select>
                     <input name="igdb_client_id" placeholder="IGDB client ID" className="rounded-2xl px-5 py-4 text-2xl font-black" />
                     <input name="igdb_client_secret" placeholder="IGDB client secret" className="rounded-2xl px-5 py-4 text-2xl font-black" />
-                    <input name="steam_api_key" placeholder="Steam API key optional" className="rounded-2xl px-5 py-4 text-2xl font-black" />
                     <button className="rounded-[20px] bg-black px-8 py-5 text-2xl font-black text-white">Finish</button>
                 </div>
             </form>

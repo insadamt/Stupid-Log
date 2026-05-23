@@ -54,12 +54,34 @@ class ProviderSearchContractTest extends TestCase
 
         Http::fake([
             'id.twitch.tv/*' => Http::response(['error' => 'unavailable'], 500),
-            'store.steampowered.com/*' => Http::response([
+            'store.steampowered.com/api/storesearch*' => Http::response([
                 'items' => [[
                     'id' => 620,
                     'name' => 'Portal 2',
                     'tiny_image' => 'https://cdn.example.test/portal.jpg',
                 ]],
+            ]),
+            'store.steampowered.com/api/appdetails*' => Http::response([
+                '620' => [
+                    'success' => true,
+                    'data' => [
+                        'name' => 'Portal 2',
+                        'header_image' => 'https://cdn.example.test/portal-header.jpg',
+                        'publishers' => ['Valve'],
+                        'short_description' => 'A test chamber puzzle game.',
+                        'price_overview' => ['initial' => 999],
+                    ],
+                ],
+            ]),
+            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response([
+                'game' => [
+                    'availableGameStats' => [
+                        'achievements' => [
+                            ['name' => 'A'],
+                            ['name' => 'B'],
+                        ],
+                    ],
+                ],
             ]),
         ]);
 
@@ -69,12 +91,94 @@ class ProviderSearchContractTest extends TestCase
             ->assertJsonPath('results.0.source', 'steam')
             ->assertJsonPath('results.0.external_id', '620')
             ->assertJsonPath('results.0.title', 'Portal 2')
-            ->assertJsonPath('results.0.publisher', null)
+            ->assertJsonPath('results.0.publisher', 'Valve')
             ->assertJsonPath('results.0.release_date', null)
-            ->assertJsonPath('results.0.description', null)
+            ->assertJsonPath('results.0.description', 'A test chamber puzzle game.')
             ->assertJsonPath('results.0.steam_app_id', '620')
+            ->assertJsonPath('results.0.base_price_default', 9.99)
+            ->assertJsonPath('results.0.total_achievements', 2)
             ->assertJsonPath('manual_available', true)
             ->assertJsonCount(1, 'warnings');
+    }
+
+    public function test_igdb_results_with_steam_app_ids_are_auto_filled_from_steam(): void
+    {
+        $user = User::firstOrFail();
+        ProviderCredential::create([
+            'user_id' => $user->id,
+            'provider_id' => Provider::where('key', 'igdb')->firstOrFail()->id,
+            'encrypted_client_id' => Crypt::encryptString('client-id'),
+            'encrypted_client_secret' => Crypt::encryptString('client-secret'),
+            'is_enabled' => true,
+        ]);
+
+        Http::fake([
+            'id.twitch.tv/*' => Http::response(['access_token' => 'token']),
+            'api.igdb.com/v4/games' => Http::response([[
+                'id' => 1,
+                'name' => 'Portal 2',
+                'summary' => 'IGDB summary.',
+                'external_games' => [[
+                    'category' => 1,
+                    'uid' => '620',
+                ]],
+            ]]),
+            'store.steampowered.com/api/appdetails*' => Http::response([
+                '620' => [
+                    'success' => true,
+                    'data' => [
+                        'price_overview' => ['initial' => 999],
+                    ],
+                ],
+            ]),
+            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response([
+                'game' => [
+                    'availableGameStats' => [
+                        'achievements' => [
+                            ['name' => 'A'],
+                            ['name' => 'B'],
+                            ['name' => 'C'],
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $this->getJson('/provider-search?query=portal')
+            ->assertOk()
+            ->assertJsonPath('results.0.source', 'igdb')
+            ->assertJsonPath('results.0.steam_app_id', '620')
+            ->assertJsonPath('results.0.base_price_default', 9.99)
+            ->assertJsonPath('results.0.total_achievements', 3);
+    }
+
+    public function test_steam_price_auto_fill_survives_achievement_schema_failures(): void
+    {
+        Http::fake([
+            'store.steampowered.com/api/storesearch*' => Http::response([
+                'items' => [[
+                    'id' => 620,
+                    'name' => 'Portal 2',
+                    'tiny_image' => 'https://cdn.example.test/portal.jpg',
+                ]],
+            ]),
+            'store.steampowered.com/api/appdetails*' => Http::response([
+                '620' => [
+                    'success' => true,
+                    'data' => [
+                        'price_overview' => ['initial' => 999],
+                    ],
+                ],
+            ]),
+            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response(['error' => 'unavailable'], 500),
+        ]);
+
+        $this->getJson('/provider-search?query=portal')
+            ->assertOk()
+            ->assertJsonPath('results.0.source', 'steam')
+            ->assertJsonPath('results.0.steam_app_id', '620')
+            ->assertJsonPath('results.0.base_price_default', 9.99)
+            ->assertJsonPath('results.0.total_achievements', null);
     }
 
     public function test_provider_search_returns_warnings_and_manual_entry_when_all_providers_fail(): void
@@ -115,6 +219,8 @@ class ProviderSearchContractTest extends TestCase
                 'release_date',
                 'description',
                 'steam_app_id',
+                'base_price_default',
+                'total_achievements',
             ]],
             'manual_available',
             'warnings',
