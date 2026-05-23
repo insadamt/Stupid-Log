@@ -201,6 +201,20 @@ return new class extends Migration
             $table->timestamps();
         });
 
+        Schema::create('snapshot_best_games', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('snapshot_run_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('library_game_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('game_id')->constrained()->cascadeOnDelete();
+            $table->unsignedTinyInteger('rank');
+            $table->string('note')->nullable();
+            $table->timestamps();
+
+            $table->unique(['snapshot_run_id', 'library_game_id']);
+            $table->unique(['snapshot_run_id', 'rank']);
+            $table->unique('game_id');
+        });
+
         Schema::create('ownership_copy_snapshots', function (Blueprint $table) {
             $table->id();
             $table->foreignId('snapshot_run_id')->constrained()->cascadeOnDelete();
@@ -232,6 +246,7 @@ return new class extends Migration
     {
         Schema::dropIfExists('owned_dlc_snapshots');
         Schema::dropIfExists('ownership_copy_snapshots');
+        Schema::dropIfExists('snapshot_best_games');
         Schema::dropIfExists('library_game_snapshots');
         Schema::dropIfExists('snapshot_runs');
         Schema::dropIfExists('owned_dlcs');

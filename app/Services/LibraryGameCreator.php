@@ -24,6 +24,7 @@ class LibraryGameCreator
         private readonly TitleNormalizer $normalizer,
         private readonly DuplicateDetectionService $duplicates,
         private readonly SteamEnrichmentService $steam,
+        private readonly CoverStorageService $covers,
     ) {}
 
     public function create(User $user, array $payload): LibraryGame
@@ -125,6 +126,13 @@ class LibraryGameCreator
             return $existing;
         }
 
+        if ($existingGameId = $gamePayload['existing_game_id'] ?? null) {
+            $existing = Game::findOrFail($existingGameId);
+            $this->steam->enrich($existing, $steamAppId, $user);
+
+            return $existing;
+        }
+
         if (($gamePayload['source'] ?? 'manual') === 'manual') {
             $possible = $this->duplicates->possibleManualDuplicates($gamePayload['title'], $gamePayload['release_date'] ?? null);
             if ($possible->isNotEmpty() && ! ($gamePayload['create_duplicate_anyway'] ?? false)) {
@@ -135,12 +143,13 @@ class LibraryGameCreator
         }
 
         $provider = Provider::where('key', $gamePayload['source'] ?? 'manual')->first();
+        $coverUrl = $gamePayload['cover_url_original'] ?? null;
 
         $game = Game::create([
             'title' => $gamePayload['title'],
             'normalized_title' => $this->normalizer->normalize($gamePayload['title']),
-            'cover_url_original' => $gamePayload['cover_url_original'] ?? null,
-            'cover_path' => $gamePayload['cover_path'] ?? null,
+            'cover_url_original' => $coverUrl,
+            'cover_path' => $gamePayload['cover_path'] ?? $this->covers->storeFromUrl($coverUrl),
             'publisher' => $gamePayload['publisher'] ?? null,
             'release_date' => $gamePayload['release_date'] ?? null,
             'description' => $gamePayload['description'] ?? null,

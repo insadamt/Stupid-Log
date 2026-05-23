@@ -9,6 +9,7 @@ export type GameCardData = {
     playtime_hours: number;
     earned_achievements: number;
     total_achievements: number;
+    completed_at?: string | null;
     progress: number;
     ownership: string[];
     devices: string[];
@@ -27,6 +28,43 @@ export type StatsData = {
     achievement_progress: number;
     base_value: number;
     purchased_value: number;
+    breakdowns: StatsBreakdowns;
+};
+
+export type PlatformBreakdown = {
+    label: string;
+    library_games: number;
+    completed: number;
+    playtime_hours: number;
+    earned_achievements: number;
+    total_achievements: number;
+    achievement_progress: number;
+    base_value: number;
+    purchased_value: number;
+};
+
+export type StatusBreakdown = {
+    label: string;
+    library_games: number;
+    playtime_hours: number;
+};
+
+export type OwnershipTypeBreakdown = {
+    label: string;
+    ownership_copies: number;
+    base_value: number;
+    purchased_value: number;
+};
+
+export type StatsBreakdowns = {
+    platforms: PlatformBreakdown[];
+    statuses: StatusBreakdown[];
+    ownership_types: OwnershipTypeBreakdown[];
+};
+
+export type GrowthMetric = {
+    delta: number;
+    percentage: number | null;
 };
 
 export type ReferenceData = {
@@ -55,11 +93,55 @@ export type SnapshotRunData = {
 };
 
 export type ConfirmedYearStats = {
+    snapshot_id: number;
     year: number;
+    status: SnapshotStatus;
+    created_at: string | null;
+    confirmed_at: string | null;
+    unique_titles: number;
     library_games: number;
+    ownership_copies: number;
+    owned_dlcs: number;
+    completed: number;
+    hundred_percent: number;
     playtime_hours: number;
     earned_achievements: number;
-    snapshot_id: number;
+    total_achievements: number;
+    achievement_progress: number;
+    base_value: number;
+    purchased_value: number;
+    breakdowns: StatsBreakdowns;
+    best_games: SnapshotBestGame[];
+    growth: Record<string, GrowthMetric>;
+};
+
+export type SnapshotBestGame = {
+    rank?: number;
+    note?: string | null;
+    library_game_id: number;
+    game_id: number;
+    title: string;
+    cover_url?: string | null;
+    platform: string;
+    status: string;
+    playtime_hours: number;
+    earned_achievements: number;
+    total_achievements: number;
+};
+
+export type SnapshotGameRow = {
+    library_game_id: number;
+    title: string;
+    platform: string;
+    status: string;
+    playtime_hours: number;
+    earned_achievements: number;
+    total_achievements: number;
+};
+
+export type SnapshotDetailsData = ConfirmedYearStats & {
+    games: SnapshotGameRow[];
+    eligible_best_games: SnapshotBestGame[];
 };
 
 export type ProviderSearchResult = {

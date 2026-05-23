@@ -567,38 +567,244 @@ class LibraryGameRulesTest extends TestCase
             'purchased_price' => 0,
         ]);
 
-        $snapshot = app(SnapshotService::class)->createDraft($this->user, 2026);
-        $this->assertNull(app(StatsService::class)->confirmedYear($this->user, 2026));
+        $year = (int) now()->format('Y');
+        $snapshot = app(SnapshotService::class)->createDraft($this->user, $year);
+        $this->assertNull(app(StatsService::class)->confirmedYear($this->user, $year));
         app(SnapshotService::class)->confirm($snapshot);
-        $this->assertSame(1, app(StatsService::class)->confirmedYear($this->user, 2026)['library_games']);
+        $confirmed = app(StatsService::class)->confirmedYear($this->user, $year);
+        $this->assertSame(1, $confirmed['library_games']);
+        $this->assertSame(1, $confirmed['unique_titles']);
+        $this->assertSame(1, $confirmed['ownership_copies']);
+        $this->assertSame(1, $confirmed['owned_dlcs']);
+        $this->assertSame(50.0, $confirmed['base_value']);
+        $this->assertSame(5.0, $confirmed['purchased_value']);
+        $this->assertSame('Steam', $confirmed['breakdowns']['platforms'][0]['label']);
     }
 
-    public function test_snapshot_drafts_are_idempotent_and_only_one_snapshot_can_be_confirmed_per_year(): void
+    public function test_snapshot_drafts_keep_multiple_previews_and_only_one_snapshot_can_be_confirmed_per_year(): void
     {
         $creator = app(LibraryGameCreator::class);
         $creator->create($this->user, $this->payload());
 
         $snapshots = app(SnapshotService::class);
-        $firstDraft = $snapshots->createDraft($this->user, 2026);
-        $secondDraft = $snapshots->createDraft($this->user, 2026);
+        $year = (int) now()->format('Y');
+        $firstDraft = $snapshots->createDraft($this->user, $year);
+        $secondDraft = $snapshots->createDraft($this->user, $year);
 
-        $this->assertDatabaseMissing('snapshot_runs', ['id' => $firstDraft->id]);
-        $this->assertSame(1, SnapshotRun::where('user_id', $this->user->id)->where('year', 2026)->where('status', 'draft')->count());
+        $this->assertDatabaseHas('snapshot_runs', ['id' => $firstDraft->id]);
+        $this->assertSame(2, SnapshotRun::where('user_id', $this->user->id)->where('year', $year)->where('status', 'draft')->count());
+        $this->assertSame(1, DB::table('library_game_snapshots')->where('snapshot_run_id', $firstDraft->id)->count());
         $this->assertSame(1, DB::table('library_game_snapshots')->where('snapshot_run_id', $secondDraft->id)->count());
 
         $snapshots->confirm($secondDraft);
         $this->assertSame('confirmed', $secondDraft->refresh()->status);
 
-        $thirdDraft = $snapshots->createDraft($this->user, 2026);
-
         try {
-            $snapshots->confirm($thirdDraft);
-            $this->fail('A second confirmed snapshot for the same year should be blocked.');
+            $snapshots->createDraft($this->user, $year);
+            $this->fail('Drafting a locked confirmed year should be blocked.');
         } catch (ValidationException) {
             $this->assertTrue(true);
         }
 
-        $this->assertSame(1, SnapshotRun::where('user_id', $this->user->id)->where('year', 2026)->where('status', 'confirmed')->count());
+        $this->assertSame(1, SnapshotRun::where('user_id', $this->user->id)->where('year', $year)->where('status', 'confirmed')->count());
+    }
+
+    public function test_snapshot_drafts_copy_current_library_stats_for_the_selected_archive_year(): void
+    {
+        $pastYear = (int) now()->format('Y') - 1;
+
+        app(LibraryGameCreator::class)->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Past Owned Game',
+                'source' => 'manual',
+                'create_duplicate_anyway' => true,
+            ],
+            'ownership_copies' => [[
+                'ownership_type_id' => OwnershipType::where('name', 'Digital')->firstOrFail()->id,
+                'base_price' => 20,
+                'purchased_price' => 10,
+                'purchased_at' => "{$pastYear}-06-01",
+            ]],
+        ]));
+
+        app(LibraryGameCreator::class)->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Past Played Current Copy Game',
+                'source' => 'manual',
+                'total_achievements' => 10,
+                'create_duplicate_anyway' => true,
+            ],
+            'ownership_copies' => [[
+                'ownership_type_id' => OwnershipType::where('name', 'Digital')->firstOrFail()->id,
+                'base_price' => 60,
+                'purchased_price' => 30,
+            ]],
+            'progress' => [
+                'status_id' => Status::where('name', 'In Progress')->firstOrFail()->id,
+                'playtime_hours' => 33.5,
+                'earned_achievements' => 4,
+                'first_played_at' => "{$pastYear}-03-01",
+            ],
+        ]));
+
+        app(LibraryGameCreator::class)->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Current Only Game',
+                'source' => 'manual',
+                'create_duplicate_anyway' => true,
+            ],
+        ]));
+
+        $snapshot = app(SnapshotService::class)->createDraft($this->user, $pastYear);
+        $summary = app(StatsService::class)->snapshotSummary($snapshot);
+
+        $this->assertSame(3, $summary['library_games']);
+        $this->assertSame(3, $summary['ownership_copies']);
+        $this->assertSame(100.0, $summary['base_value']);
+        $this->assertSame(33.5, $summary['playtime_hours']);
+        $this->assertSame(4, $summary['earned_achievements']);
+        $this->assertSame('Steam', $summary['breakdowns']['platforms'][0]['label']);
+    }
+
+    public function test_snapshot_pages_receive_summary_and_detail_payloads(): void
+    {
+        app(LibraryGameCreator::class)->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Snapshot Game',
+                'source' => 'manual',
+                'total_achievements' => 12,
+                'create_duplicate_anyway' => true,
+            ],
+            'progress' => [
+                'status_id' => Status::where('name', 'Completed')->firstOrFail()->id,
+                'playtime_hours' => 18.5,
+                'earned_achievements' => 6,
+            ],
+        ]));
+
+        $year = (int) now()->format('Y');
+        $snapshot = app(SnapshotService::class)->createDraft($this->user, $year);
+        app(SnapshotService::class)->confirm($snapshot);
+
+        $snapshotsPage = $this->get('/snapshots')->assertOk()->viewData('page');
+
+        $this->assertSame('Snapshots', $snapshotsPage['component']);
+        $this->assertSame($snapshot->id, $snapshotsPage['props']['snapshots'][0]['snapshot_id']);
+        $this->assertSame(1, $snapshotsPage['props']['snapshots'][0]['library_games']);
+        $this->assertSame(1, $snapshotsPage['props']['snapshots'][0]['completed']);
+        $this->assertSame($snapshot->id, $snapshotsPage['props']['confirmedCurrentYear']['snapshot_id']);
+
+        $detailsPage = $this->get("/snapshots/{$snapshot->id}")->assertOk()->viewData('page');
+
+        $this->assertSame('Snapshots', $detailsPage['component']);
+        $this->assertSame($snapshot->id, $detailsPage['props']['selectedSnapshot']['snapshot_id']);
+        $this->assertSame('Snapshot Game', $detailsPage['props']['selectedSnapshot']['games'][0]['title']);
+        $this->assertSame('Steam', $detailsPage['props']['selectedSnapshot']['games'][0]['platform']);
+    }
+
+    public function test_snapshot_routes_can_create_selected_years_and_delete_runs(): void
+    {
+        app(LibraryGameCreator::class)->create($this->user, $this->payload());
+        $year = (int) now()->format('Y');
+
+        $this->post('/snapshots', ['year' => $year])->assertRedirect();
+
+        $snapshot = SnapshotRun::where('user_id', $this->user->id)
+            ->where('year', $year)
+            ->where('status', 'draft')
+            ->firstOrFail();
+
+        $this->assertSame(1, DB::table('library_game_snapshots')->where('snapshot_run_id', $snapshot->id)->count());
+
+        $this->delete("/snapshots/{$snapshot->id}")->assertRedirect('/snapshots');
+
+        $this->assertDatabaseMissing('snapshot_runs', ['id' => $snapshot->id]);
+        $this->assertSame(0, DB::table('library_game_snapshots')->where('snapshot_run_id', $snapshot->id)->count());
+
+        $this->post('/snapshots', ['year' => $year + 1])->assertRedirect();
+        $this->assertDatabaseHas('snapshot_runs', ['year' => $year + 1, 'status' => 'draft']);
+    }
+
+    public function test_snapshot_best_games_are_limited_to_completed_games_for_that_year_and_unique_by_global_game(): void
+    {
+        $year = (int) now()->format('Y');
+        $nextYear = $year + 1;
+        $completed = Status::where('name', 'Completed')->firstOrFail();
+        $inProgress = Status::where('name', 'In Progress')->firstOrFail();
+        $creator = app(LibraryGameCreator::class);
+
+        $bestSteam = $creator->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Little Nightmares',
+                'source' => 'manual',
+                'total_achievements' => 10,
+                'create_duplicate_anyway' => true,
+            ],
+            'progress' => [
+                'status_id' => $completed->id,
+                'playtime_hours' => 8,
+                'earned_achievements' => 4,
+                'completed_at' => "{$year}-04-12",
+            ],
+        ]));
+
+        $notEligible = $creator->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Unfinished Game',
+                'source' => 'manual',
+                'total_achievements' => 10,
+                'create_duplicate_anyway' => true,
+            ],
+            'progress' => [
+                'status_id' => $inProgress->id,
+                'playtime_hours' => 4,
+                'earned_achievements' => 1,
+            ],
+        ]));
+
+        $bestXbox = $creator->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Little Nightmares Xbox',
+                'source' => 'manual',
+                'total_achievements' => 10,
+                'create_duplicate_anyway' => true,
+            ],
+            'progress' => [
+                'status_id' => $completed->id,
+                'playtime_hours' => 9,
+                'earned_achievements' => 5,
+                'completed_at' => "{$nextYear}-01-08",
+            ],
+        ], 'Xbox', 'Xbox Series X|S', 'Digital'));
+        $bestXbox->update(['game_id' => $bestSteam->game_id]);
+
+        $snapshot = app(SnapshotService::class)->createDraft($this->user, $year);
+        $eligible = collect(app(SnapshotService::class)->eligibleBestGames($snapshot));
+
+        $this->assertTrue($eligible->contains('library_game_id', $bestSteam->id));
+        $this->assertFalse($eligible->contains('library_game_id', $notEligible->id));
+
+        $this->patch("/snapshots/{$snapshot->id}/best-games", [
+            'library_game_ids' => [$bestSteam->id],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('snapshot_best_games', [
+            'snapshot_run_id' => $snapshot->id,
+            'library_game_id' => $bestSteam->id,
+            'game_id' => $bestSteam->game_id,
+            'rank' => 1,
+        ]);
+
+        app(SnapshotService::class)->confirm($snapshot);
+
+        $this->patch("/snapshots/{$snapshot->id}/best-games", [
+            'library_game_ids' => [],
+        ])->assertSessionHasErrors('best_games');
+
+        $nextSnapshot = app(SnapshotService::class)->createDraft($this->user, $nextYear);
+        $nextEligible = collect(app(SnapshotService::class)->eligibleBestGames($nextSnapshot));
+
+        $this->assertFalse($nextEligible->contains('library_game_id', $bestXbox->id));
     }
 
     private function payload(array $overrides = [], string $platform = 'Steam', string $device = 'PC', string $ownership = 'Digital', bool $includePhysicalStatus = true): array

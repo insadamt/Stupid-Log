@@ -27,7 +27,12 @@ export default function Settings({
     steamCredential: SteamCredential;
 }) {
     const [testingIgdb, setTestingIgdb] = useState(false);
+    const [testingSteam, setTestingSteam] = useState(false);
     const [igdbTest, setIgdbTest] = useState<{
+        ok: boolean;
+        message: string;
+    } | null>(null);
+    const [steamTest, setSteamTest] = useState<{
         ok: boolean;
         message: string;
     } | null>(null);
@@ -79,9 +84,48 @@ export default function Settings({
         }
     }
 
+    async function testSteam(event: MouseEvent<HTMLButtonElement>) {
+        const form = event.currentTarget.form;
+        if (!form) return;
+
+        setTestingSteam(true);
+        setSteamTest(null);
+
+        const csrf =
+            document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+                ?.content ?? "";
+        const formData = new FormData(form);
+
+        try {
+            const response = await fetch("/settings/steam/test", {
+                method: "POST",
+                headers: {
+                    "X-CSRF-TOKEN": csrf,
+                    Accept: "application/json",
+                },
+                body: formData,
+            });
+            const data = (await response.json()) as {
+                ok: boolean;
+                message: string;
+            };
+            setSteamTest({ ok: response.ok && data.ok, message: data.message });
+        } catch (error) {
+            setSteamTest({
+                ok: false,
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : "Steam test failed.",
+            });
+        } finally {
+            setTestingSteam(false);
+        }
+    }
+
     return (
         <AppLayout title="Settings">
-            <section className="pl-[88px]">
+            <section className="px-4 md:pl-[88px] md:pr-0">
                 <div className="mb-8 rounded-[42px] bg-black p-8 text-[#b7ff63] shadow-2xl">
                     <div className="text-sm font-black uppercase tracking-[0.32em] text-[#b7ff63]/55">
                         Profile and providers
@@ -97,7 +141,7 @@ export default function Settings({
 
                 <form
                     onSubmit={submit}
-                    className="grid max-w-5xl grid-cols-[1fr_1fr] gap-6 rounded-[42px] bg-[#b7ff63] p-8 shadow-xl"
+                    className="grid max-w-5xl gap-6 rounded-[42px] bg-[#b7ff63] p-8 shadow-xl md:grid-cols-[1fr_1fr]"
                 >
                     <label className="grid gap-2 text-sm font-black uppercase tracking-[0.18em] text-black/45">
                         Username
@@ -157,7 +201,7 @@ export default function Settings({
                             className="rounded-2xl border-4 border-black/10 bg-white px-5 py-4 text-2xl font-black normal-case tracking-normal outline-none focus:border-black"
                         />
                     </label>
-                    <div className="col-span-2 grid gap-4 rounded-[26px] bg-white/45 p-5">
+                    <div className="grid gap-4 rounded-[26px] bg-white/45 p-5 md:col-span-2">
                         <div className="flex flex-wrap items-center gap-3 text-lg font-black">
                             <span
                                 className={`rounded-full px-5 py-2 ${igdbCredential.has_client_id && igdbCredential.has_client_secret ? "bg-black text-[#b7ff63]" : "bg-white text-black/55"}`}
@@ -170,20 +214,29 @@ export default function Settings({
                             {igdbCredential.last_test_status && (
                                 <span className="rounded-full bg-white px-5 py-2 text-black/55">
                                     Last test: {igdbCredential.last_test_status}
+                                    {igdbCredential.last_tested_at ? ` at ${new Date(igdbCredential.last_tested_at).toLocaleString()}` : ""}
                                 </span>
                             )}
                         </div>
-                        <span
-                            className={`rounded-full px-5 py-2 ${
-                                steamCredential.has_api_key
-                                    ? "bg-black text-[#b7ff63]"
-                                    : "bg-white text-black/55"
-                            }`}
-                        >
-                            {steamCredential.has_api_key
-                                ? "Steam key saved"
-                                : "Steam key missing"}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-3 text-lg font-black">
+                            <span
+                                className={`rounded-full px-5 py-2 ${
+                                    steamCredential.has_api_key
+                                        ? "bg-black text-[#b7ff63]"
+                                        : "bg-white text-black/55"
+                                }`}
+                            >
+                                {steamCredential.has_api_key
+                                    ? "Steam key saved"
+                                    : "Steam key missing"}
+                            </span>
+                            {steamCredential.last_test_status && (
+                                <span className="rounded-full bg-white px-5 py-2 text-black/55">
+                                    Last test: {steamCredential.last_test_status}
+                                    {steamCredential.last_tested_at ? ` at ${new Date(steamCredential.last_tested_at).toLocaleString()}` : ""}
+                                </span>
+                            )}
+                        </div>
                         <div className="flex items-center gap-4">
                             <button
                                 type="button"
@@ -203,8 +256,27 @@ export default function Settings({
                                 </div>
                             )}
                         </div>
+                        <div className="flex items-center gap-4">
+                            <button
+                                type="button"
+                                onClick={testSteam}
+                                disabled={testingSteam}
+                                className="rounded-[20px] bg-white px-8 py-4 text-xl font-black text-black shadow-sm disabled:opacity-45"
+                            >
+                                {testingSteam
+                                    ? "Testing Steam..."
+                                    : "Test Steam API"}
+                            </button>
+                            {steamTest && (
+                                <div
+                                    className={`text-xl font-black ${steamTest.ok ? "text-black" : "text-[#b00020]"}`}
+                                >
+                                    {steamTest.message}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <button className="col-span-2 rounded-[24px] bg-black px-8 py-5 text-2xl font-black text-[#b7ff63] shadow-xl transition hover:-translate-y-1">
+                    <button className="rounded-[24px] bg-black px-8 py-5 text-2xl font-black text-[#b7ff63] shadow-xl transition hover:-translate-y-1 md:col-span-2">
                         Save Settings
                     </button>
                 </form>

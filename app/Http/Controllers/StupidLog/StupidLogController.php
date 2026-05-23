@@ -21,6 +21,7 @@ use App\Models\StupidLog\SnapshotRun;
 use App\Models\StupidLog\Status;
 use App\Models\User;
 use App\Services\LibraryGameCreator;
+use App\Services\DuplicateDetectionService;
 use App\Services\ProviderSearchService;
 use App\Services\SnapshotService;
 use App\Services\StatsService;
@@ -182,6 +183,7 @@ class StupidLogController extends Controller
             'progress.status_id' => ['required', 'integer', 'exists:statuses,id'],
             'progress.playtime_hours' => ['nullable', 'numeric', 'min:0', 'max:999999.9'],
             'progress.earned_achievements' => ['nullable', 'integer', 'min:0'],
+            'progress.completed_at' => ['nullable', 'date'],
         ]);
 
         $status = Status::findOrFail($validated['progress']['status_id']);
@@ -194,6 +196,10 @@ class StupidLogController extends Controller
 
         if ($status->name === '100%' && (! $totalAchievements || (int) $earnedAchievements !== (int) $totalAchievements)) {
             throw ValidationException::withMessages(['progress.status_id' => '100% requires earned achievements to equal total achievements.']);
+        }
+
+        if (in_array($status->name, ['Completed', '100%'], true) && empty($validated['progress']['completed_at'])) {
+            throw ValidationException::withMessages(['progress.completed_at' => 'Completed date is required for Completed and 100%.']);
         }
 
         $libraryGame->game->update([
@@ -209,6 +215,9 @@ class StupidLogController extends Controller
             'status_id' => $status->id,
             'playtime_hours' => $validated['progress']['playtime_hours'] ?? 0,
             'earned_achievements' => $earnedAchievements,
+            'completed_at' => in_array($status->name, ['Completed', '100%'], true)
+                ? $validated['progress']['completed_at']
+                : null,
         ]);
 
         return back();
@@ -267,7 +276,12 @@ class StupidLogController extends Controller
 
     public function stats(StatsService $stats): Response
     {
-        return Inertia::render('Stats', ['stats' => $stats->live($this->localUser())]);
+        $user = $this->localUser();
+
+        return Inertia::render('Stats', [
+            'stats' => $stats->live($user),
+            'confirmedYears' => $stats->confirmedYears($user),
+        ]);
     }
 
     public function snapshots(StatsService $stats): Response
@@ -276,9 +290,29 @@ class StupidLogController extends Controller
         $snapshots = SnapshotRun::where('user_id', $user->id)->latest()->get();
 
         return Inertia::render('Snapshots', [
-            'snapshots' => $snapshots,
+            'snapshots' => $snapshots->map(fn (SnapshotRun $snapshot) => $stats->snapshotSummary($snapshot))->values(),
+            'liveStats' => $stats->live($user),
             'currentYear' => (int) now()->format('Y'),
             'confirmedCurrentYear' => $stats->confirmedYear($user, (int) now()->format('Y')),
+        ]);
+    }
+
+    public function snapshotDetails(SnapshotRun $snapshotRun, StatsService $stats, SnapshotService $snapshotService): Response
+    {
+        return Inertia::render('Snapshots', [
+            'snapshots' => SnapshotRun::where('user_id', $snapshotRun->user_id)
+                ->latest()
+                ->get()
+                ->map(fn (SnapshotRun $snapshot) => $stats->snapshotSummary($snapshot))
+                ->values(),
+            'selectedSnapshot' => [
+                ...$stats->snapshotSummary($snapshotRun),
+                'games' => $stats->snapshotRows($snapshotRun),
+                'eligible_best_games' => $snapshotService->eligibleBestGames($snapshotRun),
+            ],
+            'liveStats' => $stats->live($this->localUser()),
+            'currentYear' => (int) now()->format('Y'),
+            'confirmedCurrentYear' => $stats->confirmedYear($this->localUser(), (int) now()->format('Y')),
         ]);
     }
 
@@ -297,6 +331,32 @@ class StupidLogController extends Controller
         return back();
     }
 
+    public function resnapSnapshot(SnapshotRun $snapshotRun, SnapshotService $snapshots): RedirectResponse
+    {
+        $snapshots->resnapDraft($snapshotRun);
+
+        return back();
+    }
+
+    public function updateSnapshotBestGames(Request $request, SnapshotRun $snapshotRun, SnapshotService $snapshots): RedirectResponse
+    {
+        $validated = $request->validate([
+            'library_game_ids' => ['nullable', 'array', 'max:5'],
+            'library_game_ids.*' => ['integer', 'exists:library_games,id'],
+        ]);
+
+        $snapshots->updateBestGames($snapshotRun, $validated['library_game_ids'] ?? []);
+
+        return back();
+    }
+
+    public function destroySnapshot(SnapshotRun $snapshotRun): RedirectResponse
+    {
+        $snapshotRun->delete();
+
+        return redirect()->route('snapshots');
+    }
+
     public function setup(): Response
     {
         return Inertia::render('Setup', [
@@ -311,11 +371,13 @@ class StupidLogController extends Controller
             'currency_code' => ['required', 'exists:currencies,code'],
             'igdb_client_id' => ['nullable', 'string'],
             'igdb_client_secret' => ['nullable', 'string'],
+            'steam_api_key' => ['nullable', 'string'],
         ]);
 
         $user = User::updateOrCreate(['id' => $this->localUser()->id], ['username' => $validated['username']]);
         AppSetting::updateOrCreate(['user_id' => $user->id], ['currency_code' => $validated['currency_code']]);
         $this->storeCredential($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null);
+        $this->storeCredential($user, 'steam', null, null, $validated['steam_api_key'] ?? null);
 
         return redirect()->route('home');
     }
@@ -429,6 +491,65 @@ class StupidLogController extends Controller
         }
     }
 
+    public function testSteamCredentials(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'steam_api_key' => ['nullable', 'string'],
+        ]);
+
+        $user = $this->localUser();
+        $credential = $this->credential($user, 'steam');
+        $apiKey = ($validated['steam_api_key'] ?? null) ?: ($credential?->encrypted_api_key ? Crypt::decryptString($credential->encrypted_api_key) : null);
+
+        if (! $apiKey) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Add a Steam API key before testing.',
+            ], 422);
+        }
+
+        try {
+            Http::get('https://api.steampowered.com/ISteamWebAPIUtil/GetSupportedAPIList/v1/', [
+                'key' => $apiKey,
+            ])->throw();
+
+            $this->markCredentialTest($credential, 'ok');
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Steam API key works.',
+            ]);
+        } catch (Throwable $exception) {
+            $this->markCredentialTest($credential, 'failed');
+
+            return response()->json([
+                'ok' => false,
+                'message' => 'Steam test failed: '.$exception->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function manualDuplicates(Request $request, DuplicateDetectionService $duplicates): JsonResponse
+    {
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'min:2', 'max:255'],
+            'release_date' => ['nullable', 'date'],
+        ]);
+
+        return response()->json([
+            'duplicates' => $duplicates
+                ->possibleManualDuplicates($validated['title'], $validated['release_date'] ?? null)
+                ->map(fn ($game) => [
+                    'id' => $game->id,
+                    'title' => $game->title,
+                    'release_year' => $game->release_date?->format('Y'),
+                    'publisher' => $game->publisher,
+                    'cover_url' => $game->cover_path ? asset('storage/'.$game->cover_path) : $game->cover_url_original,
+                ])
+                ->values(),
+        ]);
+    }
+
     public function storeLibraryGame(StoreLibraryGameRequest $request, LibraryGameCreator $creator): RedirectResponse
     {
         $libraryGame = $creator->create($this->localUser(), $request->validated());
@@ -510,6 +631,7 @@ class StupidLogController extends Controller
             'playtime_hours' => (float) $libraryGame->playtime_hours,
             'earned_achievements' => $libraryGame->earned_achievements ?? 0,
             'total_achievements' => $game->total_achievements ?? 0,
+            'completed_at' => $libraryGame->completed_at?->format('Y-m-d'),
             'progress' => $game->total_achievements ? round((($libraryGame->earned_achievements ?? 0) / $game->total_achievements) * 100) : 0,
             'ownership' => $libraryGame->ownershipCopies->map(fn ($copy) => $copy->ownershipType?->name ?? OwnershipType::find($copy->ownership_type_id)?->name)->filter()->values(),
             'devices' => $libraryGame->devices->pluck('name')->values(),
@@ -550,6 +672,7 @@ class StupidLogController extends Controller
                 'owned_dlc_id' => $ownedDlc?->id,
                 'title' => $dlc->title,
                 'base_price' => $dlc->base_price,
+                'cover_url' => $dlc->cover_path ? asset('storage/'.$dlc->cover_path) : $dlc->cover_url_original,
                 'state' => $ownedDlc?->acquisition_type ?? 'Not Owned',
                 'purchased_price' => $ownedDlc?->purchased_price,
                 'purchased_at' => $ownedDlc?->purchased_at?->format('Y-m-d'),

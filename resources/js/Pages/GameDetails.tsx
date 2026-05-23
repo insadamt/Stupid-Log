@@ -25,6 +25,7 @@ type Dlc = {
     id: number;
     owned_dlc_id: number | null;
     title: string;
+    cover_url?: string | null;
     base_price: string | number | null;
     state: string;
     purchased_price: string | number | null;
@@ -70,6 +71,7 @@ type GameEditForm = {
     status_id: string;
     playtime_hours: string;
     earned_achievements: string;
+    completed_at: string;
 };
 
 const physicalLike = ['Physical', 'Pre-owned', 'Borrowed'];
@@ -195,6 +197,8 @@ export default function GameDetails({
     const [editingGame, setEditingGame] = useState(false);
     const [gameErrors, setGameErrors] = useState<Record<string, string>>({});
     const [savingGame, setSavingGame] = useState(false);
+    const [pendingGameStatusId, setPendingGameStatusId] = useState<string | null>(null);
+    const [gameCompletionDateDraft, setGameCompletionDateDraft] = useState(new Date().toISOString().slice(0, 10));
     const [gameForm, setGameForm] = useState<GameEditForm>(() => ({
         title: libraryGame.title,
         publisher: libraryGame.publisher ?? '',
@@ -204,6 +208,7 @@ export default function GameDetails({
         status_id: String(references.statuses.find((status) => status.name === libraryGame.status)?.id ?? references.statuses[0]?.id ?? ''),
         playtime_hours: String(libraryGame.playtime_hours ?? 0),
         earned_achievements: String(libraryGame.earned_achievements ?? 0),
+        completed_at: libraryGame.completed_at ?? '',
     }));
     const [editingPlatformDevices, setEditingPlatformDevices] = useState(false);
     const [platformDeviceErrors, setPlatformDeviceErrors] = useState<Record<string, string>>({});
@@ -229,6 +234,8 @@ export default function GameDetails({
     const selectedOwnershipType = details.platform_ownership_types.find((type) => String(type.id) === ownershipForm.ownership_type_id);
     const needsPhysicalStatus = selectedOwnershipType ? physicalLike.includes(selectedOwnershipType.name) : false;
     const selectedPlatform = references.platforms.find((platform) => String(platform.id) === platformDeviceForm.platform_id);
+    const selectedGameStatus = references.statuses.find((status) => String(status.id) === gameForm.status_id);
+    const gameHasAchievements = Number(gameForm.total_achievements || 0) > 0;
 
     function updateOwnershipForm(patch: Partial<OwnershipForm>) {
         setOwnershipForm((current) => ({ ...current, ...patch }));
@@ -294,6 +301,35 @@ export default function GameDetails({
         setGameForm((current) => ({ ...current, ...patch }));
     }
 
+    function updateGameStatus(statusId: string) {
+        const nextStatus = references.statuses.find((status) => String(status.id) === statusId);
+        if (nextStatus?.name === 'Completed' || nextStatus?.name === '100%') {
+            setPendingGameStatusId(statusId);
+            setGameCompletionDateDraft(gameForm.completed_at || new Date().toISOString().slice(0, 10));
+            return;
+        }
+
+        setGameForm((current) => ({
+            ...current,
+            status_id: statusId,
+            earned_achievements: nextStatus?.name === '100%' && Number(current.total_achievements) > 0 ? current.total_achievements : current.earned_achievements,
+            completed_at: '',
+        }));
+    }
+
+    function applyGameCompletedStatus() {
+        if (!pendingGameStatusId) return;
+        const nextStatus = references.statuses.find((status) => String(status.id) === pendingGameStatusId);
+
+        setGameForm((current) => ({
+            ...current,
+            status_id: pendingGameStatusId,
+            earned_achievements: nextStatus?.name === '100%' && Number(current.total_achievements) > 0 ? current.total_achievements : current.earned_achievements,
+            completed_at: gameCompletionDateDraft || new Date().toISOString().slice(0, 10),
+        }));
+        setPendingGameStatusId(null);
+    }
+
     function submitGameEdit() {
         router.patch(`/games/${libraryGame.id}`, {
             game: {
@@ -307,6 +343,7 @@ export default function GameDetails({
                 status_id: Number(gameForm.status_id),
                 playtime_hours: gameForm.playtime_hours === '' ? 0 : Number(gameForm.playtime_hours),
                 earned_achievements: gameForm.earned_achievements === '' ? null : Number(gameForm.earned_achievements),
+                completed_at: gameForm.completed_at || null,
             },
         }, {
             preserveScroll: true,
@@ -650,7 +687,7 @@ export default function GameDetails({
 
                 {editingGame && (
                     <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 px-5 backdrop-blur-sm">
-                        <section className="w-full max-w-3xl rounded-[34px] border border-white/10 bg-black p-6 text-white shadow-[0_36px_120px_rgb(0_0_0/0.45)]">
+                        <section className="relative w-full max-w-3xl rounded-[34px] border border-white/10 bg-black p-6 text-white shadow-[0_36px_120px_rgb(0_0_0/0.45)]">
                             <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-5">
                                 <div>
                                     <div className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]">Edit Entry</div>
@@ -667,8 +704,10 @@ export default function GameDetails({
                                     <TextInput value={gameForm.publisher} onChange={(event) => updateGameForm({ publisher: event.target.value })} placeholder="Unknown Publisher" />
                                 </Field>
                                 <Field label="Status" error={gameErrors['progress.status_id']}>
-                                    <Select value={gameForm.status_id} onChange={(event) => updateGameForm({ status_id: event.target.value })}>
-                                        {references.statuses.map((status) => <option key={status.id} value={status.id} className="text-black">{status.name}</option>)}
+                                    <Select value={gameForm.status_id} onChange={(event) => updateGameStatus(event.target.value)}>
+                                        {references.statuses
+                                            .filter((status) => gameHasAchievements || status.name !== '100%')
+                                            .map((status) => <option key={status.id} value={status.id} className="text-black">{status.name}</option>)}
                                     </Select>
                                 </Field>
                                 <Field label="Playtime Hours" error={gameErrors['progress.playtime_hours']}>
@@ -680,9 +719,19 @@ export default function GameDetails({
                                 <Field label="Total Achievements" error={gameErrors['game.total_achievements']}>
                                     <TextInput type="number" value={gameForm.total_achievements} onChange={(event) => updateGameForm({ total_achievements: event.target.value })} />
                                 </Field>
+                                {(selectedGameStatus?.name === 'Completed' || selectedGameStatus?.name === '100%') && (
+                                    <Field label="Completed Date" error={gameErrors['progress.completed_at']}>
+                                        <TextInput type="date" value={gameForm.completed_at} onChange={(event) => updateGameForm({ completed_at: event.target.value })} />
+                                    </Field>
+                                )}
                                 <Field label="Base Value" error={gameErrors['game.base_price_default']}>
                                     <TextInput type="number" step="0.01" value={gameForm.base_price_default} onChange={(event) => updateGameForm({ base_price_default: event.target.value })} />
                                 </Field>
+                                {!gameHasAchievements && (
+                                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-black text-white/55 md:col-span-2">
+                                        100% is unavailable because this game has no achievement total.
+                                    </div>
+                                )}
                                 <div className="md:col-span-2">
                                     <Field label="Description" error={gameErrors['game.description']}>
                                         <TextArea value={gameForm.description} onChange={(event) => updateGameForm({ description: event.target.value })} placeholder="No description saved yet." />
@@ -696,6 +745,26 @@ export default function GameDetails({
                                     <Save size={18} /> {savingGame ? 'Saving' : 'Save'}
                                 </button>
                             </div>
+
+                            {pendingGameStatusId && (
+                                <div className="absolute inset-0 grid place-items-center rounded-[34px] bg-black/70 px-5">
+                                    <section className="w-full max-w-md rounded-[28px] bg-white p-6 text-black shadow-[0_30px_90px_rgb(0_0_0/0.45)]">
+                                        <div className="text-xs font-black uppercase tracking-[0.24em] text-black/35">Completion date</div>
+                                        <h3 className="mt-2 text-3xl font-black tracking-[-0.05em]">When did you finish it?</h3>
+                                        <p className="mt-3 text-sm font-bold text-black/50">Today is filled in automatically. Change it if needed.</p>
+                                        <input
+                                            value={gameCompletionDateDraft}
+                                            onChange={(event) => setGameCompletionDateDraft(event.target.value)}
+                                            type="date"
+                                            className="mt-5 h-12 w-full rounded-2xl border border-black/10 bg-[#f4f5ef] px-4 text-sm font-black text-black outline-none focus:border-black"
+                                        />
+                                        <div className="mt-6 flex justify-end gap-3">
+                                            <button type="button" onClick={() => setPendingGameStatusId(null)} className="rounded-2xl bg-black/5 px-5 py-3 text-sm font-black text-black/55">Cancel</button>
+                                            <button type="button" onClick={applyGameCompletedStatus} className="rounded-2xl bg-black px-5 py-3 text-sm font-black text-white">Apply</button>
+                                        </div>
+                                    </section>
+                                </div>
+                            )}
                         </section>
                     </div>
                 )}

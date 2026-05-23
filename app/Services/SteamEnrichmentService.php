@@ -14,6 +14,8 @@ use Throwable;
 
 class SteamEnrichmentService
 {
+    public function __construct(private readonly CoverStorageService $covers) {}
+
     public function enrich(Game $game, ?string $steamAppId, ?User $user = null): array
     {
         if (! $steamAppId) {
@@ -116,12 +118,16 @@ class SteamEnrichmentService
                 continue;
             }
 
+            $coverUrl = $dlcData['header_image'] ?? null;
+            $existing = Dlc::where('steam_app_id', $dlcId)->first();
+
             Dlc::updateOrCreate(
                 ['steam_app_id' => $dlcId],
                 [
                     'game_id' => $game->id,
                     'title' => $dlcData['name'] ?? 'Untitled DLC',
-                    'cover_url_original' => $dlcData['header_image'] ?? null,
+                    'cover_url_original' => $coverUrl,
+                    'cover_path' => $existing?->cover_path ?: $this->covers->storeFromUrl($coverUrl),
                     'base_price' => $this->price($dlcData),
                     'source_provider_id' => $provider?->id,
                     'synced_at' => now(),

@@ -95,6 +95,16 @@ type Draft = {
     first_played_at: string;
     last_played_at: string;
     completed_at: string;
+    existing_game_id: number | null;
+    create_duplicate_anyway: boolean;
+};
+
+type ManualDuplicate = {
+    id: number;
+    title: string;
+    release_year?: string | null;
+    publisher?: string | null;
+    cover_url?: string | null;
 };
 
 const steps: Array<{ key: StepKey; label: string }> = [
@@ -328,6 +338,8 @@ export default function AddGameWizard({
         first_played_at: "",
         last_played_at: "",
         completed_at: "",
+        existing_game_id: null,
+        create_duplicate_anyway: false,
     });
 
     const [open, setOpen] = useState(false);
@@ -350,6 +362,10 @@ export default function AddGameWizard({
     const [dlcQuery, setDlcQuery] = useState("");
     const [saving, setSaving] = useState(false);
     const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
+    const [duplicateCandidates, setDuplicateCandidates] = useState<ManualDuplicate[]>([]);
+    const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+    const [pendingStatusId, setPendingStatusId] = useState<number | null>(null);
+    const [completionDateDraft, setCompletionDateDraft] = useState(today());
     const searchId = useRef(0);
     const coverInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -471,6 +487,8 @@ export default function AddGameWizard({
             ownership_copies: current.ownership_copies.map((copy) => ({ ...copy, base_price: copy.base_price || basePrice })),
             dlcs,
             owned_dlcs: [],
+            existing_game_id: null,
+            create_duplicate_anyway: false,
         }));
     }
 
@@ -532,6 +550,8 @@ export default function AddGameWizard({
             ownership_copies: current.ownership_copies.map((copy) => ({ ...copy, base_price: "" })),
             dlcs: [],
             owned_dlcs: [],
+            existing_game_id: null,
+            create_duplicate_anyway: false,
         }));
         setProviderCoverUrl("");
         setLocalCoverPreview("");
@@ -682,12 +702,52 @@ export default function AddGameWizard({
 
     function chooseStatus(statusId: number) {
         const nextStatus = references.statuses.find((item) => item.id === statusId);
+        if (nextStatus?.name === "Completed" || nextStatus?.name === "100%") {
+            setPendingStatusId(statusId);
+            setCompletionDateDraft(draft.completed_at || today());
+            return;
+        }
+
         setDraft((current) => ({
             ...current,
             status_id: statusId,
             earned_achievements: nextStatus?.name === "100%" && Number(current.total_achievements) > 0 ? current.total_achievements : current.earned_achievements,
-            completed_at: nextStatus?.name === "Completed" || nextStatus?.name === "100%" ? current.completed_at || today() : current.completed_at,
+            completed_at: "",
         }));
+    }
+
+    function applyCompletedStatus() {
+        if (!pendingStatusId) return;
+        const nextStatus = references.statuses.find((item) => item.id === pendingStatusId);
+
+        setDraft((current) => ({
+            ...current,
+            status_id: pendingStatusId,
+            earned_achievements: nextStatus?.name === "100%" && Number(current.total_achievements) > 0 ? current.total_achievements : current.earned_achievements,
+            completed_at: completionDateDraft || today(),
+        }));
+        setPendingStatusId(null);
+    }
+
+    async function checkManualDuplicates() {
+        const params = new URLSearchParams({ title: draft.title.trim() });
+        if (draft.release_date) params.set("release_date", draft.release_date);
+
+        setCheckingDuplicates(true);
+        try {
+            const response = await fetch(`/library-games/manual-duplicates?${params.toString()}`, {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+            });
+            if (!response.ok) throw new Error("Duplicate check failed.");
+            const data = await response.json() as { duplicates: ManualDuplicate[] };
+            setDuplicateCandidates(data.duplicates);
+            return data.duplicates;
+        } catch {
+            return [];
+        } finally {
+            setCheckingDuplicates(false);
+        }
     }
 
     function errorFor(stepKey: StepKey): string | null {
@@ -747,9 +807,14 @@ export default function AddGameWizard({
         setStepIndex((current) => Math.max(current - 1, 0));
     }
 
-    function submit() {
+    async function submit(forceCreateDuplicate = false) {
         const reviewError = errorFor("review");
         if (reviewError) return;
+
+        if (draft.source === "manual" && !draft.existing_game_id && !draft.create_duplicate_anyway && !forceCreateDuplicate) {
+            const duplicates = await checkManualDuplicates();
+            if (duplicates.length > 0) return;
+        }
 
         const externalIds: Record<string, string> = {};
         if (draft.source === "igdb" && draft.external_id) externalIds.igdb = draft.external_id;
@@ -771,7 +836,8 @@ export default function AddGameWizard({
                 total_achievements_source: draft.total_achievements.trim() === "" ? null : "steam",
                 base_price_default: numberOrNull(draft.base_price_default),
                 base_price_source: draft.base_price_default.trim() === "" ? null : "steam",
-                create_duplicate_anyway: draft.source === "manual",
+                existing_game_id: draft.existing_game_id,
+                create_duplicate_anyway: draft.create_duplicate_anyway || forceCreateDuplicate,
             },
             platform_id: draft.platform_id,
             device_ids: draft.device_ids,
@@ -1036,9 +1102,68 @@ export default function AddGameWizard({
                         <footer className="flex items-center justify-between gap-5 border-t border-black/10 bg-white px-7 py-5">
                             <button type="button" onClick={previous} disabled={stepIndex === 0} className="flex items-center gap-3 rounded-2xl bg-black/[0.06] px-7 py-3.5 text-base font-black disabled:opacity-35"><ChevronLeft size={18} /> Back</button>
                             <div className={`hidden min-w-0 flex-1 text-center text-xs font-black uppercase tracking-[0.18em] md:block ${currentError ? "rounded-full bg-red-500/10 px-4 py-2 text-red-700" : "text-black/35"}`}>{currentError ? currentError : `${stepIndex + 1} / ${steps.length}`}</div>
-                            {stepIndex < steps.length - 1 ? <button type="button" onClick={next} disabled={!!currentError} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">Next <ChevronRight size={18} /></button> : <button type="button" onClick={submit} disabled={!!currentError || saving} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">{saving ? <><Loader2 className="animate-spin" size={18} /> Saving</> : <><Check size={18} /> Save Game</>}</button>}
+                            {stepIndex < steps.length - 1 ? <button type="button" onClick={next} disabled={!!currentError} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">Next <ChevronRight size={18} /></button> : <button type="button" onClick={() => void submit()} disabled={!!currentError || saving || checkingDuplicates} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">{saving || checkingDuplicates ? <><Loader2 className="animate-spin" size={18} /> Saving</> : <><Check size={18} /> Save Game</>}</button>}
                         </footer>
                     </section>
+
+                    {pendingStatusId && (
+                        <div className="absolute inset-0 z-10 grid place-items-center bg-black/55 px-5">
+                            <section className="w-full max-w-md rounded-[30px] bg-white p-6 text-black shadow-[0_32px_120px_rgb(0_0_0/0.4)]">
+                                <div className="text-xs font-black uppercase tracking-[0.24em] text-black/35">Completion date</div>
+                                <h3 className="mt-2 text-3xl font-black tracking-[-0.05em]">When did you finish it?</h3>
+                                <p className="mt-3 text-sm font-bold text-black/50">Today is filled in automatically. Change it if the real completed date is different.</p>
+                                <div className="mt-5">
+                                    <TextInput value={completionDateDraft} onChange={(event) => setCompletionDateDraft(event.target.value)} type="date" className="w-full border-black/10 bg-[#f4f5ef] text-black" />
+                                </div>
+                                <div className="mt-6 flex justify-end gap-3">
+                                    <button type="button" onClick={() => setPendingStatusId(null)} className="rounded-2xl bg-black/5 px-5 py-3 text-sm font-black text-black/55">Cancel</button>
+                                    <button type="button" onClick={applyCompletedStatus} className="rounded-2xl bg-black px-5 py-3 text-sm font-black text-white">Apply</button>
+                                </div>
+                            </section>
+                        </div>
+                    )}
+
+                    {duplicateCandidates.length > 0 && (
+                        <div className="absolute inset-0 z-10 grid place-items-center bg-black/55 px-5">
+                            <section className="w-full max-w-2xl rounded-[30px] bg-white p-6 text-black shadow-[0_32px_120px_rgb(0_0_0/0.4)]">
+                                <div className="text-xs font-black uppercase tracking-[0.24em] text-black/35">Possible duplicate</div>
+                                <h3 className="mt-2 text-3xl font-black tracking-[-0.05em]">This looks like an existing game.</h3>
+                                <div className="mt-5 grid gap-3">
+                                    {duplicateCandidates.map((game) => (
+                                        <button
+                                            key={game.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setDraft((current) => ({ ...current, existing_game_id: game.id, create_duplicate_anyway: false }));
+                                                setDuplicateCandidates([]);
+                                            }}
+                                            className="grid grid-cols-[54px_1fr_auto] items-center gap-3 rounded-2xl border border-black/10 bg-[#f8faf4] p-3 text-left hover:border-black"
+                                        >
+                                            <CoverImage src={game.cover_url ?? ""} className="size-14 rounded-xl" />
+                                            <div className="min-w-0">
+                                                <div className="truncate text-lg font-black">{game.title}</div>
+                                                <div className="mt-1 truncate text-xs font-bold text-black/45">{game.publisher || "Unknown publisher"} · {game.release_year || "Unknown year"}</div>
+                                            </div>
+                                            <span className="rounded-xl bg-black px-4 py-2 text-xs font-black text-white">Use existing</span>
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="mt-6 flex flex-wrap justify-end gap-3">
+                                    <button type="button" onClick={() => setDuplicateCandidates([])} className="rounded-2xl bg-black/5 px-5 py-3 text-sm font-black text-black/55">Go back</button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setDuplicateCandidates([]);
+                                            void submit(true);
+                                        }}
+                                        className="rounded-2xl bg-black px-5 py-3 text-sm font-black text-white"
+                                    >
+                                        Create new anyway
+                                    </button>
+                                </div>
+                            </section>
+                        </div>
+                    )}
                 </div>
             )}
         </>
