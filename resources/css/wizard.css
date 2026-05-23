@@ -1,74 +1,51 @@
 /*
- * Stupid Log Archive Builder — V3 visual rebuild
- * This file deliberately skins the existing wizard flow without touching the
- * data logic. It makes the wizard calmer, more readable, and closer to a game
- * console / archive terminal.
+ * Stupid Log Archive Builder — V4 rebalance
+ * This is a visual rebuild skin for the existing AddGameWizard logic.
+ * Goals: more room for real work, readable text, compact controls, and calm game UI.
  */
 
-/* Modal stage */
 .fixed.inset-0.z-50.grid.place-items-center {
     --sl-lime: #b7ff63;
-    --sl-lime-soft: #d9ffad;
     --sl-ink: #050909;
-    --sl-panel: #101614;
-    --sl-paper: #edf2ec;
-    --sl-muted: rgb(5 9 9 / 0.55);
+    --sl-paper: #e8eee7;
+    --sl-soft: #f5f8f3;
     background:
-        radial-gradient(circle at 50% 42%, rgb(183 255 99 / 0.14), transparent 36%),
-        radial-gradient(circle at 12% 20%, rgb(183 255 99 / 0.06), transparent 24%),
-        linear-gradient(rgb(4 7 7 / 0.74), rgb(4 7 7 / 0.78)) !important;
+        radial-gradient(circle at 52% 38%, rgb(183 255 99 / 0.12), transparent 34%),
+        linear-gradient(rgb(4 7 7 / 0.76), rgb(4 7 7 / 0.82)) !important;
     padding: 22px !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center > section {
-    width: min(1440px, calc(100vw - 44px)) !important;
-    max-width: 1440px !important;
+    width: min(1460px, calc(100vw - 44px)) !important;
+    max-width: 1460px !important;
     height: min(900px, calc(100vh - 44px)) !important;
     max-height: calc(100vh - 44px) !important;
-    grid-template-rows: 128px minmax(0, 1fr) 86px !important;
+    grid-template-rows: 118px minmax(0, 1fr) 82px !important;
     overflow: hidden !important;
     border-radius: 42px !important;
-    border: 1px solid rgb(255 255 255 / 0.16) !important;
+    border: 1px solid rgb(255 255 255 / 0.14) !important;
     background:
-        linear-gradient(rgb(0 0 0 / 0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgb(0 0 0 / 0.035) 1px, transparent 1px),
-        linear-gradient(180deg, #e8eee7 0%, #dfe6df 100%) !important;
-    background-size: 34px 34px, 34px 34px, auto !important;
-    box-shadow:
-        0 55px 170px rgb(0 0 0 / 0.64),
-        inset 0 0 0 1px rgb(255 255 255 / 0.38) !important;
+        linear-gradient(rgb(0 0 0 / 0.034) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(0 0 0 / 0.034) 1px, transparent 1px),
+        linear-gradient(180deg, #e9eee8, #dde5dd) !important;
+    background-size: 38px 38px, 38px 38px, auto !important;
+    box-shadow: 0 52px 160px rgb(0 0 0 / 0.64) !important;
 }
 
-/* Header */
+/* Header: compact, readable, no wasted height. */
 .fixed.inset-0.z-50.grid.place-items-center > section > header {
     position: relative;
     border-bottom: 0 !important;
     background:
-        radial-gradient(circle at 90% -60%, rgb(255 255 255 / 0.22), transparent 42%),
+        radial-gradient(circle at 92% -55%, rgb(255 255 255 / 0.18), transparent 40%),
         linear-gradient(135deg, #b7ff63 0%, #94df4d 100%) !important;
-    padding: 22px 34px 16px !important;
-}
-
-.fixed.inset-0.z-50.grid.place-items-center > section > header::after {
-    content: '';
-    position: absolute;
-    left: 34px;
-    right: 34px;
-    bottom: 18px;
-    height: 6px;
-    border-radius: 999px;
-    background: rgb(5 9 9 / 0.12);
-}
-
-.fixed.inset-0.z-50.grid.place-items-center > section > header > div:first-child {
-    position: relative;
-    z-index: 2;
+    padding: 20px 32px 14px !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center > section > header h2 {
     margin-top: 4px !important;
-    font-size: 50px !important;
-    line-height: 0.86 !important;
+    font-size: 48px !important;
+    line-height: 0.88 !important;
     letter-spacing: -0.075em !important;
     color: var(--sl-ink) !important;
 }
@@ -78,100 +55,85 @@
 }
 
 .fixed.inset-0.z-50.grid.place-items-center > section > header .grid.grid-cols-9 {
-    position: relative;
-    z-index: 2;
-    margin-top: 18px !important;
+    margin-top: 16px !important;
     gap: 8px !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center > section > header .grid.grid-cols-9 button {
     height: 5px !important;
     border-radius: 999px !important;
-    opacity: 1 !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center > section > header .grid.grid-cols-9 button.bg-black {
     background: var(--sl-ink) !important;
-    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.06) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center > section > header .grid.grid-cols-9 button.bg-white\/65 {
-    background: rgb(255 255 255 / 0.35) !important;
+    background: rgb(5 9 9 / 0.16) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center > section > header button.grid.size-11 {
     background: var(--sl-ink) !important;
     color: white !important;
-    box-shadow: 0 16px 28px rgb(0 0 0 / 0.22) !important;
+    box-shadow: 0 14px 26px rgb(0 0 0 / 0.22) !important;
 }
 
-/* Main content stage */
+/* Main shell */
 .fixed.inset-0.z-50.grid.place-items-center > section > main {
+    min-height: 0 !important;
     overflow: hidden !important;
     padding: 24px 26px !important;
-    background:
-        radial-gradient(circle at 50% 18%, rgb(183 255 99 / 0.12), transparent 36%),
-        linear-gradient(rgb(0 0 0 / 0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgb(0 0 0 / 0.035) 1px, transparent 1px) !important;
-    background-size: auto, 38px 38px, 38px 38px !important;
+    background: transparent !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center > section > main > div {
-    height: 100%;
-    min-height: 0;
+.fixed.inset-0.z-50.grid.place-items-center > section > main > div,
+.fixed.inset-0.z-50.grid.place-items-center > section > main section.min-w-0 {
+    height: 100% !important;
+    min-height: 0 !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center > section > main > div.grid.gap-7 {
-    grid-template-columns: 300px minmax(0, 1fr) !important;
+    grid-template-columns: 286px minmax(0, 1fr) !important;
+    gap: 24px !important;
     align-items: stretch !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center > section > main section.min-w-0 {
-    min-height: 0;
-    overflow: hidden;
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6,
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-5 {
+    align-content: start !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center > section > main section.min-w-0 > div.grid.gap-6,
-.fixed.inset-0.z-50.grid.place-items-center > section > main section.min-w-0 > div.grid.gap-5 {
-    height: 100%;
-    min-height: 0;
-}
-
-/* Global wizard typography/readability */
+/* Global type + form comfort */
 .fixed.inset-0.z-50.grid.place-items-center > section > main h3 {
     color: var(--sl-ink) !important;
-    font-size: 44px !important;
-    line-height: 0.88 !important;
+    font-size: 40px !important;
+    line-height: 0.92 !important;
     letter-spacing: -0.065em !important;
     text-shadow: none !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > main h4,
+.fixed.inset-0.z-50.grid.place-items-center > section > main .text-2xl,
+.fixed.inset-0.z-50.grid.place-items-center > section > main .text-3xl,
+.fixed.inset-0.z-50.grid.place-items-center > section > main .text-4xl {
+    color: var(--sl-ink) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center > section > main .text-xs.font-black.uppercase,
 .fixed.inset-0.z-50.grid.place-items-center > section > main .text-\[11px\].font-black.uppercase,
 .fixed.inset-0.z-50.grid.place-items-center > section > main label > span {
-    color: rgb(5 9 9 / 0.5) !important;
+    color: rgb(5 9 9 / 0.48) !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center > section > main p,
-.fixed.inset-0.z-50.grid.place-items-center > section > main .text-black\/45,
-.fixed.inset-0.z-50.grid.place-items-center > section > main .text-black\/50,
-.fixed.inset-0.z-50.grid.place-items-center > section > main .text-black\/55,
-.fixed.inset-0.z-50.grid.place-items-center > section > main .text-black\/60 {
-    color: rgb(5 9 9 / 0.56) !important;
-}
-
-/* Inputs */
 .fixed.inset-0.z-50.grid.place-items-center input,
 .fixed.inset-0.z-50.grid.place-items-center select,
 .fixed.inset-0.z-50.grid.place-items-center textarea {
-    border-radius: 20px !important;
+    border-radius: 19px !important;
     border: 1px solid rgb(5 9 9 / 0.1) !important;
-    background: rgb(247 250 245 / 0.92) !important;
+    background: rgb(247 250 245 / 0.9) !important;
     color: var(--sl-ink) !important;
-    font-weight: 800 !important;
-    box-shadow:
-        inset 0 2px 0 rgb(255 255 255 / 0.7),
-        inset 0 -1px 0 rgb(0 0 0 / 0.03) !important;
+    font-weight: 850 !important;
+    box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.62) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center input::placeholder,
@@ -185,167 +147,161 @@
     border-color: var(--sl-ink) !important;
     box-shadow:
         0 0 0 4px rgb(183 255 99 / 0.28),
-        inset 0 2px 0 rgb(255 255 255 / 0.7) !important;
+        inset 0 2px 0 rgb(255 255 255 / 0.62) !important;
 }
 
-/* Left draft card */
+/* Draft side panel */
 .fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 {
     display: grid !important;
-    grid-template-rows: auto 1fr !important;
+    grid-template-rows: auto auto !important;
     gap: 16px !important;
-    min-height: 0 !important;
+    align-content: start !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:first-child {
-    border-radius: 34px !important;
+    border-radius: 31px !important;
     background: var(--sl-ink) !important;
     padding: 10px !important;
-    box-shadow: 0 26px 60px rgb(0 0 0 / 0.22) !important;
+    box-shadow: 0 24px 58px rgb(0 0 0 / 0.2) !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 img {
-    border-radius: 26px !important;
+.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:first-child img,
+.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:first-child > div {
+    height: 350px !important;
+    border-radius: 24px !important;
     object-fit: cover !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child {
     border: 1px solid rgb(255 255 255 / 0.08) !important;
-    border-radius: 32px !important;
+    border-radius: 30px !important;
     background:
         radial-gradient(circle at 100% 0%, rgb(183 255 99 / 0.16), transparent 30%),
         var(--sl-ink) !important;
     color: white !important;
     padding: 22px !important;
-    box-shadow: 0 22px 50px rgb(0 0 0 / 0.16) !important;
+    box-shadow: 0 20px 44px rgb(0 0 0 / 0.14) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child h3 {
     color: white !important;
-    font-size: 28px !important;
-    line-height: 0.95 !important;
+    font-size: 26px !important;
+    line-height: 0.96 !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child .text-\[11px\],
-.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child .text-black\/35 {
-    color: rgb(183 255 99 / 0.72) !important;
+.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child .text-black\/35,
+.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child .text-\[11px\] {
+    color: rgb(183 255 99 / 0.76) !important;
 }
 
-/* Search hero */
+/* STEP 1 — Search: smaller scanner, larger result area. */
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-5:has(section.relative.overflow-hidden.rounded-\[38px\].bg-black) {
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: auto auto minmax(0, 1fr) !important;
+    gap: 14px !important;
+}
+
 .fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black {
+    border-radius: 36px !important;
+    padding: 20px !important;
     border: 1px solid rgb(183 255 99 / 0.18) !important;
-    border-radius: 44px !important;
     background:
-        radial-gradient(circle at 86% 22%, rgb(183 255 99 / 0.14), transparent 30%),
-        linear-gradient(135deg, #050909 0%, #0b1210 56%, #182310 100%) !important;
-    padding: 28px !important;
-    box-shadow:
-        0 32px 72px rgb(0 0 0 / 0.28),
-        inset 0 0 0 1px rgb(255 255 255 / 0.06) !important;
+        radial-gradient(circle at 90% 15%, rgb(183 255 99 / 0.14), transparent 30%),
+        linear-gradient(135deg, #050909 0%, #0b1210 58%, #17220f 100%) !important;
+    box-shadow: 0 24px 60px rgb(0 0 0 / 0.24) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black h3 {
     color: #f5f7f1 !important;
-    font-size: clamp(48px, 5.2vw, 78px) !important;
-    line-height: 0.82 !important;
-    letter-spacing: -0.08em !important;
+    max-width: 640px !important;
+    font-size: clamp(42px, 4vw, 58px) !important;
+    line-height: 0.86 !important;
+    letter-spacing: -0.075em !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black p {
-    color: rgb(255 255 255 / 0.42) !important;
+    color: rgb(255 255 255 / 0.45) !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black .grid.grid-cols-2 {
-    background: rgb(255 255 255 / 0.08) !important;
-    border-radius: 24px !important;
-    padding: 6px !important;
+.fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black .mt-7 {
+    margin-top: 18px !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black label {
-    height: 74px !important;
-    border-radius: 26px !important;
-    background: #edf2ec !important;
+    height: 62px !important;
+    border-radius: 22px !important;
+    background: #eef2ed !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black input {
     border: 0 !important;
     background: transparent !important;
     box-shadow: none !important;
-    font-size: 28px !important;
+    font-size: 25px !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black button.bg-\[\#b7ff63\] {
-    height: 74px !important;
-    border-radius: 26px !important;
-    box-shadow:
-        inset 0 -5px 0 rgb(0 0 0 / 0.14),
-        0 18px 34px rgb(183 255 99 / 0.14) !important;
+    height: 62px !important;
+    border-radius: 22px !important;
 }
 
-/* Search results rebuilt as calm archive cards */
 .fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] {
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
     overflow: hidden !important;
-    border-radius: 38px !important;
-    background:
-        linear-gradient(rgb(0 0 0 / 0.032) 1px, transparent 1px),
-        linear-gradient(90deg, rgb(0 0 0 / 0.032) 1px, transparent 1px),
-        #dfe6df !important;
-    background-size: 32px 32px, 32px 32px, auto !important;
-    padding: 20px !important;
+    border-radius: 34px !important;
+    background: rgb(223 230 223 / 0.82) !important;
+    padding: 16px !important;
     box-shadow:
         inset 0 0 0 1px rgb(0 0 0 / 0.05),
-        0 18px 44px rgb(0 0 0 / 0.08) !important;
+        0 16px 36px rgb(0 0 0 / 0.07) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] > div:last-child {
+    min-height: 0 !important;
+    max-height: none !important;
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 14px !important;
-    max-height: 360px !important;
-    overflow: auto !important;
+    align-content: start !important;
+    gap: 12px !important;
+    overflow-y: auto !important;
     padding-right: 8px !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group {
-    min-height: 150px !important;
-    grid-template-columns: 92px minmax(0, 1fr) 52px !important;
-    gap: 16px !important;
+    min-height: 132px !important;
+    grid-template-columns: 82px minmax(0, 1fr) 48px !important;
+    gap: 14px !important;
+    border-radius: 27px !important;
     border: 1px solid rgb(5 9 9 / 0.08) !important;
-    border-radius: 30px !important;
-    background:
-        radial-gradient(circle at 100% 0%, rgb(183 255 99 / 0.12), transparent 34%),
-        rgb(247 250 245 / 0.9) !important;
+    background: rgb(247 250 245 / 0.92) !important;
     color: var(--sl-ink) !important;
-    box-shadow:
-        0 14px 30px rgb(0 0 0 / 0.06),
-        inset 0 0 0 1px rgb(255 255 255 / 0.56) !important;
-}
-
-.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group:hover {
-    transform: translateY(-3px) !important;
-    border-color: rgb(5 9 9 / 0.2) !important;
-    background: white !important;
+    box-shadow: 0 12px 26px rgb(0 0 0 / 0.055) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group > div:first-child {
-    width: 92px !important;
-    height: 120px !important;
-    border-radius: 24px !important;
+    width: 82px !important;
+    height: 104px !important;
+    border-radius: 22px !important;
     background: var(--sl-lime) !important;
-    padding: 7px !important;
-    box-shadow: 0 14px 24px rgb(0 0 0 / 0.13) !important;
+    padding: 6px !important;
+    box-shadow: 0 13px 22px rgb(0 0 0 / 0.12) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group img,
 .fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group div:first-child > div {
     width: 100% !important;
     height: 100% !important;
-    border-radius: 18px !important;
+    border-radius: 16px !important;
     object-fit: cover !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group h4 {
     color: var(--sl-ink) !important;
-    font-size: 24px !important;
+    font-size: 23px !important;
     line-height: 0.95 !important;
 }
 
@@ -353,46 +309,86 @@
     color: rgb(5 9 9 / 0.48) !important;
 }
 
-/* Generic content panels */
-.fixed.inset-0.z-50.grid.place-items-center [class~='bg-white\/70'],
-.fixed.inset-0.z-50.grid.place-items-center .rounded-\[28px\].border.border-black\/10.bg-white\/70,
-.fixed.inset-0.z-50.grid.place-items-center .rounded-\[30px\].border.border-black\/10.bg-white,
-.fixed.inset-0.z-50.grid.place-items-center .rounded-\[28px\].border.border-black\/10.bg-white\/70 {
-    border: 1px solid rgb(5 9 9 / 0.07) !important;
-    border-radius: 34px !important;
-    background:
-        linear-gradient(rgb(0 0 0 / 0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgb(0 0 0 / 0.025) 1px, transparent 1px),
-        rgb(239 244 238 / 0.82) !important;
-    background-size: 34px 34px, 34px 34px, auto !important;
-    box-shadow:
-        0 18px 40px rgb(0 0 0 / 0.055),
-        inset 0 0 0 1px rgb(255 255 255 / 0.52) !important;
+/* STEP 2 — Basics: clean form, portrait 600x800 cover ratio. */
+.fixed.inset-0.z-50.grid.place-items-center .xl\:grid-cols-\[280px_1fr\] {
+    grid-template-columns: 270px minmax(0, 1fr) !important;
+    align-items: start !important;
 }
 
-/* Ownership: copy cards */
+.fixed.inset-0.z-50.grid.place-items-center .xl\:grid-cols-\[280px_1fr\] .h-\[360px\] {
+    width: 100% !important;
+    height: 360px !important;
+    aspect-ratio: 3 / 4 !important;
+    object-fit: cover !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .xl\:grid-cols-\[280px_1fr\] textarea {
+    min-height: 132px !important;
+}
+
+/* Generic white panels: softer, but readable. */
+.fixed.inset-0.z-50.grid.place-items-center [class~='bg-white\/70'],
+.fixed.inset-0.z-50.grid.place-items-center .rounded-\[28px\].border.border-black\/10.bg-white\/70,
+.fixed.inset-0.z-50.grid.place-items-center .rounded-\[30px\].border.border-black\/10.bg-white {
+    border: 1px solid rgb(5 9 9 / 0.075) !important;
+    border-radius: 31px !important;
+    background: rgb(239 244 238 / 0.68) !important;
+    box-shadow:
+        0 16px 34px rgb(0 0 0 / 0.045),
+        inset 0 0 0 1px rgb(255 255 255 / 0.46) !important;
+}
+
+/* STEPS 3–5: keep content at the top; make search/results compact and scrollable. */
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.rounded-\[28px\],
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.grid.gap-2.rounded-\[28px\],
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.grid.max-h-\[500px\] {
+    margin-top: 0 !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > input + div.grid.gap-2.rounded-\[28px\],
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.grid.max-h-\[500px\] {
+    max-height: 430px !important;
+    overflow-y: auto !important;
+    align-content: start !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > input + div.grid.gap-2.rounded-\[28px\] button,
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.grid.max-h-\[500px\] button {
+    min-height: 54px !important;
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+}
+
+/* STEP 6 — Ownership: restore compact pill selector + better copy cards. */
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.flex.flex-wrap.gap-2 button {
+    min-width: 0 !important;
+    min-height: 48px !important;
+    height: 48px !important;
+    border-radius: 18px !important;
+    padding: 0 20px !important;
+}
+
 .fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[24px\]'][class~='border'][class~='bg-white\/70'] {
-    border-radius: 32px !important;
+    border-radius: 30px !important;
     padding: 18px !important;
-    background:
-        radial-gradient(circle at 100% 0%, rgb(183 255 99 / 0.13), transparent 30%),
-        #edf2ec !important;
+    background: rgb(239 244 238 / 0.72) !important;
+    box-shadow: 0 16px 34px rgb(0 0 0 / 0.045) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[24px\]'][class~='border'][class~='bg-white\/70'] > div:first-child {
-    margin-bottom: 16px !important;
-    padding-bottom: 14px !important;
+    margin-bottom: 14px !important;
+    padding-bottom: 12px !important;
     border-bottom: 1px solid rgb(5 9 9 / 0.08) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[24px\]'][class~='border'][class~='bg-white\/70'] .text-2xl {
     color: var(--sl-ink) !important;
-    font-size: 28px !important;
+    font-size: 26px !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[24px\]'][class~='border'][class~='bg-white\/70'] .xl\:grid-cols-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    gap: 14px !important;
+    gap: 12px !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center button.bg-red-500\/10 {
@@ -400,34 +396,25 @@
     color: #b91c1c !important;
 }
 
-/* DLCs: readable expansion cards */
-.fixed.inset-0.z-50.grid.place-items-center [class~='max-h-\[500px\]'] {
-    max-height: 430px !important;
-}
-
+/* STEP 7 — DLCs: no spreadsheet feeling, compact readable rows. */
 .fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] {
-    grid-template-columns: 100px minmax(0, 1fr) minmax(440px, auto) !important;
-    min-height: 88px !important;
-    border-radius: 28px !important;
+    grid-template-columns: 94px minmax(0, 1fr) minmax(450px, auto) !important;
+    min-height: 82px !important;
+    border-radius: 25px !important;
     border: 1px solid rgb(5 9 9 / 0.07) !important;
-    background:
-        radial-gradient(circle at 100% 0%, rgb(183 255 99 / 0.1), transparent 32%),
-        rgb(247 250 245 / 0.9) !important;
-    box-shadow:
-        0 12px 26px rgb(0 0 0 / 0.05),
-        inset 0 0 0 1px rgb(255 255 255 / 0.52) !important;
+    background: rgb(247 250 245 / 0.9) !important;
+    box-shadow: 0 10px 22px rgb(0 0 0 / 0.04) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] img {
-    height: 58px !important;
-    border-radius: 16px !important;
+    height: 56px !important;
+    border-radius: 15px !important;
     object-fit: cover !important;
-    box-shadow: 0 10px 18px rgb(0 0 0 / 0.14) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] > div:nth-child(2) > div:first-child {
     color: var(--sl-ink) !important;
-    font-size: 19px !important;
+    font-size: 18px !important;
     line-height: 1 !important;
 }
 
@@ -436,7 +423,7 @@
 }
 
 .fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] .sm\:grid-cols-\[150px_120px_150px_auto\] {
-    grid-template-columns: 150px 110px 144px 76px !important;
+    grid-template-columns: 150px 112px 144px 74px !important;
     align-items: center !important;
 }
 
@@ -444,20 +431,39 @@
 .fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] input,
 .fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] button {
     height: 46px !important;
-    border-radius: 17px !important;
+    border-radius: 16px !important;
 }
 
-/* Review metrics */
+/* STEP 8 — Progress: statuses are chips, not giant cards. */
+.fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6:has(button) > div.flex.flex-wrap.gap-2 button {
+    min-width: 0 !important;
+    width: auto !important;
+    min-height: 46px !important;
+    height: 46px !important;
+    border-radius: 18px !important;
+    padding: 0 18px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* STEP 9 — Review: restore icon dashboard clarity. */
 .fixed.inset-0.z-50.grid.place-items-center .rounded-2xl.border.border-black\/10.bg-white.p-4 {
     border-radius: 26px !important;
     background: var(--sl-ink) !important;
     color: white !important;
     border-color: rgb(255 255 255 / 0.08) !important;
+    box-shadow: 0 16px 34px rgb(0 0 0 / 0.12) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center .rounded-2xl.border.border-black\/10.bg-white.p-4 .text-black,
-.fixed.inset-0.z-50.grid.place-items-center .rounded-2xl.border.border-black\/10.bg-white.p-4 .text-black\/35 {
+.fixed.inset-0.z-50.grid.place-items-center .rounded-2xl.border.border-black\/10.bg-white.p-4 .text-black\/35,
+.fixed.inset-0.z-50.grid.place-items-center .rounded-2xl.border.border-black\/10.bg-white.p-4 svg {
     color: white !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center > section > main .rounded-\[30px\].border.border-black\/10.bg-white.p-6 h4 {
+    color: var(--sl-ink) !important;
 }
 
 /* Footer */
@@ -465,24 +471,20 @@
     border-top: 0 !important;
     background: rgb(232 238 231 / 0.94) !important;
     backdrop-filter: blur(20px);
-    padding: 18px 30px !important;
-    box-shadow: 0 -22px 46px rgb(0 0 0 / 0.09) !important;
+    padding: 16px 30px !important;
+    box-shadow: 0 -20px 44px rgb(0 0 0 / 0.08) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center > section > footer button {
-    min-width: 132px;
-    height: 54px;
-    border-radius: 22px !important;
+    min-width: 128px !important;
+    height: 52px !important;
+    border-radius: 20px !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center > section > footer button:last-child {
     background: var(--sl-ink) !important;
     color: white !important;
-    box-shadow: 0 18px 30px rgb(0 0 0 / 0.18) !important;
-}
-
-.fixed.inset-0.z-50.grid.place-items-center > section > footer button:last-child:not(:disabled):hover {
-    transform: translateY(-2px);
+    box-shadow: 0 16px 30px rgb(0 0 0 / 0.18) !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center > section > footer .rounded-full.bg-red-500\/10 {
@@ -492,7 +494,7 @@
 
 @media (max-width: 1200px) {
     .fixed.inset-0.z-50.grid.place-items-center > section > main > div.grid.gap-7 {
-        grid-template-columns: 260px minmax(0, 1fr) !important;
+        grid-template-columns: 250px minmax(0, 1fr) !important;
     }
 
     .fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] > div:last-child {
@@ -500,6 +502,6 @@
     }
 
     .fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] {
-        grid-template-columns: 84px minmax(0, 1fr) !important;
+        grid-template-columns: 86px minmax(0, 1fr) !important;
     }
 }
