@@ -97,13 +97,14 @@ export default function GameCard({
     const shellWidth = featured ? 'w-[342px]' : homeSide ? 'w-[286px]' : compact ? 'w-[210px]' : 'w-[250px]';
     const cardHeight = featured ? 'h-[560px]' : homeSide ? 'h-[500px]' : compact ? 'h-[380px]' : 'h-[410px]';
     const coverHeight = featured ? 'h-[424px]' : homeSide ? 'h-[386px]' : compact ? 'h-[280px]' : 'h-[300px]';
+    const padding = featured ? 'p-4' : 'p-3';
     const radius = featured ? 'rounded-[28px]' : compact ? 'rounded-[26px]' : 'rounded-[24px]';
     const panelWidth = compact ? 'w-[330px]' : 'w-[380px]';
 
     const panelPosition =
-    panelSide === 'left'
-        ? `${compact ? 'right-[210px]' : 'right-[250px]'} rounded-l-[28px]`
-        : `${compact ? 'left-[210px]' : 'left-[250px]'} rounded-r-[28px]`;
+        panelSide === 'left'
+            ? `${compact ? 'right-[210px]' : 'right-[250px]'} rounded-l-[28px]`
+            : `${compact ? 'left-[210px]' : 'left-[250px]'} rounded-r-[28px]`;
 
     return (
         <article
