@@ -33,7 +33,7 @@ class ProviderSearchService
         }
 
         try {
-            $results = $this->withSteamMetadata($results);
+            $results = $this->withSteamMetadata($results, $warnings);
         } catch (Throwable $exception) {
             $warnings[] = 'Steam auto-fill unavailable: '.$exception->getMessage();
         }
@@ -109,7 +109,7 @@ class ProviderSearchService
         ]))->all();
     }
 
-    private function withSteamMetadata(array $results): array
+    private function withSteamMetadata(array $results, array &$warnings): array
     {
         $steamAppIds = collect($results)
             ->pluck('steam_app_id')
@@ -136,8 +136,9 @@ class ProviderSearchService
                 ])->throw()->json('game.availableGameStats.achievements', []);
 
                 $achievementCounts[$steamAppId] = is_array($schema) ? count($schema) : null;
-            } catch (Throwable) {
+            } catch (Throwable $exception) {
                 $achievementCounts[$steamAppId] = null;
+                $warnings[] = 'Steam achievement auto-fill unavailable for app '.$steamAppId.': '.$exception->getMessage();
             }
         }
 
@@ -149,12 +150,17 @@ class ProviderSearchService
                 return $result;
             }
 
+            $price = $this->price($data);
+            $totalAchievements = $achievementCounts[$steamAppId] ?? null;
+
             return array_merge($result, [
                 'cover_url_original' => $result['cover_url_original'] ?? $data['header_image'] ?? null,
                 'publisher' => $result['publisher'] ?? ($data['publishers'][0] ?? null),
                 'description' => $result['description'] ?? ($data['short_description'] ?? null),
-                'base_price_default' => $this->price($data),
-                'total_achievements' => $achievementCounts[$steamAppId] ?? null,
+                'base_price_default' => $price,
+                'base_price_source' => $price === null ? null : 'steam',
+                'total_achievements' => $totalAchievements,
+                'total_achievements_source' => $totalAchievements === null ? null : 'steam',
             ]);
         })->all();
     }
@@ -173,7 +179,9 @@ class ProviderSearchService
             'description' => $result['description'] ?? null,
             'steam_app_id' => isset($result['steam_app_id']) ? (string) $result['steam_app_id'] : null,
             'base_price_default' => $result['base_price_default'] ?? null,
+            'base_price_source' => $result['base_price_source'] ?? null,
             'total_achievements' => $result['total_achievements'] ?? null,
+            'total_achievements_source' => $result['total_achievements_source'] ?? null,
         ];
     }
 

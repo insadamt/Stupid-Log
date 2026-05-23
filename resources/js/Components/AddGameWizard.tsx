@@ -211,7 +211,7 @@ export default function AddGameWizard({
             base_price_default: basePrice,
             ownership_copies: current.ownership_copies.map((copy) => ({
                 ...copy,
-                base_price: copy.base_price || basePrice,
+                base_price: copy.base_price === "" ? basePrice : copy.base_price,
             })),
         }));
         setStep(1);

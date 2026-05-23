@@ -96,7 +96,9 @@ class ProviderSearchContractTest extends TestCase
             ->assertJsonPath('results.0.description', 'A test chamber puzzle game.')
             ->assertJsonPath('results.0.steam_app_id', '620')
             ->assertJsonPath('results.0.base_price_default', 9.99)
+            ->assertJsonPath('results.0.base_price_source', 'steam')
             ->assertJsonPath('results.0.total_achievements', 2)
+            ->assertJsonPath('results.0.total_achievements_source', 'steam')
             ->assertJsonPath('manual_available', true)
             ->assertJsonCount(1, 'warnings');
     }
@@ -149,7 +151,9 @@ class ProviderSearchContractTest extends TestCase
             ->assertJsonPath('results.0.source', 'igdb')
             ->assertJsonPath('results.0.steam_app_id', '620')
             ->assertJsonPath('results.0.base_price_default', 9.99)
-            ->assertJsonPath('results.0.total_achievements', 3);
+            ->assertJsonPath('results.0.base_price_source', 'steam')
+            ->assertJsonPath('results.0.total_achievements', 3)
+            ->assertJsonPath('results.0.total_achievements_source', 'steam');
     }
 
     public function test_steam_price_auto_fill_survives_achievement_schema_failures(): void
@@ -178,7 +182,34 @@ class ProviderSearchContractTest extends TestCase
             ->assertJsonPath('results.0.source', 'steam')
             ->assertJsonPath('results.0.steam_app_id', '620')
             ->assertJsonPath('results.0.base_price_default', 9.99)
-            ->assertJsonPath('results.0.total_achievements', null);
+            ->assertJsonPath('results.0.base_price_source', 'steam')
+            ->assertJsonPath('results.0.total_achievements', null)
+            ->assertJsonPath('results.0.total_achievements_source', null)
+            ->assertJsonCount(1, 'warnings');
+    }
+
+    public function test_provider_search_survives_steam_metadata_failures_after_results_are_found(): void
+    {
+        Http::fake([
+            'store.steampowered.com/api/storesearch*' => Http::response([
+                'items' => [[
+                    'id' => 620,
+                    'name' => 'Portal 2',
+                    'tiny_image' => 'https://cdn.example.test/portal.jpg',
+                ]],
+            ]),
+            'store.steampowered.com/api/appdetails*' => Http::response(['error' => 'unavailable'], 500),
+        ]);
+
+        $this->getJson('/provider-search?query=portal')
+            ->assertOk()
+            ->assertJsonPath('results.0.source', 'steam')
+            ->assertJsonPath('results.0.steam_app_id', '620')
+            ->assertJsonPath('results.0.base_price_default', null)
+            ->assertJsonPath('results.0.base_price_source', null)
+            ->assertJsonPath('results.0.total_achievements', null)
+            ->assertJsonPath('results.0.total_achievements_source', null)
+            ->assertJsonCount(1, 'warnings');
     }
 
     public function test_provider_search_returns_warnings_and_manual_entry_when_all_providers_fail(): void
@@ -220,7 +251,9 @@ class ProviderSearchContractTest extends TestCase
                 'description',
                 'steam_app_id',
                 'base_price_default',
+                'base_price_source',
                 'total_achievements',
+                'total_achievements_source',
             ]],
             'manual_available',
             'warnings',
