@@ -25,6 +25,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -240,6 +241,20 @@ class StupidLogController extends Controller
         $libraryGame = $creator->create($this->localUser(), $request->validated());
 
         return redirect()->route('games.show', $libraryGame);
+    }
+
+    public function uploadGameCover(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'cover' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+        ]);
+
+        $path = $validated['cover']->store('covers/games', 'public');
+
+        return response()->json([
+            'path' => $path,
+            'url' => Storage::disk('public')->url($path),
+        ], 201);
     }
 
     public function providerSearch(Request $request, ProviderSearchService $providers): JsonResponse

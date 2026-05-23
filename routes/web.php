@@ -9,6 +9,7 @@ Route::post('/setup', [StupidLogController::class, 'storeSetup'])->name('setup.s
 Route::get('/', [StupidLogController::class, 'home'])->name('home');
 Route::get('/library', [StupidLogController::class, 'library'])->name('library');
 Route::post('/library-games', [StupidLogController::class, 'storeLibraryGame'])->name('library-games.store');
+Route::post('/library-games/cover', [StupidLogController::class, 'uploadGameCover'])->name('library-games.cover.store');
 Route::get('/provider-search', [StupidLogController::class, 'providerSearch'])->name('provider-search');
 Route::get('/games/{libraryGame}', [StupidLogController::class, 'gameDetails'])->name('games.show');
 Route::get('/stats', [StupidLogController::class, 'stats'])->name('stats');

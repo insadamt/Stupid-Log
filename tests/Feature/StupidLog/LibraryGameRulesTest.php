@@ -20,6 +20,8 @@ use App\Services\StatsService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -131,6 +133,34 @@ class LibraryGameRulesTest extends TestCase
                 'progress.playtime_hours',
                 'progress.earned_achievements',
             ]);
+    }
+
+    public function test_game_cover_upload_stores_public_image_and_returns_path_for_wizard_payload(): void
+    {
+        Storage::fake('public');
+
+        $response = $this->postJson('/library-games/cover', [
+            'cover' => UploadedFile::fake()->createWithContent(
+                'cover.png',
+                base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=')
+            ),
+        ])->assertCreated()
+            ->assertJsonStructure(['path', 'url'])
+            ->assertJsonPath('path', fn (string $path) => str_starts_with($path, 'covers/games/'));
+
+        $path = $response->json('path');
+
+        Storage::disk('public')->assertExists($path);
+    }
+
+    public function test_game_cover_upload_rejects_non_images(): void
+    {
+        Storage::fake('public');
+
+        $this->postJson('/library-games/cover', [
+            'cover' => UploadedFile::fake()->create('cover.txt', 10, 'text/plain'),
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['cover']);
     }
 
     public function test_physical_status_and_hundred_percent_validation(): void
