@@ -6,6 +6,7 @@ use App\Models\StupidLog\Provider;
 use App\Models\StupidLog\ProviderCredential;
 use App\Models\User;
 use Illuminate\Http\Client\Pool;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Throwable;
@@ -14,11 +15,18 @@ class ProviderSearchService
 {
     private const SOURCE_ORDER = ['igdb', 'steam', 'manual'];
     private const RESULT_LIMIT = 10;
+    private const SEARCH_CACHE_SECONDS = 300;
 
     public function search(User $user, string $query, string $provider = 'igdb', bool $enrich = false, ?string $steamAppId = null): array
     {
+        $query = trim($query);
         $warnings = [];
         $provider = in_array($provider, ['igdb', 'steam'], true) ? $provider : 'igdb';
+        $cacheKey = $this->searchCacheKey($user, $query, $provider, $enrich, $steamAppId);
+
+        if ($cached = Cache::get($cacheKey)) {
+            return $cached;
+        }
 
         try {
             $results = $provider === 'steam'
@@ -35,7 +43,7 @@ class ProviderSearchService
             $results = $this->withSteamMetadata($results, $user, $warnings);
         }
 
-        return [
+        $response = [
             'query' => $query,
             'source_order' => self::SOURCE_ORDER,
             'results' => collect($results)->map(fn (array $result) => $this->result($result))->values()->all(),
@@ -45,6 +53,10 @@ class ProviderSearchService
                 ? 'IGDB search is metadata-first. If IGDB does not provide a Steam App ID, Steam enrichment is skipped.'
                 : 'Steam search is direct. Use it when you want Steam price and achievement data first.',
         ];
+
+        Cache::put($cacheKey, $response, self::SEARCH_CACHE_SECONDS);
+
+        return $response;
     }
 
     private function searchIgdb(User $user, string $query): array
@@ -58,14 +70,24 @@ class ProviderSearchService
         $clientId = Crypt::decryptString($credential->encrypted_client_id);
         $clientSecret = Crypt::decryptString($credential->encrypted_client_secret);
 
-        $token = Http::asForm()
-            ->post('https://id.twitch.tv/oauth2/token', [
-                'client_id' => $clientId,
-                'client_secret' => $clientSecret,
-                'grant_type' => 'client_credentials',
-            ])
-            ->throw()
-            ->json('access_token');
+        $token = Cache::remember(
+            'igdb-token:'.$credential->id.':'.$credential->updated_at?->timestamp,
+            now()->addMinutes(50),
+            fn () => Http::asForm()
+                ->connectTimeout(1)
+                ->timeout(4)
+                ->post('https://id.twitch.tv/oauth2/token', [
+                    'client_id' => $clientId,
+                    'client_secret' => $clientSecret,
+                    'grant_type' => 'client_credentials',
+                ])
+                ->throw()
+                ->json('access_token')
+        );
+
+        if (! is_string($token) || $token === '') {
+            return [];
+        }
 
         $safeQuery = str_replace(['"', "\n", "\r"], ' ', $query);
 
@@ -75,6 +97,8 @@ class ProviderSearchService
             'Client-ID' => $clientId,
             'Authorization' => 'Bearer '.$token,
         ])
+            ->connectTimeout(1)
+            ->timeout(5)
             ->withBody($body, 'text/plain')
             ->post('https://api.igdb.com/v4/games')
             ->throw()
@@ -131,11 +155,13 @@ class ProviderSearchService
             return [];
         }
 
-        return Http::get('https://store.steampowered.com/api/storesearch', [
-            'term' => $query,
-            'l' => 'english',
-            'cc' => 'US',
-        ])
+        return Http::connectTimeout(1)
+            ->timeout(4)
+            ->get('https://store.steampowered.com/api/storesearch', [
+                'term' => $query,
+                'l' => 'english',
+                'cc' => 'US',
+            ])
             ->throw()
             ->json('items', []);
     }
@@ -199,7 +225,7 @@ class ProviderSearchService
     {
         $responses = Http::pool(function (Pool $pool) use ($steamAppIds) {
             return collect($steamAppIds)->map(function (string $steamAppId) use ($pool) {
-                return $pool->as($steamAppId)->get('https://store.steampowered.com/api/appdetails', [
+                return $pool->as($steamAppId)->connectTimeout(1)->timeout(4)->get('https://store.steampowered.com/api/appdetails', [
                     'appids' => $steamAppId,
                     'cc' => 'US',
                     'l' => 'english',
@@ -246,7 +272,7 @@ class ProviderSearchService
 
         $responses = Http::pool(function (Pool $pool) use ($steamAppIds, $apiKey) {
             return collect($steamAppIds)->map(function (string $steamAppId) use ($pool, $apiKey) {
-                return $pool->as($steamAppId)->get(
+                return $pool->as($steamAppId)->connectTimeout(1)->timeout(4)->get(
                     'https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/',
                     [
                         'appid' => $steamAppId,
@@ -342,5 +368,29 @@ class ProviderSearchService
             ->where('provider_id', $provider->id)
             ->where('is_enabled', true)
             ->first();
+    }
+
+    private function searchCacheKey(User $user, string $query, string $provider, bool $enrich, ?string $steamAppId): string
+    {
+        return 'provider-search:'.sha1(implode('|', [
+            $user->id,
+            $provider,
+            $enrich ? '1' : '0',
+            strtolower($query),
+            (string) $steamAppId,
+            $this->credentialCachePart($user, 'igdb'),
+            $this->credentialCachePart($user, 'steam'),
+        ]));
+    }
+
+    private function credentialCachePart(User $user, string $providerKey): string
+    {
+        $credential = $this->credential($user, $providerKey);
+
+        if (! $credential) {
+            return 'none';
+        }
+
+        return $credential->id.':'.$credential->updated_at?->timestamp;
     }
 }
