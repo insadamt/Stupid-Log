@@ -57,6 +57,53 @@ class SteamEnrichmentTest extends TestCase
         $this->assertSame(1, ExternalGameId::where('external_id', '100')->where('provider_id', Provider::where('key', 'steam')->first()->id)->count());
     }
 
+    public function test_steam_enrichment_fetches_dlc_details_one_app_at_a_time(): void
+    {
+        $dlcIds = range(1000, 1104);
+
+        Http::fake([
+            'store.steampowered.com/api/appdetails*' => function ($request) use ($dlcIds) {
+                parse_str(parse_url($request->url(), PHP_URL_QUERY) ?? '', $query);
+                $appIds = explode(',', $query['appids'] ?? '');
+
+                if ($appIds === ['100']) {
+                    return Http::response([
+                        '100' => [
+                            'success' => true,
+                            'data' => [
+                                'name' => 'Steam Game',
+                                'dlc' => $dlcIds,
+                            ],
+                        ],
+                    ]);
+                }
+
+                $this->assertCount(1, $appIds);
+
+                return Http::response(collect($appIds)
+                    ->mapWithKeys(fn (string $appId) => [
+                        $appId => [
+                            'success' => true,
+                            'data' => [
+                                'name' => "Expansion {$appId}",
+                                'price_overview' => ['initial' => 999],
+                            ],
+                        ],
+                    ])
+                    ->all());
+            },
+            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response(['game' => ['availableGameStats' => ['achievements' => []]]]),
+        ]);
+
+        $game = Game::create([
+            'title' => 'Steam Game',
+            'normalized_title' => 'steam game',
+        ]);
+
+        $this->assertSame([], app(SteamEnrichmentService::class)->enrich($game, '100', $this->user));
+        $this->assertSame(count($dlcIds), Dlc::where('game_id', $game->id)->count());
+    }
+
     public function test_steam_enrichment_failures_do_not_block_manual_game_creation(): void
     {
         Http::fake([
@@ -104,6 +151,41 @@ class SteamEnrichmentTest extends TestCase
             'game_id' => $game->id,
             'provider_id' => Provider::where('key', 'steam')->first()->id,
             'external_id' => '100',
+        ]);
+    }
+
+    public function test_library_game_creation_can_mark_imported_steam_dlcs_owned_by_app_id(): void
+    {
+        Http::fake($this->steamResponses());
+
+        $this->post('/library-games', $this->payload([
+            'game' => [
+                'title' => 'Portal 2',
+                'source' => 'steam',
+                'external_id' => '100',
+                'steam_app_id' => '100',
+                'create_duplicate_anyway' => true,
+            ],
+            'owned_dlcs' => [[
+                'steam_app_id' => '200',
+                'acquisition_type' => 'Owned',
+                'purchased_price' => 7.5,
+                'purchased_at' => '2026-05-23',
+            ]],
+        ]))->assertRedirect();
+
+        $libraryGame = $this->user->libraryGames()->latest()->firstOrFail();
+
+        $dlc = Dlc::where('game_id', $libraryGame->game_id)
+            ->where('steam_app_id', '200')
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('owned_dlcs', [
+            'library_game_id' => $libraryGame->id,
+            'dlc_id' => $dlc->id,
+            'acquisition_type' => 'Owned',
+            'purchased_price' => 7.5,
+            'purchased_at' => '2026-05-23 00:00:00',
         ]);
     }
 

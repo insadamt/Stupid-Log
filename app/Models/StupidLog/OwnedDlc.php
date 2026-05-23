@@ -21,4 +21,9 @@ class OwnedDlc extends Model
     {
         return $this->belongsTo(Dlc::class);
     }
+
+    public function libraryGame(): BelongsTo
+    {
+        return $this->belongsTo(LibraryGame::class);
+    }
 }

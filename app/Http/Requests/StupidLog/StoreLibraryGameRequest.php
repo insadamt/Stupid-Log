@@ -55,8 +55,9 @@ class StoreLibraryGameRequest extends FormRequest
             'progress.completed_at' => ['nullable', 'date'],
 
             'owned_dlcs' => ['nullable', 'array'],
-            'owned_dlcs.*.dlc_id' => ['required', 'integer', 'exists:dlcs,id'],
-            'owned_dlcs.*.acquisition_type' => ['required', 'string', 'max:255'],
+            'owned_dlcs.*.dlc_id' => ['nullable', 'integer', 'exists:dlcs,id', 'required_without:owned_dlcs.*.steam_app_id'],
+            'owned_dlcs.*.steam_app_id' => ['nullable', 'string', 'max:255', 'required_without:owned_dlcs.*.dlc_id'],
+            'owned_dlcs.*.acquisition_type' => ['required', 'string', Rule::in(['Owned', 'Edition Included', 'Free'])],
             'owned_dlcs.*.purchased_price' => ['nullable', 'numeric', 'min:0'],
             'owned_dlcs.*.purchased_at' => ['nullable', 'date'],
         ];

@@ -12,6 +12,16 @@ Route::post('/library-games', [StupidLogController::class, 'storeLibraryGame'])-
 Route::post('/library-games/cover', [StupidLogController::class, 'uploadGameCover'])->name('library-games.cover.store');
 Route::get('/provider-search', [StupidLogController::class, 'providerSearch'])->name('provider-search');
 Route::get('/games/{libraryGame}', [StupidLogController::class, 'gameDetails'])->name('games.show');
+Route::patch('/games/{libraryGame}', [StupidLogController::class, 'updateLibraryGame'])->name('games.update');
+Route::delete('/games/{libraryGame}', [StupidLogController::class, 'destroyLibraryGame'])->name('games.destroy');
+Route::patch('/games/{libraryGame}/platform-devices', [StupidLogController::class, 'updatePlatformDevices'])->name('games.platform-devices.update');
+Route::post('/games/{libraryGame}/ownership-copies', [StupidLogController::class, 'storeOwnershipCopy'])->name('games.ownership-copies.store');
+Route::patch('/ownership-copies/{ownershipCopy}', [StupidLogController::class, 'updateOwnershipCopy'])->name('ownership-copies.update');
+Route::delete('/ownership-copies/{ownershipCopy}', [StupidLogController::class, 'destroyOwnershipCopy'])->name('ownership-copies.destroy');
+Route::post('/games/{libraryGame}/dlcs/refresh', [StupidLogController::class, 'refreshDlcs'])->name('games.dlcs.refresh');
+Route::post('/games/{libraryGame}/owned-dlcs', [StupidLogController::class, 'storeOwnedDlc'])->name('games.owned-dlcs.store');
+Route::patch('/owned-dlcs/{ownedDlc}', [StupidLogController::class, 'updateOwnedDlc'])->name('owned-dlcs.update');
+Route::delete('/owned-dlcs/{ownedDlc}', [StupidLogController::class, 'destroyOwnedDlc'])->name('owned-dlcs.destroy');
 Route::get('/stats', [StupidLogController::class, 'stats'])->name('stats');
 Route::get('/snapshots', [StupidLogController::class, 'snapshots'])->name('snapshots');
 Route::post('/snapshots', [StupidLogController::class, 'createSnapshot'])->name('snapshots.store');

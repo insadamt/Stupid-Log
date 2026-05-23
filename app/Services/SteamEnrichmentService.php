@@ -52,6 +52,21 @@ class SteamEnrichmentService
         return $warnings;
     }
 
+    public function refreshDlcCatalog(Game $game, string $steamAppId): void
+    {
+        $provider = Provider::where('key', 'steam')->first();
+
+        if ($provider) {
+            $game->externalIds()->firstOrCreate(
+                ['provider_id' => $provider->id, 'external_id' => $steamAppId],
+                ['url' => "https://store.steampowered.com/app/{$steamAppId}"],
+            );
+        }
+
+        $this->enrichStoreData($game, $steamAppId, $provider);
+        $game->forceFill(['provider_synced_at' => now()])->save();
+    }
+
     private function enrichStoreData(Game $game, string $steamAppId, ?Provider $provider): void
     {
         $data = $this->appDetails([$steamAppId])[$steamAppId]['data'] ?? null;
@@ -82,9 +97,20 @@ class SteamEnrichmentService
             return;
         }
 
-        $details = $this->appDetails($dlcIds->all());
-
         foreach ($dlcIds as $dlcId) {
+            try {
+                $details = $this->appDetails([$dlcId]);
+            } catch (Throwable $exception) {
+                Log::warning('Steam DLC detail enrichment failed.', [
+                    'game_id' => $game->id,
+                    'steam_app_id' => $steamAppId,
+                    'dlc_app_id' => $dlcId,
+                    'exception' => $exception,
+                ]);
+
+                continue;
+            }
+
             $dlcData = $details[$dlcId]['data'] ?? null;
             if (! is_array($dlcData)) {
                 continue;

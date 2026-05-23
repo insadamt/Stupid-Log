@@ -20,6 +20,7 @@ use App\Services\StatsService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
@@ -211,6 +212,312 @@ class LibraryGameRulesTest extends TestCase
                 'earned_achievements' => 4,
             ],
         ]));
+    }
+
+    public function test_ownership_copies_can_be_added_updated_and_deleted_after_game_creation(): void
+    {
+        $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload());
+        $familySharing = OwnershipType::where('name', 'Family Sharing')->firstOrFail();
+
+        $this->post("/games/{$libraryGame->id}/ownership-copies", [
+            'ownership_type_id' => $familySharing->id,
+            'edition_name' => 'Shared copy',
+            'base_price' => 30,
+            'purchased_price' => 0,
+            'purchased_at' => '2026-05-23',
+        ])->assertRedirect();
+
+        $copy = $libraryGame->ownershipCopies()->where('ownership_type_id', $familySharing->id)->firstOrFail();
+
+        $this->assertDatabaseHas('ownership_copies', [
+            'id' => $copy->id,
+            'edition_name' => 'Shared copy',
+            'base_price' => 30,
+            'purchased_price' => 0,
+        ]);
+
+        $eaPlay = OwnershipType::where('name', 'EA Play')->firstOrFail();
+
+        $this->patch("/ownership-copies/{$copy->id}", [
+            'ownership_type_id' => $eaPlay->id,
+            'edition_name' => 'Subscription',
+            'base_price' => 40,
+            'purchased_price' => 5,
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('ownership_copies', [
+            'id' => $copy->id,
+            'ownership_type_id' => $eaPlay->id,
+            'edition_name' => 'Subscription',
+            'base_price' => 40,
+            'purchased_price' => 5,
+        ]);
+
+        $this->delete("/ownership-copies/{$copy->id}")->assertRedirect();
+
+        $this->assertDatabaseMissing('ownership_copies', ['id' => $copy->id]);
+    }
+
+    public function test_ownership_copy_editing_enforces_platform_duplicate_physical_and_last_copy_rules(): void
+    {
+        $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload([], 'Xbox', 'Xbox Series X|S', 'Digital'));
+        $digitalCopy = $libraryGame->ownershipCopies()->firstOrFail();
+        $psPlus = OwnershipType::where('name', 'PS Plus')->firstOrFail();
+        $physical = OwnershipType::where('name', 'Physical')->firstOrFail();
+
+        $this->post("/games/{$libraryGame->id}/ownership-copies", [
+            'ownership_type_id' => $psPlus->id,
+        ])->assertSessionHasErrors('ownership_type_id');
+
+        $this->post("/games/{$libraryGame->id}/ownership-copies", [
+            'ownership_type_id' => $digitalCopy->ownership_type_id,
+        ])->assertSessionHasErrors('ownership_type_id');
+
+        $this->post("/games/{$libraryGame->id}/ownership-copies", [
+            'ownership_type_id' => $physical->id,
+        ])->assertSessionHasErrors('physical_status_id');
+
+        $this->delete("/ownership-copies/{$digitalCopy->id}")
+            ->assertSessionHasErrors('ownership_copy');
+    }
+
+    public function test_library_game_can_be_updated_and_deleted_from_details_page(): void
+    {
+        $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Old Game',
+                'source' => 'manual',
+                'total_achievements' => 10,
+                'create_duplicate_anyway' => true,
+            ],
+        ]));
+        $inProgress = Status::where('name', 'In Progress')->firstOrFail();
+
+        $this->patch("/games/{$libraryGame->id}", [
+            'game' => [
+                'title' => 'New Game',
+                'publisher' => 'New Studio',
+                'description' => 'Updated details.',
+                'base_price_default' => 25,
+                'total_achievements' => 12,
+            ],
+            'progress' => [
+                'status_id' => $inProgress->id,
+                'playtime_hours' => 6.5,
+                'earned_achievements' => 5,
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('games', [
+            'id' => $libraryGame->game_id,
+            'title' => 'New Game',
+            'normalized_title' => 'new game',
+            'publisher' => 'New Studio',
+            'description' => 'Updated details.',
+            'base_price_default' => 25,
+            'total_achievements' => 12,
+        ]);
+        $this->assertDatabaseHas('library_games', [
+            'id' => $libraryGame->id,
+            'status_id' => $inProgress->id,
+            'playtime_hours' => 6.5,
+            'earned_achievements' => 5,
+        ]);
+
+        $this->delete("/games/{$libraryGame->id}")->assertRedirect('/library');
+        $this->assertDatabaseMissing('library_games', ['id' => $libraryGame->id]);
+    }
+
+    public function test_platform_and_devices_can_be_updated_when_ownership_remains_compatible(): void
+    {
+        $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload([], 'Steam', 'PC', 'Digital'));
+        $gog = Platform::where('name', 'GOG')->firstOrFail();
+        $pc = Device::where('name', 'PC')->firstOrFail();
+
+        $this->patch("/games/{$libraryGame->id}/platform-devices", [
+            'platform_id' => $gog->id,
+            'device_ids' => [$pc->id],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('library_games', [
+            'id' => $libraryGame->id,
+            'platform_id' => $gog->id,
+        ]);
+        $this->assertDatabaseHas('library_game_device', [
+            'library_game_id' => $libraryGame->id,
+            'device_id' => $pc->id,
+        ]);
+    }
+
+    public function test_platform_device_editing_rejects_invalid_devices_duplicate_platforms_and_incompatible_ownership(): void
+    {
+        $creator = app(LibraryGameCreator::class);
+        $libraryGame = $creator->create($this->user, $this->payload([], 'Steam', 'PC', 'Digital'));
+        $xboxPayload = $this->payload([
+            'game' => [
+                'title' => $libraryGame->game->title,
+                'source' => 'manual',
+                'external_ids' => [],
+                'create_duplicate_anyway' => true,
+            ],
+        ], 'Xbox', 'Xbox Series X|S', 'Digital');
+        $existingXbox = $creator->create($this->user, $xboxPayload);
+        $existingXbox->update(['game_id' => $libraryGame->game_id]);
+
+        $xbox = Platform::where('name', 'Xbox')->firstOrFail();
+        $ps5 = Device::where('name', 'PS5')->firstOrFail();
+        $pc = Device::where('name', 'PC')->firstOrFail();
+
+        $this->patch("/games/{$libraryGame->id}/platform-devices", [
+            'platform_id' => $xbox->id,
+            'device_ids' => [$ps5->id],
+        ])->assertSessionHasErrors('device_ids');
+
+        $this->patch("/games/{$libraryGame->id}/platform-devices", [
+            'platform_id' => $xbox->id,
+            'device_ids' => [$pc->id],
+        ])->assertSessionHasErrors('platform_id');
+
+        $retro = $creator->create($this->user, $this->payload([], 'RetroAchievements', 'NES / Famicom', 'Emulation'));
+        $gog = Platform::where('name', 'GOG')->firstOrFail();
+
+        $this->patch("/games/{$retro->id}/platform-devices", [
+            'platform_id' => $gog->id,
+            'device_ids' => [$pc->id],
+        ])->assertSessionHasErrors('platform_id');
+    }
+
+    public function test_dlc_ownership_can_be_marked_updated_and_removed_from_details_page(): void
+    {
+        $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload());
+        $dlc = Dlc::create([
+            'game_id' => $libraryGame->game_id,
+            'title' => 'Expansion Pack',
+            'base_price' => 15,
+        ]);
+
+        $this->post("/games/{$libraryGame->id}/owned-dlcs", [
+            'dlc_id' => $dlc->id,
+            'acquisition_type' => 'Owned',
+            'purchased_price' => 7.5,
+            'purchased_at' => '2026-05-23',
+        ])->assertRedirect();
+
+        $ownedDlc = $libraryGame->ownedDlcs()->where('dlc_id', $dlc->id)->firstOrFail();
+
+        $this->assertDatabaseHas('owned_dlcs', [
+            'id' => $ownedDlc->id,
+            'library_game_id' => $libraryGame->id,
+            'dlc_id' => $dlc->id,
+            'acquisition_type' => 'Owned',
+            'purchased_price' => 7.5,
+        ]);
+        $this->assertSame('2026-05-23', $ownedDlc->refresh()->purchased_at->format('Y-m-d'));
+
+        $this->patch("/owned-dlcs/{$ownedDlc->id}", [
+            'acquisition_type' => 'Edition Included',
+            'purchased_price' => 99,
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('owned_dlcs', [
+            'id' => $ownedDlc->id,
+            'acquisition_type' => 'Edition Included',
+            'purchased_price' => 0,
+        ]);
+
+        $this->delete("/owned-dlcs/{$ownedDlc->id}")->assertRedirect();
+
+        $this->assertDatabaseMissing('owned_dlcs', ['id' => $ownedDlc->id]);
+    }
+
+    public function test_dlc_catalog_can_be_refreshed_from_steam_after_game_creation(): void
+    {
+        Http::fake([
+            'store.steampowered.com/api/appdetails*' => function ($request) {
+                parse_str(parse_url($request->url(), PHP_URL_QUERY) ?? '', $query);
+                $appIds = explode(',', $query['appids'] ?? '');
+
+                if ($appIds === ['100']) {
+                    return Http::response([
+                        '100' => [
+                            'success' => true,
+                            'data' => [
+                                'name' => 'Steam Game',
+                                'dlc' => [300],
+                            ],
+                        ],
+                    ]);
+                }
+
+                return Http::response([
+                    '300' => [
+                        'success' => true,
+                        'data' => [
+                            'name' => 'New Expansion',
+                            'header_image' => 'https://cdn.example.test/300.jpg',
+                            'price_overview' => ['initial' => 1499],
+                        ],
+                    ],
+                ]);
+            },
+        ]);
+
+        $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload());
+        $steam = Provider::where('key', 'steam')->firstOrFail();
+
+        ExternalGameId::create([
+            'game_id' => $libraryGame->game_id,
+            'provider_id' => $steam->id,
+            'external_id' => '100',
+            'url' => 'https://store.steampowered.com/app/100',
+        ]);
+
+        $this->post("/games/{$libraryGame->id}/dlcs/refresh")->assertRedirect();
+
+        $this->assertDatabaseHas('dlcs', [
+            'game_id' => $libraryGame->game_id,
+            'steam_app_id' => '300',
+            'title' => 'New Expansion',
+            'base_price' => 14.99,
+        ]);
+    }
+
+    public function test_dlc_ownership_rejects_wrong_game_duplicate_and_invalid_acquisition_type(): void
+    {
+        $creator = app(LibraryGameCreator::class);
+        $libraryGame = $creator->create($this->user, $this->payload());
+        $otherGame = Game::create([
+            'title' => 'Other Game',
+            'normalized_title' => 'other game',
+        ]);
+        $wrongDlc = Dlc::create([
+            'game_id' => $otherGame->id,
+            'title' => 'Wrong DLC',
+        ]);
+        $dlc = Dlc::create([
+            'game_id' => $libraryGame->game_id,
+            'title' => 'Valid DLC',
+        ]);
+
+        $this->post("/games/{$libraryGame->id}/owned-dlcs", [
+            'dlc_id' => $wrongDlc->id,
+            'acquisition_type' => 'Owned',
+        ])->assertSessionHasErrors('dlc_id');
+
+        $this->post("/games/{$libraryGame->id}/owned-dlcs", [
+            'dlc_id' => $dlc->id,
+            'acquisition_type' => 'Invalid',
+        ])->assertSessionHasErrors('acquisition_type');
+
+        $this->post("/games/{$libraryGame->id}/owned-dlcs", [
+            'dlc_id' => $dlc->id,
+            'acquisition_type' => 'Owned',
+        ])->assertRedirect();
+
+        $this->post("/games/{$libraryGame->id}/owned-dlcs", [
+            'dlc_id' => $dlc->id,
+            'acquisition_type' => 'Owned',
+        ])->assertSessionHasErrors('dlc_id');
     }
 
     public function test_dlc_pricing_stats_and_confirmed_snapshots_follow_v1_rules(): void

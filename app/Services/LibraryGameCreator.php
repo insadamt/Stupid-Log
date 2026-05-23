@@ -73,8 +73,10 @@ class LibraryGameCreator
 
             foreach ($payload['owned_dlcs'] ?? [] as $ownedDlc) {
                 $acquisitionType = $ownedDlc['acquisition_type'];
+                $dlc = $this->resolveDlc($game, $ownedDlc);
+
                 $libraryGame->ownedDlcs()->create([
-                    'dlc_id' => Dlc::findOrFail($ownedDlc['dlc_id'])->id,
+                    'dlc_id' => $dlc->id,
                     'acquisition_type' => $acquisitionType,
                     'purchased_price' => in_array($acquisitionType, ['Edition Included', 'Free'], true)
                         ? 0
@@ -249,5 +251,20 @@ class LibraryGameCreator
         }
 
         return PhysicalStatus::findOrFail($copy['physical_status_id'])->id;
+    }
+
+    private function resolveDlc(Game $game, array $ownedDlc): Dlc
+    {
+        $dlc = isset($ownedDlc['dlc_id'])
+            ? Dlc::findOrFail($ownedDlc['dlc_id'])
+            : Dlc::where('game_id', $game->id)
+                ->where('steam_app_id', (string) $ownedDlc['steam_app_id'])
+                ->firstOrFail();
+
+        if ((int) $dlc->game_id !== (int) $game->id) {
+            throw ValidationException::withMessages(['owned_dlcs' => 'Selected DLC does not belong to this game.']);
+        }
+
+        return $dlc;
     }
 }

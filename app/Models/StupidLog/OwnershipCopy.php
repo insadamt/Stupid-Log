@@ -22,4 +22,14 @@ class OwnershipCopy extends Model
     {
         return $this->belongsTo(OwnershipType::class);
     }
+
+    public function libraryGame(): BelongsTo
+    {
+        return $this->belongsTo(LibraryGame::class);
+    }
+
+    public function physicalStatus(): BelongsTo
+    {
+        return $this->belongsTo(PhysicalStatus::class);
+    }
 }

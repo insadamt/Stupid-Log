@@ -167,9 +167,9 @@ updated_at
 
 ## 5. Provider Philosophy
 
-Do not ask the user to choose a provider during game search.
+The user explicitly chooses the provider during game search.
 
-Provider logic is automatic:
+Provider logic is source-specific:
 
 ```text
 IGDB = primary metadata source
@@ -187,9 +187,9 @@ Manual = fallback and user truth
 
 ### Important
 
-Search provider is not user-selectable in V1.
+Search provider is user-selectable in V1.
 
-The app searches IGDB first. Steam is fallback/enrichment.
+The app must not automatically fall back from IGDB search to Steam search. Steam may be used only when the user selects Steam as the search provider, or as enrichment when a selected IGDB result includes a Steam App ID.
 
 ---
 
@@ -261,8 +261,9 @@ Use Laravel encryption for sensitive values.
 ```text
 User clicks Add Game
 → floating wizard opens
+→ user chooses IGDB or Steam as search provider
 → user searches game title
-→ app searches IGDB first
+→ app searches only the selected provider
 → if IGDB result exists, user selects result
 → app creates/reuses game by IGDB ID
 → app extracts Steam App ID from IGDB result if available
@@ -270,19 +271,19 @@ User clicks Add Game
 → user continues manually through platform/device/ownership/progress steps
 ```
 
-### Fallback Flow
+### Steam Search Flow
 
-If IGDB returns no usable result:
+If the user selects Steam search:
 
 ```text
 search Steam
 → if Steam result exists, user selects result
 → create/reuse game by Steam App ID
-→ fill metadata from Steam as fallback
+→ fill metadata from Steam
 → import Steam achievements/base price/DLCs
 ```
 
-If Steam also fails:
+If the selected provider fails:
 
 ```text
 show manual entry flow
@@ -917,10 +918,10 @@ Do not allow moving to the next step until the current step is valid.
 ### Step 1 — Search Game
 
 - User types game name.
-- App searches IGDB first.
-- If IGDB result exists, show results.
-- If not found, search Steam fallback.
-- If not found in Steam, show manual entry option.
+- User chooses IGDB or Steam.
+- App searches only the selected provider.
+- If results exist, show results.
+- If no result is found, show manual entry option and let the user manually switch providers if desired.
 
 ### Step 2 — Metadata Preview
 
@@ -937,7 +938,7 @@ metadata source
 
 Download cover locally when saving.
 
-Warn if data is fallback/Steam/manual.
+Warn if data is Steam/manual.
 
 ### Step 3 — Steam Enrichment
 
@@ -1779,4 +1780,3 @@ games
 ```
 
 This architecture is non-negotiable for V1.
-

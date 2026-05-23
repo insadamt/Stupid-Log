@@ -41,7 +41,7 @@ class ProviderSearchContractTest extends TestCase
             ->assertJsonMissingPath('encrypted_client_secret');
     }
 
-    public function test_provider_search_falls_back_to_steam_when_igdb_fails(): void
+    public function test_provider_search_does_not_fall_back_to_steam_when_igdb_fails(): void
     {
         $user = User::firstOrFail();
         ProviderCredential::create([
@@ -49,6 +49,12 @@ class ProviderSearchContractTest extends TestCase
             'provider_id' => Provider::where('key', 'igdb')->firstOrFail()->id,
             'encrypted_client_id' => Crypt::encryptString('client-id'),
             'encrypted_client_secret' => Crypt::encryptString('client-secret'),
+            'is_enabled' => true,
+        ]);
+        ProviderCredential::create([
+            'user_id' => $user->id,
+            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
+            'encrypted_api_key' => Crypt::encryptString('steam-key'),
             'is_enabled' => true,
         ]);
 
@@ -87,23 +93,13 @@ class ProviderSearchContractTest extends TestCase
 
         $this->getJson('/provider-search?query=portal')
             ->assertOk()
-            ->assertJsonStructure($this->searchShape())
-            ->assertJsonPath('results.0.source', 'steam')
-            ->assertJsonPath('results.0.external_id', '620')
-            ->assertJsonPath('results.0.title', 'Portal 2')
-            ->assertJsonPath('results.0.publisher', 'Valve')
-            ->assertJsonPath('results.0.release_date', null)
-            ->assertJsonPath('results.0.description', 'A test chamber puzzle game.')
-            ->assertJsonPath('results.0.steam_app_id', '620')
-            ->assertJsonPath('results.0.base_price_default', 9.99)
-            ->assertJsonPath('results.0.base_price_source', 'steam')
-            ->assertJsonPath('results.0.total_achievements', 2)
-            ->assertJsonPath('results.0.total_achievements_source', 'steam')
+            ->assertJsonStructure($this->emptySearchShape())
+            ->assertJsonPath('results', [])
             ->assertJsonPath('manual_available', true)
             ->assertJsonCount(1, 'warnings');
     }
 
-    public function test_igdb_results_with_steam_app_ids_are_auto_filled_from_steam(): void
+    public function test_igdb_results_with_steam_app_ids_are_enriched_only_when_requested(): void
     {
         $user = User::firstOrFail();
         ProviderCredential::create([
@@ -111,6 +107,12 @@ class ProviderSearchContractTest extends TestCase
             'provider_id' => Provider::where('key', 'igdb')->firstOrFail()->id,
             'encrypted_client_id' => Crypt::encryptString('client-id'),
             'encrypted_client_secret' => Crypt::encryptString('client-secret'),
+            'is_enabled' => true,
+        ]);
+        ProviderCredential::create([
+            'user_id' => $user->id,
+            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
+            'encrypted_api_key' => Crypt::encryptString('steam-key'),
             'is_enabled' => true,
         ]);
 
@@ -146,7 +148,7 @@ class ProviderSearchContractTest extends TestCase
             ]),
         ]);
 
-        $this->getJson('/provider-search?query=portal')
+        $this->getJson('/provider-search?query=portal&enrich=1')
             ->assertOk()
             ->assertJsonPath('results.0.source', 'igdb')
             ->assertJsonPath('results.0.steam_app_id', '620')
@@ -158,6 +160,14 @@ class ProviderSearchContractTest extends TestCase
 
     public function test_steam_price_auto_fill_survives_achievement_schema_failures(): void
     {
+        $user = User::firstOrFail();
+        ProviderCredential::create([
+            'user_id' => $user->id,
+            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
+            'encrypted_api_key' => Crypt::encryptString('steam-key'),
+            'is_enabled' => true,
+        ]);
+
         Http::fake([
             'store.steampowered.com/api/storesearch*' => Http::response([
                 'items' => [[
@@ -177,7 +187,47 @@ class ProviderSearchContractTest extends TestCase
             'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response(['error' => 'unavailable'], 500),
         ]);
 
-        $this->getJson('/provider-search?query=portal')
+        $this->getJson('/provider-search?query=portal&provider=steam&enrich=1')
+            ->assertOk()
+            ->assertJsonPath('results.0.source', 'steam')
+            ->assertJsonPath('results.0.steam_app_id', '620')
+            ->assertJsonPath('results.0.base_price_default', 9.99)
+            ->assertJsonPath('results.0.base_price_source', 'steam')
+            ->assertJsonPath('results.0.total_achievements', null)
+            ->assertJsonPath('results.0.total_achievements_source', null)
+            ->assertJsonCount(1, 'warnings');
+    }
+
+    public function test_provider_search_survives_steam_pool_connection_failures(): void
+    {
+        $user = User::firstOrFail();
+        ProviderCredential::create([
+            'user_id' => $user->id,
+            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
+            'encrypted_api_key' => Crypt::encryptString('steam-key'),
+            'is_enabled' => true,
+        ]);
+
+        Http::fake([
+            'store.steampowered.com/api/storesearch*' => Http::response([
+                'items' => [[
+                    'id' => 620,
+                    'name' => 'Portal 2',
+                    'tiny_image' => 'https://cdn.example.test/portal.jpg',
+                ]],
+            ]),
+            'store.steampowered.com/api/appdetails*' => Http::response([
+                '620' => [
+                    'success' => true,
+                    'data' => [
+                        'price_overview' => ['initial' => 999],
+                    ],
+                ],
+            ]),
+            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::failedConnection('Steam achievements timed out.'),
+        ]);
+
+        $this->getJson('/provider-search?query=portal&provider=steam&enrich=1')
             ->assertOk()
             ->assertJsonPath('results.0.source', 'steam')
             ->assertJsonPath('results.0.steam_app_id', '620')
@@ -201,7 +251,7 @@ class ProviderSearchContractTest extends TestCase
             'store.steampowered.com/api/appdetails*' => Http::response(['error' => 'unavailable'], 500),
         ]);
 
-        $this->getJson('/provider-search?query=portal')
+        $this->getJson('/provider-search?query=portal&provider=steam&enrich=1')
             ->assertOk()
             ->assertJsonPath('results.0.source', 'steam')
             ->assertJsonPath('results.0.steam_app_id', '620')
@@ -233,7 +283,7 @@ class ProviderSearchContractTest extends TestCase
             ->assertJsonStructure($this->emptySearchShape())
             ->assertJsonPath('results', [])
             ->assertJsonPath('manual_available', true)
-            ->assertJsonCount(2, 'warnings');
+            ->assertJsonCount(1, 'warnings');
     }
 
     private function searchShape(): array

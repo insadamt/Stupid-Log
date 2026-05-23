@@ -57,6 +57,21 @@ type OwnershipCopyDraft = {
     purchased_at: string;
 };
 
+type DlcCatalogItem = {
+    id?: number | null;
+    steam_app_id: string;
+    title: string;
+    cover_url_original?: string | null;
+    base_price?: number | string | null;
+};
+
+type OwnedDlcDraft = {
+    steam_app_id: string;
+    acquisition_type: "Owned" | "Edition Included" | "Free";
+    purchased_price: string;
+    purchased_at: string;
+};
+
 type Draft = {
     title: string;
     source: GameSource;
@@ -72,6 +87,8 @@ type Draft = {
     platform_id: number;
     device_ids: number[];
     ownership_copies: OwnershipCopyDraft[];
+    dlcs: DlcCatalogItem[];
+    owned_dlcs: OwnedDlcDraft[];
     status_id: number;
     playtime_hours: string;
     earned_achievements: string;
@@ -93,6 +110,7 @@ const steps: Array<{ key: StepKey; label: string }> = [
 ];
 
 const physicalLike = ["Physical", "Pre-owned", "Borrowed"];
+const dlcAcquisitionTypes: OwnedDlcDraft["acquisition_type"][] = ["Owned", "Edition Included", "Free"];
 
 function localId() {
     return Math.random().toString(36).slice(2, 10);
@@ -157,6 +175,18 @@ function preferredResultCover(result: WizardSearchResult) {
 function fallbackResultCover(result: WizardSearchResult) {
     const preferred = preferredResultCover(result);
     return result.cover_url_original && result.cover_url_original !== preferred ? result.cover_url_original : "";
+}
+
+function dlcCatalogFromResult(result: WizardSearchResult): DlcCatalogItem[] {
+    return (result.dlcs ?? [])
+        .filter((dlc) => !!dlc.steam_app_id)
+        .map((dlc) => ({
+            id: dlc.id ?? null,
+            steam_app_id: String(dlc.steam_app_id),
+            title: dlc.title,
+            cover_url_original: dlc.cover_url_original ?? null,
+            base_price: dlc.base_price ?? null,
+        }));
 }
 
 function uploadErrorMessage(payload: unknown) {
@@ -290,6 +320,8 @@ export default function AddGameWizard({
             purchased_price: "",
             purchased_at: "",
         }],
+        dlcs: [],
+        owned_dlcs: [],
         status_id: defaultStatus?.id ?? 0,
         playtime_hours: "0",
         earned_achievements: "0",
@@ -315,6 +347,7 @@ export default function AddGameWizard({
     const [coverError, setCoverError] = useState("");
     const [platformQuery, setPlatformQuery] = useState("");
     const [deviceQuery, setDeviceQuery] = useState("");
+    const [dlcQuery, setDlcQuery] = useState("");
     const [saving, setSaving] = useState(false);
     const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
     const searchId = useRef(0);
@@ -331,6 +364,8 @@ export default function AddGameWizard({
     const selectedOwnerships = draft.ownership_copies.map((copy) => ownershipById.get(copy.ownership_type_id)).filter(Boolean) as string[];
     const filteredPlatforms = references.platforms.filter((item) => item.name.toLowerCase().includes(platformQuery.trim().toLowerCase()));
     const filteredDevices = (platform?.devices ?? []).filter((item) => item.name.toLowerCase().includes(deviceQuery.trim().toLowerCase()));
+    const filteredDlcs = draft.dlcs.filter((dlc) => dlc.title.toLowerCase().includes(dlcQuery.trim().toLowerCase()));
+    const ownedDlcCount = draft.owned_dlcs.length;
     const coverPreview = localCoverPreview || draft.cover_url_original;
     const showSidePanel = !["search", "basics"].includes(step.key);
 
@@ -351,6 +386,7 @@ export default function AddGameWizard({
         setNotice("");
         setCoverError("");
         setServerErrors({});
+        setDlcQuery("");
         setOpen(true);
     }
 
@@ -414,6 +450,7 @@ export default function AddGameWizard({
         const basePrice = result.base_price_default === null || result.base_price_default === undefined ? "" : String(result.base_price_default);
         const totalAchievements = result.total_achievements === null || result.total_achievements === undefined ? "" : String(result.total_achievements);
         const cover = preferredResultCover(result);
+        const dlcs = dlcCatalogFromResult(result);
 
         setProviderCoverUrl(cover);
         setLocalCoverPreview("");
@@ -432,12 +469,15 @@ export default function AddGameWizard({
             total_achievements: totalAchievements,
             base_price_default: basePrice,
             ownership_copies: current.ownership_copies.map((copy) => ({ ...copy, base_price: copy.base_price || basePrice })),
+            dlcs,
+            owned_dlcs: [],
         }));
     }
 
     function mergeSteamEnrichment(result: WizardSearchResult) {
         const basePrice = result.base_price_default === null || result.base_price_default === undefined ? "" : String(result.base_price_default);
         const totalAchievements = result.total_achievements === null || result.total_achievements === undefined ? "" : String(result.total_achievements);
+        const dlcs = dlcCatalogFromResult(result);
 
         setOriginalFromResult(result);
         setDraft((current) => ({
@@ -446,6 +486,10 @@ export default function AddGameWizard({
             base_price_default: basePrice || current.base_price_default,
             total_achievements: totalAchievements || current.total_achievements,
             ownership_copies: current.ownership_copies.map((copy) => ({ ...copy, base_price: copy.base_price || basePrice })),
+            dlcs: dlcs.length ? dlcs : current.dlcs,
+            owned_dlcs: dlcs.length
+                ? current.owned_dlcs.filter((ownedDlc) => dlcs.some((dlc) => dlc.steam_app_id === ownedDlc.steam_app_id))
+                : current.owned_dlcs,
         }));
     }
 
@@ -454,7 +498,7 @@ export default function AddGameWizard({
         setSelectedResultKey(resultKey(result));
         setStepIndex(1);
 
-        if (!result.steam_app_id || result.source === "steam") return;
+        if (!result.steam_app_id) return;
 
         setEnriching(true);
         try {
@@ -486,11 +530,14 @@ export default function AddGameWizard({
             total_achievements: "",
             base_price_default: "",
             ownership_copies: current.ownership_copies.map((copy) => ({ ...copy, base_price: "" })),
+            dlcs: [],
+            owned_dlcs: [],
         }));
         setProviderCoverUrl("");
         setLocalCoverPreview("");
         setSteamOriginal(null);
         setSelectedResultKey("manual");
+        setDlcQuery("");
         setStepIndex(1);
     }
 
@@ -594,6 +641,42 @@ export default function AddGameWizard({
         setDraft((current) => ({
             ...current,
             ownership_copies: current.ownership_copies.map((copy) => copy.local_id === localIdValue ? { ...copy, ...patch } : copy),
+        }));
+    }
+
+    function ownedDlcFor(steamAppId: string) {
+        return draft.owned_dlcs.find((ownedDlc) => ownedDlc.steam_app_id === steamAppId);
+    }
+
+    function updateOwnedDlc(steamAppId: string, patch: Partial<OwnedDlcDraft>) {
+        setDraft((current) => {
+            const existing = current.owned_dlcs.find((ownedDlc) => ownedDlc.steam_app_id === steamAppId);
+            const nextOwnedDlc: OwnedDlcDraft = {
+                steam_app_id: steamAppId,
+                acquisition_type: "Owned",
+                purchased_price: "",
+                purchased_at: "",
+                ...existing,
+                ...patch,
+            };
+
+            if (["Edition Included", "Free"].includes(nextOwnedDlc.acquisition_type)) {
+                nextOwnedDlc.purchased_price = "0";
+            }
+
+            return {
+                ...current,
+                owned_dlcs: existing
+                    ? current.owned_dlcs.map((ownedDlc) => ownedDlc.steam_app_id === steamAppId ? nextOwnedDlc : ownedDlc)
+                    : [...current.owned_dlcs, nextOwnedDlc],
+            };
+        });
+    }
+
+    function removeOwnedDlc(steamAppId: string) {
+        setDraft((current) => ({
+            ...current,
+            owned_dlcs: current.owned_dlcs.filter((ownedDlc) => ownedDlc.steam_app_id !== steamAppId),
         }));
     }
 
@@ -708,7 +791,12 @@ export default function AddGameWizard({
                 last_played_at: draft.last_played_at || null,
                 completed_at: draft.completed_at || null,
             },
-            owned_dlcs: [],
+            owned_dlcs: draft.owned_dlcs.map((ownedDlc) => ({
+                steam_app_id: ownedDlc.steam_app_id,
+                acquisition_type: ownedDlc.acquisition_type,
+                purchased_price: numberOrNull(ownedDlc.purchased_price),
+                purchased_at: ownedDlc.purchased_at || null,
+            })),
         }, {
             preserveScroll: true,
             onStart: () => { setSaving(true); setServerErrors({}); },
@@ -871,13 +959,74 @@ export default function AddGameWizard({
                                         <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Ownership</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Select your copies.</h3></div><div className="flex flex-wrap gap-2">{platform?.ownership_types.map((type) => { const selected = draft.ownership_copies.some((copy) => copy.ownership_type_id === type.id); return <button key={type.id} type="button" onClick={() => selected ? removeCopy(draft.ownership_copies.find((copy) => copy.ownership_type_id === type.id)?.local_id ?? "") : addCopy(type.id)} className={`rounded-2xl px-5 py-3 text-sm font-black ${selected ? "bg-black text-white" : "bg-white text-black/55"}`}>{type.name}</button>; })}</div><div className="grid gap-3">{draft.ownership_copies.map((copy, index) => { const name = ownershipById.get(copy.ownership_type_id); const needsPhysical = !!name && physicalLike.includes(name); return <div key={copy.local_id} className="rounded-[24px] border border-black/10 bg-white/70 p-4"><div className="mb-4 flex items-center justify-between"><div><div className="text-[11px] font-black uppercase tracking-[0.2em] text-black/35">Copy {index + 1}</div><div className="text-2xl font-black tracking-[-0.04em]">{name || "Ownership"}</div></div><button type="button" onClick={() => removeCopy(copy.local_id)} disabled={draft.ownership_copies.length === 1} className="rounded-xl bg-red-500/10 px-4 py-2 text-xs font-black text-red-700 disabled:opacity-35">Remove</button></div><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Field label="Edition"><TextInput value={copy.edition_name} onChange={(event) => updateCopy(copy.local_id, { edition_name: event.target.value })} placeholder="Standard" /></Field><Field label="Base Price"><TextInput value={copy.base_price} onChange={(event) => updateCopy(copy.local_id, { base_price: event.target.value })} type="number" step="0.01" placeholder="Unknown" /></Field><Field label="Paid"><TextInput value={copy.purchased_price} onChange={(event) => updateCopy(copy.local_id, { purchased_price: event.target.value })} type="number" step="0.01" placeholder="Unknown" /></Field>{needsPhysical && <Field label="Physical Status"><Select value={copy.physical_status_id ?? ""} onChange={(event) => updateCopy(copy.local_id, { physical_status_id: Number(event.target.value) || null })}><option value="">Required</option>{references.physicalStatuses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field>}<Field label="Purchased At"><TextInput value={copy.purchased_at} onChange={(event) => updateCopy(copy.local_id, { purchased_at: event.target.value })} type="date" /></Field></div></div>; })}</div></div>
                                     )}
 
-                                    {step.key === "dlcs" && <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">DLCs</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Coming soon.</h3></div><EmptyCard title="DLC ownership is coming soon." body="The backend DLC catalog work is not finished yet. Continue now; DLC ownership will be handled after backend support is complete." /></div>}
+                                    {step.key === "dlcs" && (
+                                        <div className="grid gap-6">
+                                            <div>
+                                                <div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">DLCs</div>
+                                                <h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Mark expansions.</h3>
+                                            </div>
+
+                                            {enriching && <Notice><span className="inline-flex items-center gap-3"><Loader2 className="size-5 animate-spin" /> Steam DLC catalog is loading.</span></Notice>}
+
+                                            {!draft.steam_app_id && (
+                                                <EmptyCard title="No Steam App ID." body="DLC catalog import needs a Steam App ID. Continue now and refresh DLCs from the details page after adding one." />
+                                            )}
+
+                                            {draft.steam_app_id && !draft.dlcs.length && !enriching && (
+                                                <EmptyCard title="No DLC catalog loaded." body="Steam did not return DLCs for this game yet. The full catalog will still be imported locally when the game is saved." />
+                                            )}
+
+                                            {draft.dlcs.length > 0 && (
+                                                <>
+                                                    <div className="grid gap-4 rounded-[28px] border border-black/10 bg-white/70 p-4 md:grid-cols-[1fr_auto] md:items-center">
+                                                        <TextInput value={dlcQuery} onChange={(event) => setDlcQuery(event.target.value)} placeholder="Search DLCs..." />
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <Pill active>{ownedDlcCount} marked</Pill>
+                                                            <Pill muted>{draft.dlcs.length} imported on save</Pill>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid max-h-[500px] gap-3 overflow-y-auto rounded-[28px] border border-black/10 bg-white/70 p-3">
+                                                        {filteredDlcs.map((dlc) => {
+                                                            const ownedDlc = ownedDlcFor(dlc.steam_app_id);
+                                                            const selected = !!ownedDlc;
+                                                            const acquisitionType = ownedDlc?.acquisition_type ?? "Owned";
+                                                            const included = ["Edition Included", "Free"].includes(acquisitionType);
+
+                                                            return (
+                                                                <div key={dlc.steam_app_id} className={`grid gap-4 rounded-[22px] border p-3 transition ${selected ? "border-black bg-white" : "border-black/5 bg-white/55"} lg:grid-cols-[96px_1fr_auto] lg:items-center`}>
+                                                                    <CoverImage src={dlc.cover_url_original ?? ""} alt={dlc.title} className="h-[54px] w-full rounded-2xl lg:h-[54px] lg:w-24" />
+                                                                    <div className="min-w-0">
+                                                                        <div className="truncate text-lg font-black tracking-[-0.035em]">{dlc.title}</div>
+                                                                        <div className="mt-1 text-sm font-bold text-black/45">{money(dlc.base_price)}</div>
+                                                                    </div>
+                                                                    <div className="grid gap-2 sm:grid-cols-[150px_120px_150px_auto]">
+                                                                        <Select value={selected ? acquisitionType : "Not Owned"} onChange={(event) => event.target.value === "Not Owned" ? removeOwnedDlc(dlc.steam_app_id) : updateOwnedDlc(dlc.steam_app_id, { acquisition_type: event.target.value as OwnedDlcDraft["acquisition_type"] })}>
+                                                                            <option value="Not Owned">Not Owned</option>
+                                                                            {dlcAcquisitionTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                                                                        </Select>
+                                                                        <TextInput value={ownedDlc?.purchased_price ?? ""} onChange={(event) => updateOwnedDlc(dlc.steam_app_id, { purchased_price: event.target.value })} type="number" step="0.01" placeholder="Paid" disabled={!selected || included} />
+                                                                        <TextInput value={ownedDlc?.purchased_at ?? ""} onChange={(event) => updateOwnedDlc(dlc.steam_app_id, { purchased_at: event.target.value })} type="date" disabled={!selected} />
+                                                                        <button type="button" onClick={() => selected ? removeOwnedDlc(dlc.steam_app_id) : updateOwnedDlc(dlc.steam_app_id, { acquisition_type: "Owned" })} className={`rounded-2xl px-4 py-3 text-sm font-black ${selected ? "bg-black text-white" : "bg-black/5 text-black/55"}`}>
+                                                                            {selected ? "Marked" : "Own"}
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    {!filteredDlcs.length && <Notice>No DLC matches the current search.</Notice>}
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {step.key === "progress" && (
                                         <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Progress</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Track the state.</h3></div><div className="flex flex-wrap gap-2">{availableStatuses.map((item) => <button key={item.id} type="button" onClick={() => chooseStatus(item.id)} className={`rounded-2xl px-5 py-3 text-sm font-black ${draft.status_id === item.id ? "bg-black text-white" : "bg-white text-black/55"}`}>{item.name}</button>)}</div><div className="grid gap-4 rounded-[28px] border border-black/10 bg-white/70 p-5 md:grid-cols-2"><Field label="Playtime Hours"><TextInput value={draft.playtime_hours} onChange={(event) => update("playtime_hours", event.target.value)} type="number" step="0.1" /></Field><Field label="Earned Achievements"><TextInput value={draft.earned_achievements} onChange={(event) => update("earned_achievements", event.target.value)} type="number" placeholder={hasAchievements ? `0 / ${draft.total_achievements}` : "No achievements"} /></Field>{status?.name !== "Not Played" && <Field label="First Played"><TextInput value={draft.first_played_at} onChange={(event) => update("first_played_at", event.target.value)} type="date" /></Field>}{status?.name !== "Not Played" && <Field label="Last Played"><TextInput value={draft.last_played_at} onChange={(event) => update("last_played_at", event.target.value)} type="date" /></Field>}{(status?.name === "Completed" || status?.name === "100%") && <Field label="Completed At"><TextInput value={draft.completed_at} onChange={(event) => update("completed_at", event.target.value)} type="date" /></Field>}</div>{!hasAchievements && <Notice>100% is hidden because this game has no achievement total.</Notice>}</div>
                                     )}
 
-                                    {step.key === "review" && <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Review</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Save receipt.</h3></div><div className="rounded-[30px] border border-black/10 bg-white p-6"><h4 className="text-4xl font-black tracking-[-0.06em]">{draft.title}</h4><div className="mt-5 grid gap-3 text-base font-bold text-black/60 md:grid-cols-2"><p><span className="font-black text-black">Source:</span> {sourceName(draft.source)}</p><p><span className="font-black text-black">Platform:</span> {platform?.name || "Missing"}</p><p><span className="font-black text-black">Devices:</span> {selectedDevices.length ? selectedDevices.join(", ") : "Missing"}</p><p><span className="font-black text-black">Ownership:</span> {selectedOwnerships.length ? selectedOwnerships.join(", ") : "Missing"}</p><p><span className="font-black text-black">Status:</span> {status?.name || "Missing"}</p><p><span className="font-black text-black">Playtime:</span> {draft.playtime_hours || 0}h</p><p><span className="font-black text-black">Achievements:</span> {draft.earned_achievements || 0} / {draft.total_achievements || "Unknown"}</p><p><span className="font-black text-black">Base price:</span> {money(draft.base_price_default)}</p></div></div><div className="grid gap-4 md:grid-cols-3"><Metric label="Cover" value={draft.cover_path ? "Uploaded" : coverPreview ? "Provider" : "Missing"} icon={<Package />} /><Metric label="Devices" value={selectedDevices.length} icon={<Layers3 />} /><Metric label="Copies" value={draft.ownership_copies.length} icon={<Database />} /></div></div>}
+                                    {step.key === "review" && <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Review</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Save receipt.</h3></div><div className="rounded-[30px] border border-black/10 bg-white p-6"><h4 className="text-4xl font-black tracking-[-0.06em]">{draft.title}</h4><div className="mt-5 grid gap-3 text-base font-bold text-black/60 md:grid-cols-2"><p><span className="font-black text-black">Source:</span> {sourceName(draft.source)}</p><p><span className="font-black text-black">Platform:</span> {platform?.name || "Missing"}</p><p><span className="font-black text-black">Devices:</span> {selectedDevices.length ? selectedDevices.join(", ") : "Missing"}</p><p><span className="font-black text-black">Ownership:</span> {selectedOwnerships.length ? selectedOwnerships.join(", ") : "Missing"}</p><p><span className="font-black text-black">DLCs marked:</span> {ownedDlcCount}</p><p><span className="font-black text-black">Status:</span> {status?.name || "Missing"}</p><p><span className="font-black text-black">Playtime:</span> {draft.playtime_hours || 0}h</p><p><span className="font-black text-black">Achievements:</span> {draft.earned_achievements || 0} / {draft.total_achievements || "Unknown"}</p><p><span className="font-black text-black">Base price:</span> {money(draft.base_price_default)}</p></div></div><div className="grid gap-4 md:grid-cols-4"><Metric label="Cover" value={draft.cover_path ? "Uploaded" : coverPreview ? "Provider" : "Missing"} icon={<Package />} /><Metric label="Devices" value={selectedDevices.length} icon={<Layers3 />} /><Metric label="Copies" value={draft.ownership_copies.length} icon={<Database />} /><Metric label="DLCs" value={ownedDlcCount} icon={<Package />} /></div></div>}
 
                                     {Object.keys(serverErrors).length > 0 && <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-5 text-sm font-black text-red-700"><div className="mb-2 text-base">Backend rejected the save:</div><ul className="list-inside list-disc space-y-1">{Object.entries(serverErrors).map(([key, value]) => <li key={key}>{key}: {value}</li>)}</ul></div>}
                                 </section>
