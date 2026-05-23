@@ -7,6 +7,7 @@ type TabKey = 'overview' | 'breakdowns' | 'progression' | 'archive';
 type MetricKey = 'library_games' | 'completed' | 'hundred_percent' | 'playtime_hours' | 'earned_achievements' | 'total_achievements' | 'achievement_progress' | 'base_value' | 'purchased_value';
 type StatView = StatsData & { year?: number; growth?: Record<string, GrowthMetric>; best_games?: ConfirmedYearStats['best_games'] };
 type Slice = { label: string; value: number; color: string; growth?: GrowthMetric | null };
+type ChartConfig = { title: string; eyebrow: string; data: Slice[]; total: string; center: string; delta?: GrowthMetric | null; format: (value: number) => string };
 
 const tabs: Array<{ key: TabKey; title: string; sub: string }> = [
     { key: 'overview', title: 'Overview', sub: 'core totals' },
@@ -156,8 +157,8 @@ function Donut({ data, total, center }: { data: Slice[]; total: string; center: 
     );
 }
 
-function GameUiChart({ title, eyebrow, data, total, center, delta, format = (value: number) => num(value, value % 1 ? 1 : 0) }: { title: string; eyebrow: string; data: Slice[]; total: string; center: string; delta?: GrowthMetric | null; format?: (value: number) => string }) {
-    const sum = data.reduce((acc, slice) => acc + slice.value, 0);
+function GameUiChart({ config }: { config: ChartConfig }) {
+    const sum = config.data.reduce((acc, slice) => acc + slice.value, 0);
 
     return (
         <article className="grid h-full min-h-0 grid-cols-[250px_1fr_1.45fr] gap-4 rounded-[30px] bg-black p-4 text-white shadow-[0_24px_75px_rgb(0_0_0/0.2)]">
@@ -166,26 +167,26 @@ function GameUiChart({ title, eyebrow, data, total, center, delta, format = (val
                 <h3 className="mt-2 text-3xl font-black leading-none">Choose Metric</h3>
                 <div className="mt-4 h-px bg-white/10" />
                 <div className="mt-4 grid max-h-[calc(100%-92px)] gap-2 overflow-y-auto pr-1">
-                    {data.length === 0 && <div className="rounded-2xl bg-white/7 p-4 text-sm font-bold text-white/35">No metric data yet.</div>}
-                    {data.map((slice, index) => (
+                    {config.data.length === 0 && <div className="rounded-2xl bg-white/7 p-4 text-sm font-bold text-white/35">No metric data yet.</div>}
+                    {config.data.map((slice, index) => (
                         <div key={slice.label} className={`grid grid-cols-[40px_1fr] items-center gap-3 rounded-[20px] p-3 ring-1 ${index === 0 ? 'bg-[#b7ff63] text-black ring-[#b7ff63]' : 'bg-white/7 text-white/48 ring-white/5'}`}>
                             <div className={`${index === 0 ? 'bg-black text-[#b7ff63]' : 'bg-black/70 text-white/45'} grid size-9 place-items-center rounded-full text-sm font-black`}>{index + 1}</div>
                             <div className="min-w-0">
                                 <div className="truncate text-sm font-black">{slice.label}</div>
-                                <div className="mt-0.5 text-[10px] font-black uppercase tracking-[0.14em] opacity-55">{format(slice.value)}</div>
+                                <div className="mt-0.5 text-[10px] font-black uppercase tracking-[0.14em] opacity-55">{config.format(slice.value)}</div>
                             </div>
                         </div>
                     ))}
                 </div>
             </aside>
             <section className="min-h-0 rounded-[26px] bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-5 ring-1 ring-white/8">
-                <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]/70">{eyebrow}</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]/70">{config.eyebrow}</div>
                 <div className="mt-2 flex items-start justify-between gap-3">
-                    <h2 className="text-4xl font-black leading-none text-[#9BE44D]">{title}</h2>
-                    <DeltaBadge value={delta} compact />
+                    <h2 className="text-4xl font-black leading-none text-[#9BE44D]">{config.title}</h2>
+                    <DeltaBadge value={config.delta} compact />
                 </div>
                 <div className="mt-5 grid h-[calc(100%-82px)] place-items-center">
-                    <Donut data={data} total={total} center={center} />
+                    <Donut data={config.data} total={config.total} center={config.center} />
                 </div>
             </section>
             <section className="min-h-0 rounded-[26px] bg-white/[0.06] p-4 ring-1 ring-white/8">
@@ -194,8 +195,8 @@ function GameUiChart({ title, eyebrow, data, total, center, delta, format = (val
                     <div className="grid size-11 place-items-center rounded-2xl bg-[#b7ff63] text-black"><BarChart3 size={22} strokeWidth={3} /></div>
                 </div>
                 <div className="mt-4 grid max-h-[calc(100%-60px)] gap-3 overflow-y-auto pr-1">
-                    {data.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm font-bold text-white/35">No rows available.</div>}
-                    {data.map((slice) => {
+                    {config.data.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm font-bold text-white/35">No rows available.</div>}
+                    {config.data.map((slice) => {
                         const percent = sum > 0 ? (slice.value / sum) * 100 : 0;
                         return (
                             <div key={slice.label} className="rounded-[22px] bg-white/[0.07] p-4 ring-1 ring-white/8">
@@ -207,7 +208,7 @@ function GameUiChart({ title, eyebrow, data, total, center, delta, format = (val
                                     <span className="text-sm font-black text-white/80">{num(percent, 1)}%</span>
                                 </div>
                                 <div className="mt-2 flex items-center justify-between gap-3 text-xs font-black text-white/35">
-                                    <span>{format(slice.value)}</span>
+                                    <span>{config.format(slice.value)}</span>
                                     <DeltaBadge value={slice.growth} compact />
                                 </div>
                             </div>
@@ -267,7 +268,7 @@ function Breakdowns({ stats, previous }: { stats: StatView; previous?: StatView 
         ? (includeDlcs ? item.base_value : n(item.base_value_without_dlcs ?? item.base_value))
         : (includeDlcs ? item.purchased_value : n(item.purchased_value_without_dlcs ?? item.purchased_value));
 
-    const chartConfig = (() => {
+    const chartConfig: ChartConfig = (() => {
         if (chart === 'games') {
             const data = gamesMode === 'platform' ? slices<PlatformBreakdown>(platforms, (item) => item.library_games, prevPlatforms) : slices<StatusBreakdown>(statuses, (item) => item.library_games, prevStatuses);
             return { title: 'Total Games', eyebrow: gamesMode === 'platform' ? 'By platform' : 'By status', data, total: num(stats.library_games), center: 'games', delta: metricGrowth('library_games', stats, previous), format: (value: number) => num(value) };
@@ -296,7 +297,7 @@ function Breakdowns({ stats, previous }: { stats: StatView; previous?: StatView 
                     {chart === 'value' && <button type="button" onClick={() => setIncludeDlcs((value) => !value)} className={`rounded-full px-3 py-2 text-[11px] font-black uppercase tracking-[0.12em] ring-1 ring-black/10 ${includeDlcs ? 'bg-[#b7ff63] text-black' : 'bg-white/75 text-black/45 hover:text-black'}`}>{includeDlcs ? 'DLCs included' : 'DLCs excluded'}</button>}
                 </div>
             </div>
-            <GameUiChart {...chartConfig} />
+            <GameUiChart config={chartConfig} />
         </div>
     );
 }
@@ -446,20 +447,15 @@ function Empty({ text, dark = false }: { text: string; dark?: boolean }) {
 }
 
 function SlideNav({ active, setActive }: { active: TabKey; setActive: (tab: TabKey) => void }) {
-    const index = tabs.findIndex((tab) => tab.key === active);
-    const go = (step: number) => setActive(tabs[(index + step + tabs.length) % tabs.length].key);
-
     return (
-        <div className="flex h-[70px] shrink-0 justify-center px-2 pt-3">
-            <div className="flex max-w-full items-center gap-2 overflow-x-auto rounded-[26px] border border-black/10 bg-black p-2 shadow-[0_22px_70px_rgb(0_0_0/0.24)]">
-                <button type="button" onClick={() => go(-1)} className="grid size-11 shrink-0 place-items-center rounded-[20px] bg-white/8 text-white/70 hover:text-[#b7ff63]"><ChevronLeft size={18} /></button>
+        <div className="flex h-[86px] shrink-0 justify-center px-2 py-3">
+            <div className="flex max-w-full items-center gap-2 overflow-x-auto rounded-[26px] border border-black/10 bg-black p-3 shadow-[0_22px_70px_rgb(0_0_0/0.24)]">
                 {tabs.map((tab) => (
-                    <button key={tab.key} type="button" onClick={() => setActive(tab.key)} className={`min-w-[155px] rounded-[20px] px-5 py-3 text-left transition ${active === tab.key ? 'bg-[#b7ff63] text-black' : 'bg-white/7 text-white/45 hover:text-white'}`}>
+                    <button key={tab.key} type="button" onClick={() => setActive(tab.key)} className={`min-w-[165px] rounded-[20px] px-5 py-3 text-left transition ${active === tab.key ? 'bg-[#b7ff63] text-black' : 'bg-white/7 text-white/45 hover:text-white'}`}>
                         <div className="text-sm font-black">{tab.title}</div>
                         <div className="text-[10px] font-black uppercase tracking-[0.16em] opacity-50">{tab.sub}</div>
                     </button>
                 ))}
-                <button type="button" onClick={() => go(1)} className="grid size-11 shrink-0 place-items-center rounded-[20px] bg-white/8 text-white/70 hover:text-[#b7ff63]"><ChevronRight size={18} /></button>
             </div>
         </div>
     );
@@ -467,7 +463,7 @@ function SlideNav({ active, setActive }: { active: TabKey; setActive: (tab: TabK
 
 export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData; confirmedYears?: ConfirmedYearStats[] }) {
     const [view, setView] = useState<'all-time' | string>('all-time');
-    const [active, setActive] = useState<TabKey>('breakdowns');
+    const [active, setActive] = useState<TabKey>('overview');
     const yearsAsc = useMemo(() => [...confirmedYears].sort((a, b) => a.year - b.year), [confirmedYears]);
     const yearsDesc = useMemo(() => [...confirmedYears].sort((a, b) => b.year - a.year), [confirmedYears]);
     const selectedYear = view === 'all-time' ? null : confirmedYears.find((year) => String(year.year) === view) ?? null;
@@ -494,9 +490,9 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                 : <Archive stats={current} previous={previous} selectedYear={selectedYear} />;
 
     return (
-        <AppLayout title="Stats">
-            <section className="h-[calc(100vh-32px)] overflow-hidden px-4 pb-3 md:pl-[88px] md:pr-6">
-                <div className="mx-auto grid h-full max-w-[1540px] grid-rows-[120px_1fr_70px] gap-3 overflow-hidden">
+        <AppLayout title="Stats" lockViewport>
+            <section className="h-full overflow-hidden px-4 md:pl-[88px] md:pr-6">
+                <div className="mx-auto grid h-full max-w-[1540px] grid-rows-[120px_minmax(0,1fr)_86px] gap-3 overflow-hidden">
                     <header className="rounded-[34px] bg-black px-6 py-5 text-white shadow-[0_24px_80px_rgb(0_0_0/0.20)]">
                         <div className="grid h-full gap-5 xl:grid-cols-[1fr_auto] xl:items-center">
                             <div className="min-w-0">
