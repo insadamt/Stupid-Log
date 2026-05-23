@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 
 class StatsService
 {
+    private const VALUE_OWNERSHIP_TYPES = ['Digital', 'Physical'];
+
     private const GROWTH_KEYS = [
         'unique_titles',
         'library_games',
@@ -49,6 +51,7 @@ class StatsService
             'base_value' => round((float) $baseValue, 2),
             'purchased_value' => round((float) $purchasedValue, 2),
             'breakdowns' => $this->liveBreakdowns($libraryGames),
+            'archive' => $this->liveArchive($libraryGames),
         ];
     }
 
@@ -86,6 +89,10 @@ class StatsService
         $dlcQuery = DB::table('owned_dlc_snapshots')->where('snapshot_run_id', $snapshot->id);
         $totalAchievements = (int) (clone $libraryQuery)->sum('total_achievements');
         $earnedAchievements = (int) (clone $libraryQuery)->sum('earned_achievements');
+        $copyBaseValue = $this->snapshotEligibleCopyValue($snapshot, 'base_price');
+        $copyPurchasedValue = $this->snapshotEligibleCopyValue($snapshot, 'purchased_price');
+        $dlcBaseValue = $this->snapshotOwnedDlcValue($snapshot, 'base_price');
+        $dlcPurchasedValue = $this->snapshotOwnedDlcValue($snapshot, 'purchased_price');
 
         return [
             'snapshot_id' => $snapshot->id,
@@ -109,9 +116,10 @@ class StatsService
             'earned_achievements' => $earnedAchievements,
             'total_achievements' => $totalAchievements,
             'achievement_progress' => $totalAchievements > 0 ? round(($earnedAchievements / $totalAchievements) * 100, 1) : 0,
-            'base_value' => round((float) (clone $copyQuery)->sum('base_price') + (float) (clone $dlcQuery)->where('acquisition_type', '!=', 'Edition Included')->sum('base_price'), 2),
-            'purchased_value' => round((float) (clone $copyQuery)->sum('purchased_price') + (float) (clone $dlcQuery)->sum('purchased_price'), 2),
+            'base_value' => round($copyBaseValue + $dlcBaseValue, 2),
+            'purchased_value' => round($copyPurchasedValue + $dlcPurchasedValue, 2),
             'breakdowns' => $this->snapshotBreakdowns($snapshot),
+            'archive' => $this->snapshotArchive($snapshot),
             'best_games' => $this->snapshotBestGames($snapshot),
             'growth' => [],
         ];
@@ -217,8 +225,8 @@ class StatsService
                 ->map(fn (Collection $copies, string $label) => [
                     'label' => $label,
                     'ownership_copies' => $copies->count(),
-                    'base_value' => round((float) $copies->sum('base_price'), 2),
-                    'purchased_value' => round((float) $copies->sum('purchased_price'), 2),
+                    'base_value' => in_array($label, self::VALUE_OWNERSHIP_TYPES, true) ? round((float) $copies->sum('base_price'), 2) : 0,
+                    'purchased_value' => in_array($label, self::VALUE_OWNERSHIP_TYPES, true) ? round((float) $copies->sum('purchased_price'), 2) : 0,
                 ])
                 ->sortByDesc('ownership_copies')
                 ->values()
@@ -230,6 +238,10 @@ class StatsService
     {
         $earnedAchievements = (int) $games->sum('earned_achievements');
         $totalAchievements = (int) $games->sum(fn (LibraryGame $libraryGame) => $libraryGame->game->total_achievements ?? 0);
+        $baseWithoutDlcs = $games->sum(fn (LibraryGame $libraryGame) => $this->liveCopyBaseValue($libraryGame));
+        $purchasedWithoutDlcs = $games->sum(fn (LibraryGame $libraryGame) => $this->liveCopyPurchasedValue($libraryGame));
+        $dlcBaseValue = $games->sum(fn (LibraryGame $libraryGame) => $this->liveDlcBaseValue($libraryGame));
+        $dlcPurchasedValue = $games->sum(fn (LibraryGame $libraryGame) => $this->liveDlcPurchasedValue($libraryGame));
 
         return [
             'label' => $label,
@@ -239,8 +251,22 @@ class StatsService
             'earned_achievements' => $earnedAchievements,
             'total_achievements' => $totalAchievements,
             'achievement_progress' => $totalAchievements > 0 ? round(($earnedAchievements / $totalAchievements) * 100, 1) : 0,
-            'base_value' => round((float) $games->sum(fn (LibraryGame $libraryGame) => $this->liveBaseValue($libraryGame)), 2),
-            'purchased_value' => round((float) $games->sum(fn (LibraryGame $libraryGame) => $this->livePurchasedValue($libraryGame)), 2),
+            'base_value_without_dlcs' => round((float) $baseWithoutDlcs, 2),
+            'purchased_value_without_dlcs' => round((float) $purchasedWithoutDlcs, 2),
+            'dlc_base_value' => round((float) $dlcBaseValue, 2),
+            'dlc_purchased_value' => round((float) $dlcPurchasedValue, 2),
+            'base_value' => round((float) $baseWithoutDlcs + (float) $dlcBaseValue, 2),
+            'purchased_value' => round((float) $purchasedWithoutDlcs + (float) $dlcPurchasedValue, 2),
+            'statuses' => $games
+                ->groupBy(fn (LibraryGame $libraryGame) => $libraryGame->status->name)
+                ->map(fn (Collection $statusGames, string $statusLabel) => [
+                    'label' => $statusLabel,
+                    'library_games' => $statusGames->count(),
+                    'playtime_hours' => round((float) $statusGames->sum('playtime_hours'), 1),
+                ])
+                ->sortByDesc('library_games')
+                ->values()
+                ->all(),
         ];
     }
 
@@ -266,11 +292,13 @@ class StatsService
             ->keyBy('id');
 
         $copyValues = DB::table('ownership_copy_snapshots')
+            ->join('ownership_types', 'ownership_types.id', '=', 'ownership_copy_snapshots.ownership_type_id')
             ->join('library_game_snapshots', function ($join) {
                 $join->on('library_game_snapshots.snapshot_run_id', '=', 'ownership_copy_snapshots.snapshot_run_id')
                     ->on('library_game_snapshots.library_game_id', '=', 'ownership_copy_snapshots.library_game_id');
             })
             ->where('ownership_copy_snapshots.snapshot_run_id', $snapshot->id)
+            ->whereIn('ownership_types.name', self::VALUE_OWNERSHIP_TYPES)
             ->groupBy('library_game_snapshots.platform_id')
             ->selectRaw('library_game_snapshots.platform_id, sum(ownership_copy_snapshots.base_price) as base_value, sum(ownership_copy_snapshots.purchased_price) as purchased_value')
             ->get()
@@ -282,17 +310,30 @@ class StatsService
                     ->on('library_game_snapshots.library_game_id', '=', 'owned_dlc_snapshots.library_game_id');
             })
             ->where('owned_dlc_snapshots.snapshot_run_id', $snapshot->id)
+            ->where('owned_dlc_snapshots.acquisition_type', 'Owned')
             ->groupBy('library_game_snapshots.platform_id')
-            ->selectRaw("library_game_snapshots.platform_id, sum(case when owned_dlc_snapshots.acquisition_type != 'Edition Included' then owned_dlc_snapshots.base_price else 0 end) as base_value, sum(owned_dlc_snapshots.purchased_price) as purchased_value")
+            ->selectRaw('library_game_snapshots.platform_id, sum(owned_dlc_snapshots.base_price) as base_value, sum(owned_dlc_snapshots.purchased_price) as purchased_value')
             ->get()
             ->keyBy('platform_id');
 
+        $statusesByPlatform = DB::table('library_game_snapshots')
+            ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
+            ->where('snapshot_run_id', $snapshot->id)
+            ->groupBy('library_game_snapshots.platform_id', 'statuses.name')
+            ->selectRaw('library_game_snapshots.platform_id, statuses.name as label, count(*) as library_games, sum(playtime_hours) as playtime_hours')
+            ->get()
+            ->groupBy('platform_id');
+
         return $platforms
-            ->map(function ($row) use ($copyValues, $dlcValues) {
+            ->map(function ($row) use ($copyValues, $dlcValues, $statusesByPlatform) {
                 $copy = $copyValues->get($row->id);
                 $dlc = $dlcValues->get($row->id);
                 $earnedAchievements = (int) $row->earned_achievements;
                 $totalAchievements = (int) $row->total_achievements;
+                $copyBase = (float) ($copy?->base_value ?? 0);
+                $copyPaid = (float) ($copy?->purchased_value ?? 0);
+                $dlcBase = (float) ($dlc?->base_value ?? 0);
+                $dlcPaid = (float) ($dlc?->purchased_value ?? 0);
 
                 return [
                     'label' => $row->label,
@@ -302,8 +343,21 @@ class StatsService
                     'earned_achievements' => $earnedAchievements,
                     'total_achievements' => $totalAchievements,
                     'achievement_progress' => $totalAchievements > 0 ? round(($earnedAchievements / $totalAchievements) * 100, 1) : 0,
-                    'base_value' => round((float) ($copy?->base_value ?? 0) + (float) ($dlc?->base_value ?? 0), 2),
-                    'purchased_value' => round((float) ($copy?->purchased_value ?? 0) + (float) ($dlc?->purchased_value ?? 0), 2),
+                    'base_value_without_dlcs' => round($copyBase, 2),
+                    'purchased_value_without_dlcs' => round($copyPaid, 2),
+                    'dlc_base_value' => round($dlcBase, 2),
+                    'dlc_purchased_value' => round($dlcPaid, 2),
+                    'base_value' => round($copyBase + $dlcBase, 2),
+                    'purchased_value' => round($copyPaid + $dlcPaid, 2),
+                    'statuses' => ($statusesByPlatform->get($row->id) ?? collect())
+                        ->map(fn ($statusRow) => [
+                            'label' => $statusRow->label,
+                            'library_games' => (int) $statusRow->library_games,
+                            'playtime_hours' => round((float) $statusRow->playtime_hours, 1),
+                        ])
+                        ->sortByDesc('library_games')
+                        ->values()
+                        ->all(),
                 ];
             })
             ->sortByDesc('library_games')
@@ -340,26 +394,155 @@ class StatsService
             ->map(fn ($row) => [
                 'label' => $row->label,
                 'ownership_copies' => (int) $row->ownership_copies,
-                'base_value' => round((float) $row->base_value, 2),
-                'purchased_value' => round((float) $row->purchased_value, 2),
+                'base_value' => in_array($row->label, self::VALUE_OWNERSHIP_TYPES, true) ? round((float) $row->base_value, 2) : 0,
+                'purchased_value' => in_array($row->label, self::VALUE_OWNERSHIP_TYPES, true) ? round((float) $row->purchased_value, 2) : 0,
             ])
             ->sortByDesc('ownership_copies')
             ->values()
             ->all();
     }
 
+    private function liveArchive(Collection $libraryGames): array
+    {
+        $items = $libraryGames->map(fn (LibraryGame $libraryGame) => $this->archiveItemFromLive($libraryGame));
+
+        return [
+            'most_played' => $items->sortByDesc('playtime_hours')->take(8)->values()->all(),
+            'biggest_base_price' => $items->filter(fn ($item) => $item['base_value'] > 0)->sortByDesc('base_value')->take(8)->values()->all(),
+            'biggest_paid_price' => $items->filter(fn ($item) => $item['purchased_value'] > 0)->sortByDesc('purchased_value')->take(8)->values()->all(),
+        ];
+    }
+
+    private function archiveItemFromLive(LibraryGame $libraryGame): array
+    {
+        return [
+            'library_game_id' => $libraryGame->id,
+            'game_id' => $libraryGame->game_id,
+            'title' => $libraryGame->game->title,
+            'cover_url' => $libraryGame->game->cover_path ? asset('storage/'.$libraryGame->game->cover_path) : $libraryGame->game->cover_url_original,
+            'platform' => $libraryGame->platform->name,
+            'status' => $libraryGame->status->name,
+            'playtime_hours' => (float) $libraryGame->playtime_hours,
+            'base_value' => round($this->liveBaseValue($libraryGame), 2),
+            'purchased_value' => round($this->livePurchasedValue($libraryGame), 2),
+        ];
+    }
+
+    private function snapshotArchive(SnapshotRun $snapshot): array
+    {
+        $rows = DB::table('library_game_snapshots')
+            ->join('games', 'games.id', '=', 'library_game_snapshots.game_id')
+            ->join('platforms', 'platforms.id', '=', 'library_game_snapshots.platform_id')
+            ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
+            ->where('snapshot_run_id', $snapshot->id)
+            ->select([
+                'library_game_snapshots.library_game_id',
+                'library_game_snapshots.game_id',
+                'games.title',
+                'games.cover_url_original',
+                'games.cover_path',
+                'platforms.name as platform',
+                'statuses.name as status',
+                'library_game_snapshots.playtime_hours',
+            ])
+            ->get();
+
+        $copyValues = DB::table('ownership_copy_snapshots')
+            ->join('ownership_types', 'ownership_types.id', '=', 'ownership_copy_snapshots.ownership_type_id')
+            ->where('snapshot_run_id', $snapshot->id)
+            ->whereIn('ownership_types.name', self::VALUE_OWNERSHIP_TYPES)
+            ->groupBy('library_game_id')
+            ->selectRaw('library_game_id, sum(base_price) as base_value, sum(purchased_price) as purchased_value')
+            ->get()
+            ->keyBy('library_game_id');
+
+        $dlcValues = DB::table('owned_dlc_snapshots')
+            ->where('snapshot_run_id', $snapshot->id)
+            ->where('acquisition_type', 'Owned')
+            ->groupBy('library_game_id')
+            ->selectRaw('library_game_id, sum(base_price) as base_value, sum(purchased_price) as purchased_value')
+            ->get()
+            ->keyBy('library_game_id');
+
+        $items = $rows->map(function ($row) use ($copyValues, $dlcValues) {
+            $copy = $copyValues->get($row->library_game_id);
+            $dlc = $dlcValues->get($row->library_game_id);
+
+            return [
+                'library_game_id' => (int) $row->library_game_id,
+                'game_id' => (int) $row->game_id,
+                'title' => $row->title,
+                'cover_url' => $row->cover_path ? asset('storage/'.$row->cover_path) : $row->cover_url_original,
+                'platform' => $row->platform,
+                'status' => $row->status,
+                'playtime_hours' => (float) $row->playtime_hours,
+                'base_value' => round((float) ($copy?->base_value ?? 0) + (float) ($dlc?->base_value ?? 0), 2),
+                'purchased_value' => round((float) ($copy?->purchased_value ?? 0) + (float) ($dlc?->purchased_value ?? 0), 2),
+            ];
+        });
+
+        return [
+            'most_played' => $items->sortByDesc('playtime_hours')->take(8)->values()->all(),
+            'biggest_base_price' => $items->filter(fn ($item) => $item['base_value'] > 0)->sortByDesc('base_value')->take(8)->values()->all(),
+            'biggest_paid_price' => $items->filter(fn ($item) => $item['purchased_value'] > 0)->sortByDesc('purchased_value')->take(8)->values()->all(),
+        ];
+    }
+
+    private function liveEligibleCopies(LibraryGame $libraryGame): Collection
+    {
+        return $libraryGame->ownershipCopies->filter(fn ($copy) => in_array($copy->ownershipType?->name, self::VALUE_OWNERSHIP_TYPES, true));
+    }
+
+    private function liveOwnedDlcs(LibraryGame $libraryGame): Collection
+    {
+        return $libraryGame->ownedDlcs->filter(fn ($ownedDlc) => $ownedDlc->acquisition_type === 'Owned');
+    }
+
+    private function liveCopyBaseValue(LibraryGame $libraryGame): float
+    {
+        return (float) $this->liveEligibleCopies($libraryGame)->sum('base_price');
+    }
+
+    private function liveCopyPurchasedValue(LibraryGame $libraryGame): float
+    {
+        return (float) $this->liveEligibleCopies($libraryGame)->sum('purchased_price');
+    }
+
+    private function liveDlcBaseValue(LibraryGame $libraryGame): float
+    {
+        return (float) $this->liveOwnedDlcs($libraryGame)->sum(fn ($ownedDlc) => $ownedDlc->dlc?->base_price ?? 0);
+    }
+
+    private function liveDlcPurchasedValue(LibraryGame $libraryGame): float
+    {
+        return (float) $this->liveOwnedDlcs($libraryGame)->sum('purchased_price');
+    }
+
     private function liveBaseValue(LibraryGame $libraryGame): float
     {
-        return (float) $libraryGame->ownershipCopies->sum('base_price')
-            + (float) $libraryGame->ownedDlcs
-                ->filter(fn ($ownedDlc) => $ownedDlc->acquisition_type !== 'Edition Included')
-                ->sum(fn ($ownedDlc) => $ownedDlc->dlc?->base_price ?? 0);
+        return $this->liveCopyBaseValue($libraryGame) + $this->liveDlcBaseValue($libraryGame);
     }
 
     private function livePurchasedValue(LibraryGame $libraryGame): float
     {
-        return (float) $libraryGame->ownershipCopies->sum('purchased_price')
-            + (float) $libraryGame->ownedDlcs->sum('purchased_price');
+        return $this->liveCopyPurchasedValue($libraryGame) + $this->liveDlcPurchasedValue($libraryGame);
+    }
+
+    private function snapshotEligibleCopyValue(SnapshotRun $snapshot, string $column): float
+    {
+        return (float) DB::table('ownership_copy_snapshots')
+            ->join('ownership_types', 'ownership_types.id', '=', 'ownership_copy_snapshots.ownership_type_id')
+            ->where('snapshot_run_id', $snapshot->id)
+            ->whereIn('ownership_types.name', self::VALUE_OWNERSHIP_TYPES)
+            ->sum($column);
+    }
+
+    private function snapshotOwnedDlcValue(SnapshotRun $snapshot, string $column): float
+    {
+        return (float) DB::table('owned_dlc_snapshots')
+            ->where('snapshot_run_id', $snapshot->id)
+            ->where('acquisition_type', 'Owned')
+            ->sum($column);
     }
 
     private function withGrowth(Collection $summaries): Collection
