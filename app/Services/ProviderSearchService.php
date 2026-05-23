@@ -13,31 +13,27 @@ use Throwable;
 class ProviderSearchService
 {
     private const SOURCE_ORDER = ['igdb', 'steam', 'manual'];
-    private const RESULT_LIMIT = 8;
-    private const ENRICHMENT_LIMIT = 5;
+    private const RESULT_LIMIT = 10;
 
-    public function search(User $user, string $query): array
+    public function search(User $user, string $query, string $provider = 'igdb', bool $enrich = false, ?string $steamAppId = null): array
     {
         $warnings = [];
-        $results = [];
+        $provider = in_array($provider, ['igdb', 'steam'], true) ? $provider : 'igdb';
 
         try {
-            $results = $this->searchIgdb($user, $query);
+            $results = $provider === 'steam'
+                ? $this->steamResults($query, $steamAppId)
+                : $this->searchIgdb($user, $query);
         } catch (Throwable $exception) {
-            $warnings[] = 'IGDB search unavailable.';
+            $results = [];
+            $warnings[] = $provider === 'steam'
+                ? 'Steam search unavailable.'
+                : 'IGDB search unavailable.';
         }
 
-        if (! $results) {
-            try {
-                $results = $this->searchSteam($query);
-            } catch (Throwable $exception) {
-                $warnings[] = 'Steam fallback unavailable.';
-            }
-        } else {
-            $results = $this->attachSteamAppIdsToIgdbResults($results, $query, $warnings);
+        if ($enrich) {
+            $results = $this->withSteamMetadata($results, $user, $warnings);
         }
-
-        $results = $this->withSteamMetadata($results, $user, $warnings);
 
         return [
             'query' => $query,
@@ -45,7 +41,9 @@ class ProviderSearchService
             'results' => collect($results)->map(fn (array $result) => $this->result($result))->values()->all(),
             'manual_available' => true,
             'warnings' => array_values(array_unique($warnings)),
-            'notice' => 'Manual entry remains available because saved user data is the source of truth.',
+            'notice' => $provider === 'igdb'
+                ? 'IGDB search is metadata-first. If IGDB does not provide a Steam App ID, Steam enrichment is skipped.'
+                : 'Steam search is direct. Use it when you want Steam price and achievement data first.',
         ];
     }
 
@@ -104,48 +102,25 @@ class ProviderSearchService
         })->all();
     }
 
-    private function searchSteam(string $query): array
+    private function steamResults(string $query, ?string $steamAppId): array
     {
+        if ($steamAppId) {
+            return [$this->result([
+                'source' => 'steam',
+                'external_id' => $steamAppId,
+                'title' => $query ?: 'Steam App '.$steamAppId,
+                'cover_url_original' => null,
+                'publisher' => null,
+                'release_date' => null,
+                'description' => null,
+                'steam_app_id' => $steamAppId,
+            ])];
+        }
+
         return collect($this->steamStoreSearch($query))
             ->take(self::RESULT_LIMIT)
             ->map(fn (array $item) => $this->steamSearchResult($item))
             ->all();
-    }
-
-    private function attachSteamAppIdsToIgdbResults(array $results, string $query, array &$warnings): array
-    {
-        $hasMissingSteamIds = collect($results)->contains(function (array $result) {
-            return ($result['source'] ?? null) === 'igdb' && empty($result['steam_app_id']);
-        });
-
-        if (! $hasMissingSteamIds) {
-            return $results;
-        }
-
-        try {
-            $sharedCandidates = $this->steamStoreSearch($query);
-        } catch (Throwable) {
-            $warnings[] = 'Steam resolver unavailable. Some IGDB results may not have Steam enrichment.';
-
-            return $results;
-        }
-
-        return collect($results)->map(function (array $result) use ($sharedCandidates) {
-            if (($result['source'] ?? null) !== 'igdb' || ! empty($result['steam_app_id'])) {
-                return $result;
-            }
-
-            $match = $this->bestSteamMatch($result['title'] ?? '', $sharedCandidates);
-
-            if (! $match || empty($match['id'])) {
-                return $result;
-            }
-
-            return array_merge($result, [
-                'steam_app_id' => (string) $match['id'],
-                'steam_resolved_from' => 'steam_store_search',
-            ]);
-        })->all();
     }
 
     private function steamStoreSearch(string $query): array
@@ -179,34 +154,6 @@ class ProviderSearchService
         ]);
     }
 
-    private function bestSteamMatch(string $title, array $candidates): ?array
-    {
-        $normalizedTitle = $this->normalizeTitle($title);
-
-        if ($normalizedTitle === '') {
-            return null;
-        }
-
-        $validCandidates = collect($candidates)
-            ->filter(fn (array $candidate) => ! empty($candidate['id']) && ! empty($candidate['name']))
-            ->values();
-
-        $exact = $validCandidates->first(function (array $candidate) use ($normalizedTitle) {
-            return $this->normalizeTitle((string) $candidate['name']) === $normalizedTitle;
-        });
-
-        if ($exact) {
-            return $exact;
-        }
-
-        return $validCandidates->first(function (array $candidate) use ($normalizedTitle) {
-            $candidateTitle = $this->normalizeTitle((string) $candidate['name']);
-
-            return str_contains($candidateTitle, $normalizedTitle)
-                || str_contains($normalizedTitle, $candidateTitle);
-        });
-    }
-
     private function withSteamMetadata(array $results, User $user, array &$warnings): array
     {
         $steamAppIds = collect($results)
@@ -214,7 +161,6 @@ class ProviderSearchService
             ->filter(fn ($appId) => is_scalar($appId) && (string) $appId !== '')
             ->map(fn ($appId) => (string) $appId)
             ->unique()
-            ->take(self::ENRICHMENT_LIMIT)
             ->values()
             ->all();
 
@@ -237,6 +183,7 @@ class ProviderSearchService
                 : null;
 
             return array_merge($result, [
+                'title' => $result['title'] ?: ($data['name'] ?? 'Untitled'),
                 'cover_url_original' => $result['cover_url_original'] ?? ($data['header_image'] ?? null),
                 'publisher' => $result['publisher'] ?? ($data['publishers'][0] ?? null),
                 'description' => $result['description'] ?? ($data['short_description'] ?? null),
@@ -370,15 +317,6 @@ class ProviderSearchService
         return is_numeric($price)
             ? round(((float) $price) / 100, 2)
             : null;
-    }
-
-    private function normalizeTitle(string $title): string
-    {
-        $title = strtolower($title);
-        $title = preg_replace('/[^a-z0-9]+/i', ' ', $title) ?? '';
-        $title = preg_replace('/\s+/', ' ', $title) ?? '';
-
-        return trim($title);
     }
 
     private function steamApiKey(User $user): ?string
