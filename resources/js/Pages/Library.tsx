@@ -14,27 +14,43 @@ import GameCard from '../Components/GameCard';
 import { GameCardData, ReferenceData } from '../types';
 
 type SortMode = 'title' | 'playtime' | 'progress';
-type StatusFilter = 'All' | 'Not Played' | 'In Progress' | 'Completed' | '100%';
 
-const statusFilters: StatusFilter[] = ['All', 'Not Played', 'In Progress', 'Completed', '100%'];
+const preferredStatuses = ['All', 'Not Played', 'In Progress', 'Completed', 'Dropped', '100%'];
 
 function sortGames(games: GameCardData[], sort: SortMode) {
     return [...games].sort((a, b) => {
         if (sort === 'playtime') return Number(b.playtime_hours ?? 0) - Number(a.playtime_hours ?? 0);
         if (sort === 'progress') return Number(b.progress ?? 0) - Number(a.progress ?? 0);
+
         return a.title.localeCompare(b.title);
     });
+}
+
+function sameStatus(a: string, b: string) {
+    return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
 export default function Library({ libraryGames, references }: { libraryGames: GameCardData[]; references: ReferenceData }) {
     const [query, setQuery] = useState('');
     const [sort, setSort] = useState<SortMode>('title');
-    const [status, setStatus] = useState<StatusFilter>('All');
+    const [status, setStatus] = useState('All');
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [page, setPage] = useState(0);
 
     const cardsPerRow = filtersOpen ? 4 : 5;
     const pageSize = cardsPerRow * 2;
+
+    const statusOptions = useMemo(() => {
+        const existing = libraryGames
+            .map((game) => game.status)
+            .filter(Boolean);
+
+        const merged = [...preferredStatuses, ...existing];
+
+        return Array.from(
+            new Map(merged.map((item) => [item.toLowerCase(), item])).values(),
+        );
+    }, [libraryGames]);
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -46,7 +62,7 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
                     .filter(Boolean)
                     .some((value) => String(value).toLowerCase().includes(q));
 
-            const matchesStatus = status === 'All' || game.status === status;
+            const matchesStatus = status === 'All' || sameStatus(game.status, status);
 
             return matchesQuery && matchesStatus;
         });
@@ -67,19 +83,21 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
 
     return (
         <AppLayout title="Library" lockViewport>
-            <section className="grid h-full grid-rows-[auto_minmax(0,1fr)] gap-5 pl-[88px]">
-                <header className="grid grid-cols-[minmax(0,1fr)_minmax(360px,520px)_auto_auto] items-center gap-4 rounded-[38px] bg-black px-7 py-5 text-white shadow-[0_24px_55px_rgb(0_0_0/0.2)]">
+            <section className="grid h-full grid-rows-[auto_minmax(0,1fr)] gap-4 pl-[88px]">
+                <header className="grid grid-cols-[minmax(0,1fr)_minmax(320px,480px)_auto_auto] items-center gap-4 rounded-[34px] bg-black px-7 py-4 text-white shadow-[0_24px_55px_rgb(0_0_0/0.2)]">
                     <div>
                         <p className="text-[11px] font-black uppercase tracking-[0.34em] text-[#b7ff63]">
                             Game Shelf
                         </p>
-                        <h1 className="mt-1 text-[46px] font-black leading-none tracking-[-0.05em]">
+
+                        <h1 className="mt-1 text-[44px] font-black leading-none tracking-[-0.05em]">
                             Library Archive
                         </h1>
                     </div>
 
-                    <label className="flex h-[58px] items-center gap-4 rounded-[24px] bg-white/10 px-5 text-lg font-black text-white/70 ring-1 ring-white/10">
-                        <Search size={27} strokeWidth={3} className="text-[#b7ff63]" />
+                    <label className="flex h-[54px] items-center gap-4 rounded-[22px] bg-white/10 px-5 text-lg font-black text-white/70 ring-1 ring-white/10">
+                        <Search size={26} strokeWidth={3} className="text-[#b7ff63]" />
+
                         <input
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
@@ -92,7 +110,7 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
                         type="button"
                         onClick={() => setFiltersOpen((open) => !open)}
                         className={[
-                            'flex h-[58px] items-center gap-3 rounded-[24px] px-6 text-lg font-black shadow-[0_14px_28px_rgb(0_0_0/0.18)] transition hover:-translate-y-0.5',
+                            'flex h-[54px] items-center gap-3 rounded-[22px] px-6 text-lg font-black shadow-[0_14px_28px_rgb(0_0_0/0.18)] transition hover:-translate-y-0.5',
                             filtersOpen ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-[#b7ff63]',
                         ].join(' ')}
                     >
@@ -102,11 +120,11 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
 
                     <AddGameWizard
                         references={references}
-                        buttonClassName="group h-[58px] rounded-[24px] bg-[#b7ff63] px-6 text-lg font-black text-black shadow-[0_18px_34px_rgb(0_0_0/0.22)] transition hover:-translate-y-1"
+                        buttonClassName="group h-[54px] rounded-[22px] bg-[#b7ff63] px-6 text-lg font-black text-black shadow-[0_18px_34px_rgb(0_0_0/0.22)] transition hover:-translate-y-1"
                         buttonContent={
                             <span className="flex items-center gap-3">
-                                <span className="grid size-10 place-items-center rounded-full bg-black text-[#b7ff63] transition group-hover:rotate-90">
-                                    <Plus size={25} strokeWidth={4} />
+                                <span className="grid size-9 place-items-center rounded-full bg-black text-[#b7ff63] transition group-hover:rotate-90">
+                                    <Plus size={24} strokeWidth={4} />
                                 </span>
                                 Add Game
                             </span>
@@ -116,21 +134,35 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
 
                 <main
                     className={[
-                        'grid min-h-0 gap-5 transition-[grid-template-columns] duration-300',
-                        filtersOpen ? 'grid-cols-[minmax(0,1fr)_320px]' : 'grid-cols-[minmax(0,1fr)_0px]',
+                        'grid min-h-0 transition-[grid-template-columns] duration-300',
+                        filtersOpen
+                            ? 'grid-cols-[minmax(0,1fr)_320px] gap-4'
+                            : 'grid-cols-[minmax(0,1fr)_0px] gap-0',
                     ].join(' ')}
                 >
-                    <section className="relative min-w-0 overflow-hidden rounded-[44px] border border-black/8 bg-[#eef2ed] p-6 shadow-[0_22px_55px_rgb(0_0_0/0.08)]">
+                    <section className="relative grid min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[42px] border border-black/8 bg-[#eef2ed] px-7 py-4 shadow-[0_22px_55px_rgb(0_0_0/0.08)]">
                         <div className="absolute inset-0 opacity-[0.42] [background-image:linear-gradient(rgba(0,0,0,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.045)_1px,transparent_1px)] [background-size:42px_42px]" />
                         <div className="absolute left-1/3 top-1/2 h-[340px] w-[620px] -translate-y-1/2 rounded-full bg-[#b7ff63]/20 blur-3xl" />
+                        <div className="absolute inset-x-16 bottom-[76px] h-[18px] rounded-full bg-black/12 blur-md" />
 
-                        <div className="relative z-10 mb-5 flex items-center justify-between">
-                            <div>
-                                <p className="text-[11px] font-black uppercase tracking-[0.32em] text-black/38">
-                                    Shelf Page
-                                </p>
-                                <div className="mt-1 text-2xl font-black">
-                                    {visibleGames.length ? `${safePage + 1} / ${totalPages}` : 'Empty shelf'}
+                        <div className="relative z-10 flex items-center justify-between pb-3">
+                            <div className="flex items-center gap-4">
+                                <div className="rounded-[22px] bg-black px-5 py-3 text-white shadow-[0_14px_28px_rgb(0_0_0/0.12)]">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#b7ff63]/75">
+                                        Shelf Page
+                                    </p>
+                                    <div className="mt-1 text-[25px] font-black leading-none">
+                                        {visibleGames.length ? `${safePage + 1} / ${totalPages}` : 'Empty'}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p className="text-[11px] font-black uppercase tracking-[0.3em] text-black/36">
+                                        Horizontal Archive
+                                    </p>
+                                    <p className="mt-1 text-sm font-black text-black/42">
+                                        Move shelf pages with the side arrows.
+                                    </p>
                                 </div>
                             </div>
 
@@ -138,46 +170,51 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
                                 <span className="rounded-full bg-black px-5 py-2 text-sm font-black text-[#b7ff63]">
                                     {filtered.length} visible
                                 </span>
+
                                 <span className="rounded-full bg-[#b7ff63] px-5 py-2 text-sm font-black text-black">
-                                    {cardsPerRow} x 2 shelf mode
+                                    {cardsPerRow} × 2 shelf mode
                                 </span>
                             </div>
                         </div>
 
-                        <div className="relative z-10 flex h-[calc(100%-76px)] items-center justify-center">
+                        <div className="relative z-10 flex min-h-0 items-center justify-center">
                             <button
                                 type="button"
                                 onClick={previousPage}
                                 disabled={safePage === 0}
-                                className="absolute left-2 z-30 grid size-[62px] place-items-center rounded-full bg-black text-white shadow-[0_18px_30px_rgb(0_0_0/0.2)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-25"
+                                aria-label="Previous shelf page"
+                                className="absolute left-2 z-30 grid size-[58px] place-items-center rounded-full bg-black text-white shadow-[0_18px_30px_rgb(0_0_0/0.2)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-25"
                             >
-                                <ChevronLeft size={38} strokeWidth={3.2} />
+                                <ChevronLeft size={36} strokeWidth={3.2} />
                             </button>
 
-                            <div
-                                className="grid justify-center gap-x-6 gap-y-5 overflow-visible transition-all duration-300"
-                                style={{
-                                    gridTemplateColumns: `repeat(${cardsPerRow}, 210px)`,
-                                    gridTemplateRows: 'repeat(2, 380px)',
-                                }}
-                            >
-                                {visibleGames.map((game, index) => (
-                                    <GameCard
-                                        key={`${game.id}-${safePage}-${index}`}
-                                        game={game}
-                                        compact
-                                        panelSide={(index + 1) % cardsPerRow === 0 ? 'left' : 'right'}
-                                    />
-                                ))}
+                            <div>
+                                <div
+                                    className="grid justify-center gap-x-[26px] gap-y-4 overflow-visible transition-all duration-300"
+                                    style={{
+                                        gridTemplateColumns: `repeat(${cardsPerRow}, 200px)`,
+                                        gridTemplateRows: 'repeat(2, 335px)',
+                                    }}
+                                >
+                                    {visibleGames.map((game, index) => (
+                                        <GameCard
+                                            key={`${game.id}-${safePage}-${index}`}
+                                            game={game}
+                                            compact
+                                            panelSide={(index + 1) % cardsPerRow === 0 ? 'left' : 'right'}
+                                        />
+                                    ))}
+                                </div>
                             </div>
 
                             <button
                                 type="button"
                                 onClick={nextPage}
                                 disabled={safePage >= totalPages - 1}
-                                className="absolute right-2 z-30 grid size-[62px] place-items-center rounded-full bg-black text-white shadow-[0_18px_30px_rgb(0_0_0/0.2)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-25"
+                                aria-label="Next shelf page"
+                                className="absolute right-2 z-30 grid size-[58px] place-items-center rounded-full bg-black text-white shadow-[0_18px_30px_rgb(0_0_0/0.2)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-25"
                             >
-                                <ChevronRight size={38} strokeWidth={3.2} />
+                                <ChevronRight size={36} strokeWidth={3.2} />
                             </button>
 
                             {!visibleGames.length && (
@@ -186,7 +223,10 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
                                         <p className="text-[11px] font-black uppercase tracking-[0.32em] text-[#b7ff63]">
                                             No Save Files
                                         </p>
-                                        <h2 className="mt-3 text-4xl font-black">No games match this shelf.</h2>
+
+                                        <h2 className="mt-3 text-4xl font-black">
+                                            No games match this shelf.
+                                        </h2>
                                     </div>
                                 </div>
                             )}
@@ -195,7 +235,7 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
 
                     <aside
                         className={[
-                            'min-w-0 overflow-hidden rounded-[40px] bg-black text-white shadow-[0_24px_55px_rgb(0_0_0/0.22)] transition-all duration-300',
+                            'min-w-0 overflow-hidden rounded-[38px] bg-black text-white shadow-[0_24px_55px_rgb(0_0_0/0.22)] transition-all duration-300',
                             filtersOpen ? 'p-6 opacity-100' : 'pointer-events-none p-0 opacity-0',
                         ].join(' ')}
                     >
@@ -204,8 +244,12 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
                                 <p className="text-[11px] font-black uppercase tracking-[0.32em] text-[#b7ff63]">
                                     Shelf Controls
                                 </p>
-                                <h2 className="mt-1 text-3xl font-black">Sort & Filter</h2>
+
+                                <h2 className="mt-1 text-3xl font-black">
+                                    Sort & Filter
+                                </h2>
                             </div>
+
                             <button
                                 type="button"
                                 onClick={() => setFiltersOpen(false)}
@@ -248,14 +292,14 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
                             </div>
 
                             <div className="grid gap-2">
-                                {statusFilters.map((filter) => (
+                                {statusOptions.map((filter) => (
                                     <button
                                         key={filter}
                                         type="button"
                                         onClick={() => setStatus(filter)}
                                         className={[
                                             'flex h-12 items-center justify-between rounded-[18px] px-4 text-left text-sm font-black transition',
-                                            status === filter
+                                            sameStatus(status, filter)
                                                 ? 'bg-[#b7ff63] text-black'
                                                 : 'bg-white/10 text-white/58 hover:bg-white/15',
                                         ].join(' ')}
@@ -264,7 +308,7 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
                                         <span>
                                             {filter === 'All'
                                                 ? libraryGames.length
-                                                : libraryGames.filter((game) => game.status === filter).length}
+                                                : libraryGames.filter((game) => sameStatus(game.status, filter)).length}
                                         </span>
                                     </button>
                                 ))}
@@ -275,8 +319,9 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
                             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-black/45">
                                 Layout Rule
                             </p>
+
                             <p className="mt-2 text-lg font-black leading-tight">
-                                Filter panel open: 4 cards per row. Closed: 5 cards per row.
+                                Closed shelf shows 5 × 2. Open controls shrink it to 4 × 2.
                             </p>
                         </div>
                     </aside>
