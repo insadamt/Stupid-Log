@@ -681,8 +681,7 @@ export default function AddGameWizard({
 
     function manualEntry() {
         const title = draft.title.trim();
-        if (title.length < 2) return;
-
+    
         setDraft((current) => ({
             ...current,
             title,
@@ -702,11 +701,15 @@ export default function AddGameWizard({
             existing_game_id: null,
             create_duplicate_anyway: false,
         }));
+    
         setProviderCoverUrl("");
         setLocalCoverPreview("");
         setSteamOriginal(null);
         setSelectedResultKey("manual");
         setDlcQuery("");
+        setWarnings([]);
+        setNotice("");
+        setResults([]);
         setStepIndex(1);
     }
 
@@ -1096,26 +1099,14 @@ export default function AddGameWizard({
             <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-[#b7ff63]/18 blur-3xl" />
             <div className="pointer-events-none absolute bottom-0 left-1/4 h-28 w-[520px] rounded-full bg-[#b7ff63]/10 blur-3xl" />
 
-            <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-                <BuilderTitle
-                    eyebrow="Archive Builder"
-                    title="Find the game file."
-                    body="Search the provider, pick the correct record, or force a manual entry when metadata is not reliable."
-                />
+<div className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-center">
+<BuilderTitle
+    eyebrow="Archive Builder"
+    title="Find the game file."
+/>
 
-                <div className="grid gap-3">
-                    <SourceSwitch providerMode={providerMode} setProviderMode={setProviderMode} />
-
-                    <button
-                        type="button"
-                        onClick={manualEntry}
-                        disabled={draft.title.trim().length < 2}
-                        className="h-14 rounded-[22px] bg-white/10 px-6 text-sm font-black uppercase tracking-[0.22em] text-white/62 ring-1 ring-white/10 transition hover:bg-white/15 hover:text-white disabled:opacity-35"
-                    >
-                        Manual Entry
-                    </button>
-                </div>
-            </div>
+<SourceSwitch providerMode={providerMode} setProviderMode={setProviderMode} />
+</div>
 
             <div className="relative z-10 mt-7 grid gap-4 rounded-[30px] bg-white/[0.08] p-3 ring-1 ring-white/10 md:grid-cols-[1fr_auto]">
                 <label className="flex h-[76px] items-center gap-4 rounded-[24px] bg-[#eef2ed] px-6 text-black">
@@ -1157,11 +1148,6 @@ export default function AddGameWizard({
             </div>
         </section>
 
-        {notice && (
-            <div className="rounded-[24px] bg-[#b7ff63] px-5 py-4 text-sm font-black text-black">
-                {notice}
-            </div>
-        )}
 
         {warnings.length > 0 && (
             <div className="rounded-[24px] border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-black text-red-700">
@@ -1176,23 +1162,32 @@ export default function AddGameWizard({
             </div>
         )}
 
-        {results.length === 0 && draft.title.trim().length >= 2 && !searching && (
-            <div className="grid min-h-[240px] place-items-center rounded-[34px] border border-dashed border-black/15 bg-[#eef2ed] p-8 text-center">
-                <div>
-                    <div className="mx-auto grid size-16 place-items-center rounded-[22px] bg-black text-[#b7ff63]">
-                        <Package size={26} strokeWidth={3} />
-                    </div>
-
-                    <h4 className="mt-5 text-3xl font-black tracking-[-0.05em]">
-                        No result selected.
-                    </h4>
-
-                    <p className="mx-auto mt-2 max-w-xl text-sm font-black leading-relaxed text-black/42">
-                        Search again, switch provider, or use manual entry. Do not trust bad metadata.
-                    </p>
-                </div>
+{results.length === 0 && !searching && (
+    <div className="grid min-h-[300px] place-items-center rounded-[34px] border border-dashed border-black/15 bg-[#eef2ed] p-8 text-center shadow-[inset_0_0_0_1px_rgb(255_255_255/0.45)]">
+        <div className="max-w-xl">
+            <div className="mx-auto grid size-16 place-items-center rounded-[22px] bg-black text-[#b7ff63] shadow-[0_18px_34px_rgb(0_0_0/0.16)]">
+                <Package size={26} strokeWidth={3} />
             </div>
-        )}
+
+            <h4 className="mt-5 text-3xl font-black tracking-[-0.05em]">
+                Start manually.
+            </h4>
+
+            <p className="mx-auto mt-2 max-w-md text-sm font-black leading-relaxed text-black/42">
+                Skip provider search and build the game record yourself.
+            </p>
+
+            <button
+                type="button"
+                onClick={manualEntry}
+                className="mt-6 inline-flex h-[58px] items-center justify-center gap-3 rounded-[22px] bg-black px-8 text-base font-black text-[#b7ff63] shadow-[0_18px_34px_rgb(0_0_0/0.18)] transition hover:-translate-y-0.5"
+            >
+                Manual Entry
+                <ChevronRight size={22} strokeWidth={3} />
+            </button>
+        </div>
+    </div>
+)}
 
         {results.length > 0 && (
             <section className="rounded-[38px] bg-[#dfe5df] p-5 shadow-[inset_0_0_0_1px_rgb(0_0_0/0.05)]">

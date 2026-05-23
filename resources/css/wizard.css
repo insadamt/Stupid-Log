@@ -216,9 +216,9 @@
 .fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black h3 {
     color: #f5f7f1 !important;
     max-width: 640px !important;
-    font-size: clamp(42px, 4vw, 58px) !important;
-    line-height: 0.86 !important;
-    letter-spacing: -0.075em !important;
+    font-size: clamp(38px, 3.5vw, 50px) !important;
+    line-height: 0.9 !important;
+    letter-spacing: -0.07em !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black p {
