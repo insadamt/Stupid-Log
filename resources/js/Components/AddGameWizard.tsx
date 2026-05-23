@@ -1,6 +1,5 @@
 import { router } from "@inertiajs/react";
 import {
-    ArrowRight,
     Check,
     ChevronLeft,
     ChevronRight,
@@ -13,7 +12,6 @@ import {
     Search,
     ShieldCheck,
     Sparkles,
-    Steam,
     X,
 } from "lucide-react";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -507,7 +505,7 @@ export default function AddGameWizard({
                                                     </div>
                                                     <div className="grid grid-cols-2 rounded-[22px] bg-white/10 p-1">
                                                         <button type="button" onClick={() => setProviderMode("igdb")} className={`rounded-[18px] px-6 py-3 text-sm font-black uppercase tracking-[0.16em] ${providerMode === "igdb" ? "bg-[#b7ff63] text-black" : "text-white/55"}`}><Database className="mr-2 inline size-4" /> IGDB</button>
-                                                        <button type="button" onClick={() => setProviderMode("steam")} className={`rounded-[18px] px-6 py-3 text-sm font-black uppercase tracking-[0.16em] ${providerMode === "steam" ? "bg-[#b7ff63] text-black" : "text-white/55"}`}><Steam className="mr-2 inline size-4" /> Steam</button>
+                                                        <button type="button" onClick={() => setProviderMode("steam")} className={`rounded-[18px] px-6 py-3 text-sm font-black uppercase tracking-[0.16em] ${providerMode === "steam" ? "bg-[#b7ff63] text-black" : "text-white/55"}`}><Gamepad2 className="mr-2 inline size-4" /> Steam</button>
                                                     </div>
                                                 </div>
 
@@ -556,7 +554,7 @@ export default function AddGameWizard({
                                                 <div className="grid gap-5 md:grid-cols-2"><Field label="Steam Base Price"><TextInput value={draft.base_price_default} onChange={(event) => update("base_price_default", event.target.value)} type="number" step="0.01" placeholder="Unknown" /></Field><Field label="Total Achievements"><TextInput value={draft.total_achievements} onChange={(event) => update("total_achievements", event.target.value)} type="number" placeholder="Unknown" /></Field></div>
                                                 <Field label="Description"><TextArea value={draft.description} onChange={(event) => update("description", event.target.value)} placeholder="No description" /></Field>
                                             </div>
-                                            <div className="grid gap-4 md:grid-cols-3"><Metric label="Source" value={draft.source} icon={<ShieldCheck />} /><Metric label="Steam Price" value={money(draft.base_price_default)} icon={<Steam />} /><Metric label="Achievements" value={numberText(draft.total_achievements)} icon={<Sparkles />} /></div>
+                                            <div className="grid gap-4 md:grid-cols-3"><Metric label="Source" value={draft.source} icon={<ShieldCheck />} /><Metric label="Steam Price" value={money(draft.base_price_default)} icon={<Gamepad2 />} /><Metric label="Achievements" value={numberText(draft.total_achievements)} icon={<Sparkles />} /></div>
                                         </div>
                                     )}
 
