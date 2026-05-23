@@ -25,19 +25,27 @@ import {
 
 type GameSource = "manual" | "igdb" | "steam";
 type ProviderMode = "igdb" | "steam";
-type StepKey = "search" | "basics" | "enrich" | "platform" | "devices" | "ownership" | "dlcs" | "progress" | "review";
-type DlcState = "Not Owned" | "Owned" | "Edition Included" | "Free";
+type StepKey = "search" | "basics" | "steam" | "platform" | "devices" | "ownership" | "dlcs" | "progress" | "review";
 
-type DlcPreview = {
-    id?: number | null;
-    steam_app_id?: string | null;
-    title: string;
-    cover_url_original?: string | null;
-    base_price?: number | string | null;
+type WizardSearchResult = ProviderSearchResult & {
+    dlcs?: Array<{
+        id?: number | null;
+        steam_app_id?: string | null;
+        title: string;
+        cover_url_original?: string | null;
+        base_price?: number | string | null;
+    }>;
 };
 
-type WizardSearchResult = ProviderSearchResult & { dlcs?: DlcPreview[] };
-type WizardSearchResponse = Omit<ProviderSearchResponse, "results"> & { results: WizardSearchResult[] };
+type WizardSearchResponse = Omit<ProviderSearchResponse, "results"> & {
+    results: WizardSearchResult[];
+};
+
+type SteamOriginal = {
+    steam_app_id: string;
+    base_price_default: string;
+    total_achievements: string;
+};
 
 type OwnershipCopyDraft = {
     local_id: string;
@@ -49,18 +57,13 @@ type OwnershipCopyDraft = {
     purchased_at: string;
 };
 
-type DlcDraft = DlcPreview & {
-    state: DlcState;
-    purchased_price: string;
-    purchased_at: string;
-};
-
 type Draft = {
     title: string;
     source: GameSource;
     external_id: string;
     steam_app_id: string;
     cover_url_original: string;
+    cover_path: string;
     publisher: string;
     release_date: string;
     description: string;
@@ -69,7 +72,6 @@ type Draft = {
     platform_id: number;
     device_ids: number[];
     ownership_copies: OwnershipCopyDraft[];
-    dlcs: DlcDraft[];
     status_id: number;
     playtime_hours: string;
     earned_achievements: string;
@@ -78,11 +80,10 @@ type Draft = {
     completed_at: string;
 };
 
-const physicalLike = ["Physical", "Pre-owned", "Borrowed"];
 const steps: Array<{ key: StepKey; label: string }> = [
     { key: "search", label: "Search" },
     { key: "basics", label: "Basics" },
-    { key: "enrich", label: "Steam" },
+    { key: "steam", label: "Steam" },
     { key: "platform", label: "Platform" },
     { key: "devices", label: "Devices" },
     { key: "ownership", label: "Ownership" },
@@ -90,6 +91,8 @@ const steps: Array<{ key: StepKey; label: string }> = [
     { key: "progress", label: "Progress" },
     { key: "review", label: "Review" },
 ];
+
+const physicalLike = ["Physical", "Pre-owned", "Borrowed"];
 
 function localId() {
     return Math.random().toString(36).slice(2, 10);
@@ -99,11 +102,21 @@ function today() {
     return new Date().toISOString().slice(0, 10);
 }
 
+function year(value: string | null | undefined) {
+    return value ? value.slice(0, 4) : "Unknown year";
+}
+
 function toDateInput(value: string | null | undefined) {
     if (!value) return "";
     if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
+}
+
+function money(value: string | number | null | undefined) {
+    if (value === null || value === undefined || value === "") return "Unknown";
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? `$${parsed.toFixed(2)}` : String(value);
 }
 
 function numberOrNull(value: string) {
@@ -118,25 +131,23 @@ function integerOrNull(value: string) {
     return Number.isInteger(parsed) ? parsed : null;
 }
 
-function money(value: string | number | null | undefined) {
-    if (value === null || value === undefined || value === "") return "Unknown";
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? `$${parsed.toFixed(2)}` : String(value);
-}
-
-function firstByName<T extends { id: number; name: string }>(items: T[], name: string) {
-    return items.find((item) => item.name === name) ?? items[0];
-}
-
 function sourceName(source: GameSource) {
     if (source === "igdb") return "IGDB";
     if (source === "steam") return "Steam";
     return "Manual";
 }
 
+function firstByName<T extends { id: number; name: string }>(items: T[], name: string) {
+    return items.find((item) => item.name === name) ?? items[0];
+}
+
+function csrfToken() {
+    return document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? "";
+}
+
 function Pill({ children, active = false, muted = false }: { children: ReactNode; active?: boolean; muted?: boolean }) {
     return (
-        <span className={`inline-flex items-center rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.16em] ${active ? "bg-[#b7ff63] text-black" : muted ? "bg-black/5 text-black/45" : "bg-black text-white"}`}>
+        <span className={`inline-flex items-center rounded-full px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] ${active ? "bg-[#b7ff63] text-black" : muted ? "bg-black/5 text-black/45" : "bg-black text-white"}`}>
             {children}
         </span>
     );
@@ -145,27 +156,27 @@ function Pill({ children, active = false, muted = false }: { children: ReactNode
 function Field({ label, children }: { label: string; children: ReactNode }) {
     return (
         <label className="grid gap-2">
-            <span className="text-xs font-black uppercase tracking-[0.22em] text-black/40">{label}</span>
+            <span className="text-[11px] font-black uppercase tracking-[0.22em] text-black/40">{label}</span>
             {children}
         </label>
     );
 }
 
 function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-    return <input {...props} className={`h-[58px] rounded-[20px] border border-black/10 bg-[#f4f5ef] px-4 text-base font-bold text-black outline-none transition placeholder:text-black/30 focus:border-black ${props.className ?? ""}`} />;
+    return <input {...props} className={`h-12 rounded-2xl border border-black/10 bg-white px-4 text-sm font-bold text-black outline-none transition placeholder:text-black/30 focus:border-black ${props.className ?? ""}`} />;
 }
 
 function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-    return <textarea {...props} className={`min-h-[132px] rounded-[22px] border border-black/10 bg-[#f4f5ef] px-4 py-4 text-base font-bold text-black outline-none transition placeholder:text-black/30 focus:border-black ${props.className ?? ""}`} />;
+    return <textarea {...props} className={`min-h-[128px] rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm font-bold text-black outline-none transition placeholder:text-black/30 focus:border-black ${props.className ?? ""}`} />;
 }
 
 function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-    return <select {...props} className={`h-[58px] rounded-[20px] border border-black/10 bg-[#f4f5ef] px-4 text-base font-bold text-black outline-none transition focus:border-black ${props.className ?? ""}`} />;
+    return <select {...props} className={`h-12 rounded-2xl border border-black/10 bg-white px-4 text-sm font-bold text-black outline-none transition focus:border-black ${props.className ?? ""}`} />;
 }
 
 function Notice({ children, tone = "default" }: { children: ReactNode; tone?: "default" | "warning" | "danger" }) {
     return (
-        <div className={`rounded-[24px] border px-5 py-4 text-sm font-black leading-relaxed ${tone === "danger" ? "border-red-500/20 bg-red-500/10 text-red-700" : tone === "warning" ? "border-black/10 bg-[#fff3c4] text-black" : "border-black/10 bg-white text-black/55"}`}>
+        <div className={`rounded-2xl border px-4 py-3 text-sm font-bold leading-relaxed ${tone === "danger" ? "border-red-500/20 bg-red-500/10 text-red-700" : tone === "warning" ? "border-black/10 bg-[#fff4c8] text-black/70" : "border-black/10 bg-white text-black/55"}`}>
             {children}
         </div>
     );
@@ -173,23 +184,23 @@ function Notice({ children, tone = "default" }: { children: ReactNode; tone?: "d
 
 function Metric({ label, value, icon }: { label: string; value: ReactNode; icon?: ReactNode }) {
     return (
-        <div className="rounded-[26px] border border-black/10 bg-white p-5 shadow-[0_16px_42px_rgb(0_0_0/0.055)]">
-            <div className="flex items-center justify-between gap-4">
-                <div className="text-xs font-black uppercase tracking-[0.22em] text-black/35">{label}</div>
-                {icon && <div className="text-black/30">{icon}</div>}
+        <div className="rounded-2xl border border-black/10 bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-black/35">{label}</div>
+                {icon && <div className="text-black/25">{icon}</div>}
             </div>
-            <div className="mt-2 text-3xl font-black tracking-[-0.05em] text-black">{value}</div>
+            <div className="mt-2 text-2xl font-black tracking-[-0.04em] text-black">{value}</div>
         </div>
     );
 }
 
 function EmptyCard({ title, body }: { title: string; body: string }) {
     return (
-        <div className="grid min-h-[220px] place-items-center rounded-[32px] border border-dashed border-black/15 bg-white/70 p-8 text-center">
+        <div className="grid min-h-[220px] place-items-center rounded-[28px] border border-dashed border-black/15 bg-white/60 p-8 text-center">
             <div>
-                <div className="mx-auto grid size-16 place-items-center rounded-[22px] bg-black text-[#b7ff63]"><Package /></div>
-                <div className="mt-5 text-3xl font-black tracking-[-0.05em]">{title}</div>
-                <p className="mx-auto mt-2 max-w-xl text-base font-bold text-black/45">{body}</p>
+                <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-black text-[#b7ff63]"><Package size={22} /></div>
+                <div className="mt-4 text-2xl font-black tracking-[-0.04em]">{title}</div>
+                <p className="mx-auto mt-2 max-w-xl text-sm font-bold text-black/45">{body}</p>
             </div>
         </div>
     );
@@ -213,6 +224,7 @@ export default function AddGameWizard({
         external_id: "",
         steam_app_id: "",
         cover_url_original: "",
+        cover_path: "",
         publisher: "",
         release_date: "",
         description: "",
@@ -229,7 +241,6 @@ export default function AddGameWizard({
             purchased_price: "",
             purchased_at: "",
         }],
-        dlcs: [],
         status_id: defaultStatus?.id ?? 0,
         playtime_hours: "0",
         earned_achievements: "0",
@@ -242,16 +253,22 @@ export default function AddGameWizard({
     const [stepIndex, setStepIndex] = useState(0);
     const [providerMode, setProviderMode] = useState<ProviderMode>("igdb");
     const [draft, setDraft] = useState<Draft>(makeDraft);
+    const [steamOriginal, setSteamOriginal] = useState<SteamOriginal | null>(null);
+    const [providerCoverUrl, setProviderCoverUrl] = useState("");
     const [results, setResults] = useState<WizardSearchResult[]>([]);
     const [selectedResultKey, setSelectedResultKey] = useState("");
     const [warnings, setWarnings] = useState<string[]>([]);
     const [notice, setNotice] = useState("");
     const [searching, setSearching] = useState(false);
     const [enriching, setEnriching] = useState(false);
+    const [uploadingCover, setUploadingCover] = useState(false);
+    const [coverError, setCoverError] = useState("");
+    const [platformQuery, setPlatformQuery] = useState("");
     const [deviceQuery, setDeviceQuery] = useState("");
     const [saving, setSaving] = useState(false);
     const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
     const searchId = useRef(0);
+    const coverInputRef = useRef<HTMLInputElement | null>(null);
 
     const step = steps[stepIndex];
     const platform = useMemo(() => references.platforms.find((item) => item.id === draft.platform_id), [draft.platform_id, references.platforms]);
@@ -262,8 +279,9 @@ export default function AddGameWizard({
     const availableStatuses = references.statuses.filter((item) => hasAchievements || item.name !== "100%");
     const selectedDevices = draft.device_ids.map((idValue) => deviceById.get(idValue)).filter(Boolean) as string[];
     const selectedOwnerships = draft.ownership_copies.map((copy) => ownershipById.get(copy.ownership_type_id)).filter(Boolean) as string[];
-    const hasEditionCopy = draft.ownership_copies.some((copy) => copy.edition_name.trim().length > 0);
-    const visibleDevices = (platform?.devices ?? []).filter((device) => device.name.toLowerCase().includes(deviceQuery.trim().toLowerCase()));
+    const filteredPlatforms = references.platforms.filter((item) => item.name.toLowerCase().includes(platformQuery.trim().toLowerCase()));
+    const filteredDevices = (platform?.devices ?? []).filter((item) => item.name.toLowerCase().includes(deviceQuery.trim().toLowerCase()));
+    const coverPreview = draft.cover_url_original;
 
     function update<K extends keyof Draft>(key: K, value: Draft[K]) {
         setDraft((current) => ({ ...current, [key]: value }));
@@ -273,10 +291,13 @@ export default function AddGameWizard({
         setDraft(makeDraft());
         setStepIndex(0);
         setProviderMode("igdb");
+        setSteamOriginal(null);
+        setProviderCoverUrl("");
         setResults([]);
         setSelectedResultKey("");
         setWarnings([]);
         setNotice("");
+        setCoverError("");
         setServerErrors({});
         setOpen(true);
     }
@@ -308,10 +329,9 @@ export default function AddGameWizard({
         try {
             const data = await providerSearch(query, provider, provider === "steam");
             if (requestId !== searchId.current) return;
-
             setResults(data.results);
             setWarnings(data.warnings);
-            setNotice(data.results.length ? `${provider === "igdb" ? "IGDB" : "Steam"} results loaded.` : `No ${provider === "igdb" ? "IGDB" : "Steam"} result found. Try the other source or use manual entry.`);
+            setNotice(data.results.length ? `${provider === "igdb" ? "IGDB" : "Steam"} results loaded.` : `No ${provider === "igdb" ? "IGDB" : "Steam"} result found.`);
         } catch (error) {
             if (requestId !== searchId.current) return;
             setResults([]);
@@ -326,45 +346,53 @@ export default function AddGameWizard({
         return `${result.source}:${result.external_id}`;
     }
 
-    function dlcsFrom(result: WizardSearchResult): DlcDraft[] {
-        return (result.dlcs ?? []).map((dlc) => ({ ...dlc, state: "Not Owned", purchased_price: "", purchased_at: "" }));
+    function setOriginalFromResult(result: WizardSearchResult) {
+        const basePrice = result.base_price_default === null || result.base_price_default === undefined ? "" : String(result.base_price_default);
+        const totalAchievements = result.total_achievements === null || result.total_achievements === undefined ? "" : String(result.total_achievements);
+
+        if (!result.steam_app_id && !basePrice && !totalAchievements) return;
+
+        setSteamOriginal({
+            steam_app_id: result.steam_app_id ?? "",
+            base_price_default: basePrice,
+            total_achievements: totalAchievements,
+        });
     }
 
     function applyResult(result: WizardSearchResult) {
         const basePrice = result.base_price_default === null || result.base_price_default === undefined ? "" : String(result.base_price_default);
         const totalAchievements = result.total_achievements === null || result.total_achievements === undefined ? "" : String(result.total_achievements);
+        const cover = result.cover_url_original ?? "";
 
+        setProviderCoverUrl(cover);
+        setOriginalFromResult(result);
         setDraft((current) => ({
             ...current,
             title: result.title,
             source: result.source,
             external_id: result.external_id,
             steam_app_id: result.steam_app_id ?? "",
-            cover_url_original: result.cover_url_original ?? "",
+            cover_url_original: cover,
+            cover_path: "",
             publisher: result.publisher ?? "",
             release_date: toDateInput(result.release_date),
             description: result.description ?? "",
             total_achievements: totalAchievements,
             base_price_default: basePrice,
-            dlcs: dlcsFrom(result),
             ownership_copies: current.ownership_copies.map((copy) => ({ ...copy, base_price: copy.base_price || basePrice })),
         }));
     }
 
-    function mergeEnrichment(result: WizardSearchResult) {
+    function mergeSteamEnrichment(result: WizardSearchResult) {
         const basePrice = result.base_price_default === null || result.base_price_default === undefined ? "" : String(result.base_price_default);
         const totalAchievements = result.total_achievements === null || result.total_achievements === undefined ? "" : String(result.total_achievements);
 
+        setOriginalFromResult(result);
         setDraft((current) => ({
             ...current,
             steam_app_id: current.steam_app_id || result.steam_app_id || "",
-            cover_url_original: current.cover_url_original || result.cover_url_original || "",
-            publisher: current.publisher || result.publisher || "",
-            release_date: current.release_date || toDateInput(result.release_date),
-            description: current.description || result.description || "",
-            total_achievements: totalAchievements || current.total_achievements,
             base_price_default: basePrice || current.base_price_default,
-            dlcs: result.dlcs?.length ? dlcsFrom(result) : current.dlcs,
+            total_achievements: totalAchievements || current.total_achievements,
             ownership_copies: current.ownership_copies.map((copy) => ({ ...copy, base_price: copy.base_price || basePrice })),
         }));
     }
@@ -380,9 +408,9 @@ export default function AddGameWizard({
         try {
             const enriched = await providerSearch(result.title, "steam", true, result.steam_app_id);
             setWarnings(enriched.warnings);
-            if (enriched.results[0]) mergeEnrichment(enriched.results[0]);
+            if (enriched.results[0]) mergeSteamEnrichment(enriched.results[0]);
         } catch {
-            setWarnings((current) => [...current, "Steam enrichment failed. Continue manually."]);
+            setWarnings((current) => [...current, "Steam enrichment failed. You can edit Steam fields manually."]);
         } finally {
             setEnriching(false);
         }
@@ -399,33 +427,49 @@ export default function AddGameWizard({
             external_id: "",
             steam_app_id: "",
             cover_url_original: "",
+            cover_path: "",
             publisher: "",
             release_date: "",
             description: "",
             total_achievements: "",
             base_price_default: "",
-            dlcs: [],
             ownership_copies: current.ownership_copies.map((copy) => ({ ...copy, base_price: "" })),
         }));
+        setProviderCoverUrl("");
+        setSteamOriginal(null);
         setSelectedResultKey("manual");
         setStepIndex(1);
     }
 
-    async function enrichCurrent() {
-        if (!draft.steam_app_id.trim()) {
-            setWarnings(["Add a Steam App ID first."]);
-            return;
-        }
+    async function uploadCover(file: File) {
+        const body = new FormData();
+        body.append("cover", file);
+        setUploadingCover(true);
+        setCoverError("");
 
-        setEnriching(true);
         try {
-            const enriched = await providerSearch(draft.title || `Steam App ${draft.steam_app_id}`, "steam", true, draft.steam_app_id.trim());
-            setWarnings(enriched.warnings);
-            if (enriched.results[0]) mergeEnrichment(enriched.results[0]);
-        } catch {
-            setWarnings(["Steam enrichment failed. Continue manually."]);
+            const headers: Record<string, string> = { Accept: "application/json" };
+            const token = csrfToken();
+            if (token) headers["X-CSRF-TOKEN"] = token;
+
+            const response = await fetch("/library-games/cover", {
+                method: "POST",
+                headers,
+                body,
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message ?? "Cover upload failed.");
+
+            setDraft((current) => ({
+                ...current,
+                cover_path: data.path,
+                cover_url_original: data.url,
+            }));
+        } catch (error) {
+            setCoverError(error instanceof Error ? error.message : "Cover upload failed.");
         } finally {
-            setEnriching(false);
+            setUploadingCover(false);
         }
     }
 
@@ -494,13 +538,6 @@ export default function AddGameWizard({
         }));
     }
 
-    function updateDlc(index: number, patch: Partial<DlcDraft>) {
-        setDraft((current) => ({
-            ...current,
-            dlcs: current.dlcs.map((dlc, dlcIndex) => dlcIndex === index ? { ...dlc, ...patch } : dlc),
-        }));
-    }
-
     function chooseStatus(statusId: number) {
         const nextStatus = references.statuses.find((item) => item.id === statusId);
         setDraft((current) => ({
@@ -514,15 +551,14 @@ export default function AddGameWizard({
     function errorFor(stepKey: StepKey): string | null {
         if (stepKey === "search") return selectedResultKey ? null : "Select a result or use manual entry.";
         if (stepKey === "basics") return draft.title.trim() ? null : "Title is required.";
-        if (stepKey === "enrich") return null;
+        if (stepKey === "steam") return null;
         if (stepKey === "platform") return draft.platform_id ? null : "Select one platform.";
         if (stepKey === "devices") return draft.device_ids.length ? null : "Select at least one device.";
 
         if (stepKey === "ownership") {
-            if (!draft.ownership_copies.length) return "Add at least one ownership copy.";
             const ids = draft.ownership_copies.map((copy) => copy.ownership_type_id);
+            if (!ids.length) return "Add at least one ownership copy.";
             if (new Set(ids).size !== ids.length) return "Duplicate ownership type is not allowed.";
-
             for (const copy of draft.ownership_copies) {
                 const name = ownershipById.get(copy.ownership_type_id);
                 if (name && physicalLike.includes(name) && !copy.physical_status_id) return `${name} requires physical status.`;
@@ -578,16 +614,6 @@ export default function AddGameWizard({
         if (draft.source === "steam" && draft.external_id) externalIds.steam = draft.external_id;
         if (draft.steam_app_id) externalIds.steam = draft.steam_app_id;
 
-        const ownedDlcs = draft.dlcs
-            .filter((dlc) => dlc.state !== "Not Owned")
-            .filter((dlc) => typeof dlc.id === "number")
-            .map((dlc) => ({
-                dlc_id: dlc.id,
-                acquisition_type: dlc.state,
-                purchased_price: dlc.state === "Edition Included" || dlc.state === "Free" ? 0 : numberOrNull(dlc.purchased_price),
-                purchased_at: dlc.purchased_at || null,
-            }));
-
         router.post("/library-games", {
             game: {
                 title: draft.title.trim(),
@@ -597,7 +623,8 @@ export default function AddGameWizard({
                 source: draft.source,
                 external_ids: externalIds,
                 steam_app_id: draft.steam_app_id || null,
-                cover_url_original: draft.cover_url_original || null,
+                cover_url_original: draft.cover_path ? null : (draft.cover_url_original || null),
+                cover_path: draft.cover_path || null,
                 total_achievements: integerOrNull(draft.total_achievements),
                 total_achievements_source: draft.total_achievements.trim() === "" ? null : "steam",
                 base_price_default: numberOrNull(draft.base_price_default),
@@ -622,7 +649,7 @@ export default function AddGameWizard({
                 last_played_at: draft.last_played_at || null,
                 completed_at: draft.completed_at || null,
             },
-            owned_dlcs: ownedDlcs,
+            owned_dlcs: [],
         }, {
             preserveScroll: true,
             onStart: () => { setSaving(true); setServerErrors({}); },
@@ -648,6 +675,14 @@ export default function AddGameWizard({
         return () => window.clearTimeout(timeout);
     }, [draft.title, providerMode, open, step.key]);
 
+    const resetButtons = steamOriginal && (
+        <div className="flex flex-wrap gap-2">
+            {draft.steam_app_id !== steamOriginal.steam_app_id && steamOriginal.steam_app_id && <button type="button" onClick={() => update("steam_app_id", steamOriginal.steam_app_id)} className="rounded-full bg-black/5 px-4 py-2 text-xs font-black text-black/55">Reset App ID</button>}
+            {draft.base_price_default !== steamOriginal.base_price_default && steamOriginal.base_price_default && <button type="button" onClick={() => update("base_price_default", steamOriginal.base_price_default)} className="rounded-full bg-black/5 px-4 py-2 text-xs font-black text-black/55">Reset Price</button>}
+            {draft.total_achievements !== steamOriginal.total_achievements && steamOriginal.total_achievements && <button type="button" onClick={() => update("total_achievements", steamOriginal.total_achievements)} className="rounded-full bg-black/5 px-4 py-2 text-xs font-black text-black/55">Reset Achievements</button>}
+        </div>
+    );
+
     return (
         <>
             <button type="button" onClick={resetAndOpen} className={buttonClassName}>
@@ -661,58 +696,33 @@ export default function AddGameWizard({
 
             {open && (
                 <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4 py-5 backdrop-blur-md">
-                    <section className="grid max-h-[94vh] w-full max-w-[1360px] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[36px] border border-white/20 bg-[#eff1ea] shadow-[0_44px_150px_rgb(0_0_0/0.55)]">
-                        <header className="border-b border-black/10 bg-[#b7ff63] px-7 py-6">
+                    <section className="grid max-h-[94vh] w-full max-w-[1280px] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[32px] border border-white/20 bg-[#eff1ea] shadow-[0_44px_150px_rgb(0_0_0/0.55)]">
+                        <header className="border-b border-black/10 bg-[#b7ff63] px-7 py-5">
                             <div className="flex items-start justify-between gap-6">
                                 <div>
-                                    <div className="text-sm font-black uppercase tracking-[0.35em] text-black/45">Stupid Log Archive Builder</div>
-                                    <h2 className="mt-1 text-5xl font-black leading-none tracking-[-0.06em] text-black">Add Game</h2>
+                                    <div className="text-xs font-black uppercase tracking-[0.35em] text-black/45">Stupid Log Archive Builder</div>
+                                    <h2 className="mt-1 text-4xl font-black leading-none tracking-[-0.06em] text-black">Add Game</h2>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <Pill>{step.label}</Pill>
-                                    <button type="button" onClick={() => setOpen(false)} className="grid size-12 place-items-center rounded-full bg-black text-white transition hover:scale-105"><X /></button>
+                                    <button type="button" onClick={() => setOpen(false)} className="grid size-11 place-items-center rounded-full bg-black text-white transition hover:scale-105"><X size={20} /></button>
                                 </div>
                             </div>
-                            <div className="mt-6 grid grid-cols-9 gap-2">
-                                {steps.map((item, index) => (
-                                    <button key={item.key} type="button" disabled={!canOpenStep(index)} onClick={() => canOpenStep(index) && setStepIndex(index)} className={`h-2 rounded-full transition ${index <= stepIndex ? "bg-black" : "bg-white/70"} ${!canOpenStep(index) ? "cursor-not-allowed opacity-50" : ""}`} aria-label={item.label} />
-                                ))}
+                            <div className="mt-5 grid grid-cols-9 gap-2">
+                                {steps.map((item, index) => <button key={item.key} type="button" disabled={!canOpenStep(index)} onClick={() => canOpenStep(index) && setStepIndex(index)} className={`h-1.5 rounded-full transition ${index <= stepIndex ? "bg-black" : "bg-white/65"} ${!canOpenStep(index) ? "cursor-not-allowed opacity-50" : ""}`} aria-label={item.label} />)}
                             </div>
                         </header>
 
                         <main className="overflow-y-auto p-7">
-                            <div className={step.key === "search" ? "grid gap-6 xl:grid-cols-[360px_1fr]" : "grid gap-7 lg:grid-cols-[300px_1fr]"}>
-                                {step.key === "search" ? (
-                                    <aside className="grid gap-4 self-start">
-                                        <div className="rounded-[34px] bg-black p-6 text-white shadow-[0_24px_70px_rgb(0_0_0/0.25)]">
-                                            <div className="text-sm font-black uppercase tracking-[0.3em] text-[#b7ff63]">Search Source</div>
-                                            <h3 className="mt-2 text-5xl font-black tracking-[-0.07em]">Choose who answers.</h3>
-                                            <p className="mt-3 text-base font-bold text-white/50">No automatic fallback. Pick IGDB for metadata or Steam for store data.</p>
-                                            <div className="mt-6 grid gap-3">
-                                                <button type="button" onClick={() => setProviderMode("igdb")} className={`rounded-[26px] border p-5 text-left transition ${providerMode === "igdb" ? "border-[#b7ff63] bg-[#b7ff63] text-black" : "border-white/10 bg-white/5 text-white"}`}>
-                                                    <div className="flex items-center gap-3 text-2xl font-black"><Database /> IGDB</div>
-                                                    <div className="mt-2 text-sm font-bold opacity-60">Covers, title, publisher, date, Steam App ID when available.</div>
-                                                </button>
-                                                <button type="button" onClick={() => setProviderMode("steam")} className={`rounded-[26px] border p-5 text-left transition ${providerMode === "steam" ? "border-[#b7ff63] bg-[#b7ff63] text-black" : "border-white/10 bg-white/5 text-white"}`}>
-                                                    <div className="flex items-center gap-3 text-2xl font-black"><Gamepad2 /> Steam</div>
-                                                    <div className="mt-2 text-sm font-bold opacity-60">Store-first search with price and achievements enrichment.</div>
-                                                </button>
-                                            </div>
+                            <div className={step.key === "search" ? "grid gap-5" : "grid gap-7 lg:grid-cols-[280px_1fr]"}>
+                                {step.key !== "search" && (
+                                    <aside className="space-y-4">
+                                        <div className="rounded-[28px] bg-black p-2.5 shadow-[0_18px_60px_rgb(0_0_0/0.18)]">
+                                            {coverPreview ? <img src={coverPreview} alt="" className="h-[360px] w-full rounded-[22px] object-cover" /> : <div className="grid h-[360px] place-items-center rounded-[22px] bg-[#171a17] text-center"><div><div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#b7ff63] text-3xl font-black text-black">SL</div><div className="mt-4 text-xs font-black uppercase tracking-[0.24em] text-white/35">No Cover</div></div></div>}
                                         </div>
-                                        <button type="button" onClick={manualEntry} disabled={draft.title.trim().length < 2} className="rounded-[26px] bg-black px-8 py-5 text-lg font-black text-white transition hover:-translate-y-0.5 disabled:opacity-35">Manual Entry</button>
-                                    </aside>
-                                ) : (
-                                    <aside className="space-y-5">
-                                        <div className="rounded-[34px] bg-black p-3 shadow-[0_24px_70px_rgb(0_0_0/0.25)]">
-                                            {draft.cover_url_original ? <img src={draft.cover_url_original} alt="" className="h-[420px] w-full rounded-[26px] object-cover" /> : (
-                                                <div className="grid h-[420px] place-items-center rounded-[26px] bg-[#171a17] text-center">
-                                                    <div><div className="mx-auto grid size-20 place-items-center rounded-[24px] bg-[#b7ff63] text-4xl font-black text-black">SL</div><div className="mt-5 text-xs font-black uppercase tracking-[0.26em] text-white/35">No Cover</div></div>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="rounded-[28px] border border-black/10 bg-white p-5">
-                                            <div className="text-xs font-black uppercase tracking-[0.22em] text-black/35">Current Draft</div>
-                                            <h3 className="mt-2 text-3xl font-black tracking-[-0.05em]">{draft.title || "Untitled Game"}</h3>
+                                        <div className="rounded-3xl border border-black/10 bg-white p-5">
+                                            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-black/35">Current Draft</div>
+                                            <h3 className="mt-2 text-2xl font-black tracking-[-0.05em]">{draft.title || "Untitled Game"}</h3>
                                             <div className="mt-4 flex flex-wrap gap-2"><Pill>{sourceName(draft.source)}</Pill>{draft.steam_app_id && <Pill active>Steam {draft.steam_app_id}</Pill>}</div>
                                         </div>
                                     </aside>
@@ -721,64 +731,106 @@ export default function AddGameWizard({
                                 <section className="min-w-0">
                                     {step.key === "search" && (
                                         <div className="grid gap-5">
-                                            <div className="rounded-[36px] bg-black p-7 text-white">
-                                                <div className="flex flex-wrap items-end justify-between gap-5">
-                                                    <div>
-                                                        <div className="text-sm font-black uppercase tracking-[0.3em] text-[#b7ff63]">{providerMode === "igdb" ? "IGDB Search" : "Steam Search"}</div>
-                                                        <h3 className="mt-2 text-6xl font-black tracking-[-0.07em]">Find the game.</h3>
+                                            <div className="rounded-[30px] border border-black/10 bg-white p-5">
+                                                <div className="flex flex-wrap items-center justify-between gap-4">
+                                                    <div className="grid grid-cols-2 rounded-2xl bg-black/5 p-1">
+                                                        <button type="button" onClick={() => setProviderMode("igdb")} className={`rounded-xl px-6 py-3 text-sm font-black uppercase tracking-[0.16em] ${providerMode === "igdb" ? "bg-black text-white" : "text-black/45"}`}>IGDB</button>
+                                                        <button type="button" onClick={() => setProviderMode("steam")} className={`rounded-xl px-6 py-3 text-sm font-black uppercase tracking-[0.16em] ${providerMode === "steam" ? "bg-black text-white" : "text-black/45"}`}>Steam</button>
                                                     </div>
-                                                    <Pill active>{providerMode === "igdb" ? "Metadata mode" : "Store mode"}</Pill>
+                                                    <button type="button" onClick={manualEntry} disabled={draft.title.trim().length < 2} className="rounded-2xl bg-black px-6 py-3 text-sm font-black text-white disabled:opacity-35">Manual Entry</button>
                                                 </div>
-                                                <label className="mt-8 flex h-[76px] items-center gap-4 rounded-[26px] bg-white px-5 text-black">
-                                                    <Search className="size-7 shrink-0 text-black/35" />
-                                                    <input value={draft.title} onChange={(event) => update("title", event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void runSearch(); } }} placeholder={`Search ${providerMode === "igdb" ? "IGDB" : "Steam"}...`} className="min-w-0 flex-1 bg-transparent text-3xl font-black tracking-[-0.04em] outline-none placeholder:text-black/25" autoFocus />
-                                                    <button type="button" onClick={() => void runSearch()} disabled={searching || draft.title.trim().length < 2} className="grid size-14 place-items-center rounded-2xl bg-black text-white disabled:opacity-40">{searching ? <Loader2 className="animate-spin" /> : <ChevronRight />}</button>
+                                                <label className="mt-5 flex h-[68px] items-center gap-4 rounded-2xl border border-black/10 bg-[#f4f5ef] px-5 text-black">
+                                                    <Search className="size-6 shrink-0 text-black/35" />
+                                                    <input value={draft.title} onChange={(event) => update("title", event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void runSearch(); } }} placeholder={`Search ${providerMode === "igdb" ? "IGDB" : "Steam"}...`} className="min-w-0 flex-1 bg-transparent text-2xl font-black tracking-[-0.04em] outline-none placeholder:text-black/25" autoFocus />
+                                                    <button type="button" onClick={() => void runSearch()} disabled={searching || draft.title.trim().length < 2} className="grid size-12 place-items-center rounded-xl bg-black text-white disabled:opacity-40">{searching ? <Loader2 className="animate-spin" /> : <ChevronRight />}</button>
                                                 </label>
                                             </div>
+
                                             {notice && <Notice>{notice}</Notice>}
                                             {warnings.length > 0 && <Notice tone="warning"><div className="flex gap-3"><AlertTriangle className="mt-0.5 size-5 shrink-0" /><div className="space-y-1">{warnings.slice(0, 3).map((warning) => <p key={warning}>{warning}</p>)}</div></div></Notice>}
-                                            {results.length === 0 && draft.title.trim().length >= 2 && !searching && <EmptyCard title="No result selected yet." body="Results appear here. Try another source if the selected provider returns noise." />}
-                                            <div className="grid gap-4 2xl:grid-cols-2">
+                                            {results.length === 0 && draft.title.trim().length >= 2 && !searching && <EmptyCard title="No result selected yet." body="Results show cover, title, publisher, and release year only. Switch provider if the results are wrong." />}
+
+                                            <div className="grid gap-3">
                                                 {results.map((result) => (
-                                                    <button key={resultKey(result)} type="button" onClick={() => void selectResult(result)} className={`group grid gap-4 rounded-[32px] border bg-white p-4 text-left shadow-[0_14px_35px_rgb(0_0_0/0.07)] transition hover:-translate-y-1 hover:shadow-[0_24px_70px_rgb(0_0_0/0.14)] sm:grid-cols-[104px_1fr] ${selectedResultKey === resultKey(result) ? "border-black" : "border-black/10"}`}>
-                                                        {result.cover_url_original ? <img src={result.cover_url_original} alt="" className="h-[142px] w-[104px] rounded-[22px] object-cover" /> : <div className="grid h-[142px] w-[104px] place-items-center rounded-[22px] bg-black/10 text-xs font-black uppercase tracking-[0.14em] text-black/35">No Cover</div>}
+                                                    <button key={resultKey(result)} type="button" onClick={() => void selectResult(result)} className="group grid gap-4 rounded-3xl border border-black/10 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-black sm:grid-cols-[82px_1fr_auto] sm:items-center">
+                                                        {result.cover_url_original ? <img src={result.cover_url_original} alt="" className="h-[106px] w-[82px] rounded-2xl object-cover" /> : <div className="grid h-[106px] w-[82px] place-items-center rounded-2xl bg-black/10 text-[10px] font-black uppercase tracking-[0.14em] text-black/35">No Cover</div>}
                                                         <div className="min-w-0">
-                                                            <div className="flex flex-wrap gap-2"><Pill>{sourceName(result.source)}</Pill>{result.steam_app_id && <Pill active>Steam {result.steam_app_id}</Pill>}{result.total_achievements !== null && <Pill muted>{result.total_achievements} achievements</Pill>}</div>
-                                                            <div className="mt-3 truncate text-3xl font-black tracking-[-0.06em]">{result.title}</div>
-                                                            <div className="mt-1 truncate text-base font-bold text-black/45">{result.publisher || "Unknown Publisher"}{result.release_date ? ` · ${result.release_date}` : ""}</div>
-                                                            <div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full bg-black px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-white group-hover:bg-[#b7ff63] group-hover:text-black">Select</span><Pill muted>{money(result.base_price_default)}</Pill></div>
+                                                            <div className="truncate text-2xl font-black tracking-[-0.045em]">{result.title}</div>
+                                                            <div className="mt-1 truncate text-sm font-bold text-black/45">{result.publisher || "Unknown publisher"} · {year(result.release_date)}</div>
                                                         </div>
+                                                        <span className="rounded-full bg-black px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-white group-hover:bg-[#b7ff63] group-hover:text-black">Select</span>
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
 
-                                    {step.key === "basics" && <div className="grid gap-6"><div><div className="text-sm font-black uppercase tracking-[0.28em] text-black/35">Metadata</div><h3 className="mt-1 text-5xl font-black tracking-[-0.06em]">Fix the record.</h3></div>{enriching && <Notice><span className="inline-flex items-center gap-3"><Loader2 className="size-5 animate-spin" /> Fetching Steam enrichment...</span></Notice>}<div className="grid gap-5 rounded-[34px] border border-black/10 bg-white p-6"><div className="grid gap-5 md:grid-cols-2"><Field label="Title"><TextInput value={draft.title} onChange={(event) => update("title", event.target.value)} /></Field><Field label="Publisher"><TextInput value={draft.publisher} onChange={(event) => update("publisher", event.target.value)} placeholder="Unknown" /></Field><Field label="Release Date"><TextInput value={draft.release_date} onChange={(event) => update("release_date", event.target.value)} type="date" /></Field><Field label="Cover URL"><TextInput value={draft.cover_url_original} onChange={(event) => update("cover_url_original", event.target.value)} placeholder="https://..." /></Field></div><Field label="Description"><TextArea value={draft.description} onChange={(event) => update("description", event.target.value)} placeholder="No description" /></Field></div><div className="grid gap-4 md:grid-cols-3"><Metric label="Source" value={sourceName(draft.source)} icon={<ShieldCheck />} /><Metric label="Steam App" value={draft.steam_app_id || "Missing"} icon={<Gamepad2 />} /><Metric label="DLC Preview" value={draft.dlcs.length || "After save"} icon={<Package />} /></div></div>}
+                                    {step.key === "basics" && (
+                                        <div className="grid gap-6">
+                                            <div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Game Basics</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Clean the record.</h3></div>
+                                            {enriching && <Notice><span className="inline-flex items-center gap-3"><Loader2 className="size-5 animate-spin" /> Steam data is being attached in the background.</span></Notice>}
+                                            <div className="grid gap-6 rounded-[28px] border border-black/10 bg-white/70 p-5 xl:grid-cols-[280px_1fr]">
+                                                <div>
+                                                    <div className="rounded-[24px] bg-black p-2">
+                                                        {coverPreview ? <img src={coverPreview} alt="" className="h-[360px] w-full rounded-[18px] object-cover" /> : <div className="grid h-[360px] place-items-center rounded-[18px] bg-black/20 text-white/45">No cover</div>}
+                                                    </div>
+                                                    <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadCover(file); event.currentTarget.value = ""; }} />
+                                                    <div className="mt-3 grid grid-cols-2 gap-2">
+                                                        <button type="button" onClick={() => coverInputRef.current?.click()} disabled={uploadingCover} className="rounded-2xl bg-black px-4 py-3 text-sm font-black text-white disabled:opacity-40">{uploadingCover ? "Uploading" : "Upload"}</button>
+                                                        <button type="button" onClick={() => setDraft((current) => ({ ...current, cover_url_original: providerCoverUrl, cover_path: "" }))} disabled={!providerCoverUrl || (!draft.cover_path && draft.cover_url_original === providerCoverUrl)} className="rounded-2xl bg-black/5 px-4 py-3 text-sm font-black text-black/55 disabled:opacity-35">Reset</button>
+                                                    </div>
+                                                    {coverError && <div className="mt-3 text-sm font-black text-red-600">{coverError}</div>}
+                                                </div>
+                                                <div className="grid gap-4 content-start">
+                                                    <div className="grid gap-4 md:grid-cols-2"><Field label="Title"><TextInput value={draft.title} onChange={(event) => update("title", event.target.value)} /></Field><Field label="Publisher"><TextInput value={draft.publisher} onChange={(event) => update("publisher", event.target.value)} placeholder="Unknown" /></Field><Field label="Release Date"><TextInput value={draft.release_date} onChange={(event) => update("release_date", event.target.value)} type="date" /></Field></div>
+                                                    <Field label="Description"><TextArea value={draft.description} onChange={(event) => update("description", event.target.value)} placeholder="No description" /></Field>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
-                                    {step.key === "enrich" && <div className="grid gap-6"><div><div className="text-sm font-black uppercase tracking-[0.28em] text-black/35">Steam Enrichment</div><h3 className="mt-1 text-5xl font-black tracking-[-0.06em]">Price, achievements, DLC catalog.</h3></div><Notice tone="warning">Achievements and base price are Steam-based hints. Double-check them for non-Steam platforms.</Notice><div className="grid gap-5 rounded-[34px] border border-black/10 bg-white p-6"><div className="grid gap-5 md:grid-cols-[1fr_auto]"><Field label="Steam App ID"><TextInput value={draft.steam_app_id} onChange={(event) => update("steam_app_id", event.target.value)} placeholder="Optional" /></Field><button type="button" onClick={() => void enrichCurrent()} disabled={enriching || draft.steam_app_id.trim().length === 0} className="self-end rounded-[22px] bg-black px-8 py-4 text-lg font-black text-white disabled:opacity-35">{enriching ? "Fetching..." : "Fetch Steam Data"}</button></div><div className="grid gap-5 md:grid-cols-2"><Field label="Default Base Price"><TextInput value={draft.base_price_default} onChange={(event) => update("base_price_default", event.target.value)} type="number" step="0.01" placeholder="Unknown" /></Field><Field label="Total Achievements"><TextInput value={draft.total_achievements} onChange={(event) => update("total_achievements", event.target.value)} type="number" placeholder="Unknown" /></Field></div></div><div className="grid gap-4 md:grid-cols-3"><Metric label="Base Price" value={money(draft.base_price_default)} icon={<Database />} /><Metric label="Achievements" value={draft.total_achievements || "Unknown"} icon={<Sparkles />} /><Metric label="DLCs" value={draft.dlcs.length || "Imported on save"} icon={<Package />} /></div></div>}
+                                    {step.key === "steam" && (
+                                        <div className="grid gap-6">
+                                            <div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Steam Data</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Verify store fields.</h3></div>
+                                            <Notice tone="warning">Steam is the source for base price and achievements. IGDB does not provide these fields. You can edit them, then reset back to Steam values when available.</Notice>
+                                            <div className="grid gap-4 rounded-[28px] border border-black/10 bg-white/70 p-5 md:grid-cols-3">
+                                                <Field label="Steam App ID"><TextInput value={draft.steam_app_id} onChange={(event) => update("steam_app_id", event.target.value)} placeholder="Unknown" /></Field>
+                                                <Field label="Base Price"><TextInput value={draft.base_price_default} onChange={(event) => update("base_price_default", event.target.value)} type="number" step="0.01" placeholder="Unknown" /></Field>
+                                                <Field label="Total Achievements"><TextInput value={draft.total_achievements} onChange={(event) => update("total_achievements", event.target.value)} type="number" placeholder="Unknown" /></Field>
+                                            </div>
+                                            {resetButtons}
+                                        </div>
+                                    )}
 
-                                    {step.key === "platform" && <div className="grid gap-6"><div><div className="text-sm font-black uppercase tracking-[0.28em] text-black/35">Platform</div><h3 className="mt-1 text-5xl font-black tracking-[-0.06em]">Choose the ecosystem.</h3></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{references.platforms.map((item) => <button key={item.id} type="button" onClick={() => choosePlatform(item.id)} className={`rounded-[28px] border px-6 py-7 text-left transition hover:-translate-y-1 ${draft.platform_id === item.id ? "border-black bg-black text-white" : "border-black/10 bg-white text-black"}`}><div className="text-3xl font-black tracking-[-0.04em]">{item.name}</div><div className="mt-3 text-sm font-bold opacity-50">{item.devices.length} devices · {item.ownership_types.length} ownership types</div></button>)}</div></div>}
+                                    {step.key === "platform" && (
+                                        <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Platform</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Choose the ecosystem.</h3></div><TextInput value={platformQuery} onChange={(event) => setPlatformQuery(event.target.value)} placeholder="Search platform..." /><div className="grid gap-2 rounded-[28px] border border-black/10 bg-white/70 p-3">{filteredPlatforms.map((item) => <button key={item.id} type="button" onClick={() => choosePlatform(item.id)} className={`flex items-center justify-between rounded-2xl px-5 py-4 text-left transition ${draft.platform_id === item.id ? "bg-black text-white" : "bg-white text-black hover:bg-black/5"}`}><span className="text-lg font-black">{item.name}</span><span className="text-xs font-black uppercase tracking-[0.16em] opacity-45">{item.devices.length} devices</span></button>)}</div></div>
+                                    )}
 
-                                    {step.key === "devices" && <div className="grid gap-6"><div><div className="text-sm font-black uppercase tracking-[0.28em] text-black/35">Devices</div><h3 className="mt-1 text-5xl font-black tracking-[-0.06em]">Where can you play it?</h3></div><div className="rounded-[30px] border border-black/10 bg-white p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><div className="text-xs font-black uppercase tracking-[0.22em] text-black/35">Selected</div><div className="mt-2 flex flex-wrap gap-2">{selectedDevices.length ? selectedDevices.map((name) => <Pill key={name} active>{name}</Pill>) : <Pill muted>None</Pill>}</div></div><TextInput value={deviceQuery} onChange={(event) => setDeviceQuery(event.target.value)} placeholder="Filter devices..." className="w-full md:w-[320px]" /></div></div><div className="max-h-[520px] overflow-y-auto pr-1"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{visibleDevices.map((device) => <button key={device.id} type="button" onClick={() => toggleDevice(device.id)} className={`rounded-[24px] border px-6 py-5 text-left text-lg font-black transition hover:-translate-y-0.5 ${draft.device_ids.includes(device.id) ? "border-black bg-black text-white" : "border-black/10 bg-white text-black"}`}>{device.name}</button>)}</div></div></div>}
+                                    {step.key === "devices" && (
+                                        <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Devices</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Where can you play it?</h3></div><div className="rounded-[28px] border border-black/10 bg-white/70 p-4"><div className="mb-4 flex flex-wrap gap-2">{selectedDevices.length ? selectedDevices.map((name) => <Pill key={name} active>{name}</Pill>) : <Pill muted>No device selected</Pill>}</div><TextInput value={deviceQuery} onChange={(event) => setDeviceQuery(event.target.value)} placeholder="Search devices..." /></div><div className="grid max-h-[500px] gap-2 overflow-y-auto rounded-[28px] border border-black/10 bg-white/70 p-3">{filteredDevices.map((device) => <button key={device.id} type="button" onClick={() => toggleDevice(device.id)} className={`flex items-center justify-between rounded-2xl px-5 py-4 text-left text-base font-black transition ${draft.device_ids.includes(device.id) ? "bg-black text-white" : "bg-white text-black hover:bg-black/5"}`}><span>{device.name}</span>{draft.device_ids.includes(device.id) && <Check size={18} />}</button>)}</div></div>
+                                    )}
 
-                                    {step.key === "ownership" && <div className="grid gap-6"><div><div className="text-sm font-black uppercase tracking-[0.28em] text-black/35">Ownership</div><h3 className="mt-1 text-5xl font-black tracking-[-0.06em]">Select your copies.</h3></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{platform?.ownership_types.map((type) => { const selected = draft.ownership_copies.some((copy) => copy.ownership_type_id === type.id); return <button key={type.id} type="button" onClick={() => selected ? removeCopy(draft.ownership_copies.find((copy) => copy.ownership_type_id === type.id)?.local_id ?? "") : addCopy(type.id)} className={`rounded-[24px] border px-5 py-5 text-left font-black transition hover:-translate-y-0.5 ${selected ? "border-black bg-black text-white" : "border-black/10 bg-white text-black"}`}><div className="text-xl">{type.name}</div><div className="mt-2 text-xs uppercase tracking-[0.18em] opacity-45">{selected ? "Selected" : "Add copy"}</div></button>; })}</div><div className="grid gap-5">{draft.ownership_copies.map((copy, index) => { const name = ownershipById.get(copy.ownership_type_id); const needsPhysical = !!name && physicalLike.includes(name); return <div key={copy.local_id} className="rounded-[32px] border border-black/10 bg-white p-5"><div className="mb-5 flex items-center justify-between gap-4"><div><div className="text-xs font-black uppercase tracking-[0.22em] text-black/35">Copy {index + 1}</div><div className="text-3xl font-black tracking-[-0.05em]">{name || "Ownership"}</div></div><button type="button" onClick={() => removeCopy(copy.local_id)} disabled={draft.ownership_copies.length === 1} className="rounded-[18px] bg-red-500/15 px-5 py-3 text-sm font-black text-red-700 disabled:opacity-35">Remove</button></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Field label="Type"><Select value={copy.ownership_type_id} onChange={(event) => updateCopy(copy.local_id, { ownership_type_id: Number(event.target.value), physical_status_id: null })}>{platform?.ownership_types.map((item) => { const used = draft.ownership_copies.some((usedCopy) => usedCopy.local_id !== copy.local_id && usedCopy.ownership_type_id === item.id); return <option key={item.id} value={item.id} disabled={used}>{item.name}</option>; })}</Select></Field><Field label="Edition"><TextInput value={copy.edition_name} onChange={(event) => updateCopy(copy.local_id, { edition_name: event.target.value })} placeholder="Standard" /></Field><Field label="Base Price"><TextInput value={copy.base_price} onChange={(event) => updateCopy(copy.local_id, { base_price: event.target.value })} type="number" step="0.01" placeholder="Unknown" /></Field><Field label="Paid"><TextInput value={copy.purchased_price} onChange={(event) => updateCopy(copy.local_id, { purchased_price: event.target.value })} type="number" step="0.01" placeholder="Unknown" /></Field>{needsPhysical && <Field label="Physical Status"><Select value={copy.physical_status_id ?? ""} onChange={(event) => updateCopy(copy.local_id, { physical_status_id: Number(event.target.value) || null })}><option value="">Required</option>{references.physicalStatuses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field>}<Field label="Purchased At"><TextInput value={copy.purchased_at} onChange={(event) => updateCopy(copy.local_id, { purchased_at: event.target.value })} type="date" /></Field></div></div>; })}</div></div>}
+                                    {step.key === "ownership" && (
+                                        <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Ownership</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Select your copies.</h3></div><div className="flex flex-wrap gap-2">{platform?.ownership_types.map((type) => { const selected = draft.ownership_copies.some((copy) => copy.ownership_type_id === type.id); return <button key={type.id} type="button" onClick={() => selected ? removeCopy(draft.ownership_copies.find((copy) => copy.ownership_type_id === type.id)?.local_id ?? "") : addCopy(type.id)} className={`rounded-2xl px-5 py-3 text-sm font-black ${selected ? "bg-black text-white" : "bg-white text-black/55"}`}>{type.name}</button>; })}</div><div className="grid gap-3">{draft.ownership_copies.map((copy, index) => { const name = ownershipById.get(copy.ownership_type_id); const needsPhysical = !!name && physicalLike.includes(name); return <div key={copy.local_id} className="rounded-[24px] border border-black/10 bg-white/70 p-4"><div className="mb-4 flex items-center justify-between"><div><div className="text-[11px] font-black uppercase tracking-[0.2em] text-black/35">Copy {index + 1}</div><div className="text-2xl font-black tracking-[-0.04em]">{name || "Ownership"}</div></div><button type="button" onClick={() => removeCopy(copy.local_id)} disabled={draft.ownership_copies.length === 1} className="rounded-xl bg-red-500/10 px-4 py-2 text-xs font-black text-red-700 disabled:opacity-35">Remove</button></div><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Field label="Type"><Select value={copy.ownership_type_id} onChange={(event) => updateCopy(copy.local_id, { ownership_type_id: Number(event.target.value), physical_status_id: null })}>{platform?.ownership_types.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field><Field label="Edition"><TextInput value={copy.edition_name} onChange={(event) => updateCopy(copy.local_id, { edition_name: event.target.value })} placeholder="Standard" /></Field><Field label="Base Price"><TextInput value={copy.base_price} onChange={(event) => updateCopy(copy.local_id, { base_price: event.target.value })} type="number" step="0.01" placeholder="Unknown" /></Field><Field label="Paid"><TextInput value={copy.purchased_price} onChange={(event) => updateCopy(copy.local_id, { purchased_price: event.target.value })} type="number" step="0.01" placeholder="Unknown" /></Field>{needsPhysical && <Field label="Physical Status"><Select value={copy.physical_status_id ?? ""} onChange={(event) => updateCopy(copy.local_id, { physical_status_id: Number(event.target.value) || null })}><option value="">Required</option>{references.physicalStatuses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field>}<Field label="Purchased At"><TextInput value={copy.purchased_at} onChange={(event) => updateCopy(copy.local_id, { purchased_at: event.target.value })} type="date" /></Field></div></div>; })}</div></div>
+                                    )}
 
-                                    {step.key === "dlcs" && <div className="grid gap-6"><div><div className="text-sm font-black uppercase tracking-[0.28em] text-black/35">DLCs</div><h3 className="mt-1 text-5xl font-black tracking-[-0.06em]">Expansion ownership.</h3></div><Notice tone="warning">Steam DLC catalog is imported during save. This checkpoint supports DLC previews only when the backend returns real DLC IDs. Otherwise, edit DLC ownership from the details page after save.</Notice>{draft.dlcs.length === 0 ? <EmptyCard title="No DLC preview available." body={draft.steam_app_id ? "DLC catalog will be imported when the game is saved." : "No Steam App ID is attached, so the wizard cannot discover DLCs."} /> : <div className="grid gap-4">{draft.dlcs.map((dlc, index) => <div key={`${dlc.steam_app_id ?? dlc.title}-${index}`} className="grid gap-4 rounded-[28px] border border-black/10 bg-white p-4 md:grid-cols-[1fr_auto]"><div><div className="text-2xl font-black tracking-[-0.04em]">{dlc.title}</div><div className="mt-1 text-sm font-bold text-black/45">Base price: {money(dlc.base_price)}</div></div><div className="grid gap-3 md:min-w-[360px]"><div className="grid grid-cols-2 gap-2">{(["Not Owned", "Owned", "Edition Included", "Free"] as DlcState[]).filter((state) => state !== "Edition Included" || hasEditionCopy).map((state) => <button key={state} type="button" onClick={() => updateDlc(index, { state, purchased_price: state === "Free" || state === "Edition Included" ? "0" : dlc.purchased_price })} className={`rounded-[16px] px-3 py-3 text-xs font-black uppercase tracking-[0.12em] ${dlc.state === state ? "bg-black text-white" : "bg-black/5 text-black/45"}`}>{state}</button>)}</div>{dlc.state === "Owned" && <div className="grid gap-2 sm:grid-cols-2"><TextInput value={dlc.purchased_price} onChange={(event) => updateDlc(index, { purchased_price: event.target.value })} type="number" step="0.01" placeholder="Paid" /><TextInput value={dlc.purchased_at} onChange={(event) => updateDlc(index, { purchased_at: event.target.value })} type="date" /></div>}</div></div>)}</div>}</div>}
+                                    {step.key === "dlcs" && <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">DLCs</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Coming soon.</h3></div><EmptyCard title="DLC ownership is coming soon." body="The backend DLC catalog work is not finished yet. Continue now; DLC ownership will be handled after backend support is complete." /></div>}
 
-                                    {step.key === "progress" && <div className="grid gap-6"><div><div className="text-sm font-black uppercase tracking-[0.28em] text-black/35">Progress</div><h3 className="mt-1 text-5xl font-black tracking-[-0.06em]">Track the state.</h3></div>{!hasAchievements && <Notice>100% status is hidden because this game has no achievement total.</Notice>}<div className="grid gap-5 rounded-[34px] border border-black/10 bg-white p-6"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{availableStatuses.map((item) => <button key={item.id} type="button" onClick={() => chooseStatus(item.id)} className={`rounded-[22px] border px-5 py-5 text-left text-lg font-black transition hover:-translate-y-0.5 ${draft.status_id === item.id ? "border-black bg-black text-white" : "border-black/10 bg-[#f4f5ef] text-black"}`}>{item.name}</button>)}</div><div className="grid gap-5 md:grid-cols-2"><Field label="Playtime Hours"><TextInput value={draft.playtime_hours} onChange={(event) => update("playtime_hours", event.target.value)} type="number" step="0.1" /></Field><Field label="Earned Achievements"><TextInput value={draft.earned_achievements} onChange={(event) => update("earned_achievements", event.target.value)} type="number" placeholder={hasAchievements ? `0 / ${draft.total_achievements}` : "No achievements"} /></Field><Field label="First Played"><TextInput value={draft.first_played_at} onChange={(event) => update("first_played_at", event.target.value)} type="date" /></Field><Field label="Last Played"><TextInput value={draft.last_played_at} onChange={(event) => update("last_played_at", event.target.value)} type="date" /></Field><Field label="Completed At"><TextInput value={draft.completed_at} onChange={(event) => update("completed_at", event.target.value)} type="date" /></Field></div></div></div>}
+                                    {step.key === "progress" && (
+                                        <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Progress</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Track the state.</h3></div><div className="flex flex-wrap gap-2">{availableStatuses.map((item) => <button key={item.id} type="button" onClick={() => chooseStatus(item.id)} className={`rounded-2xl px-5 py-3 text-sm font-black ${draft.status_id === item.id ? "bg-black text-white" : "bg-white text-black/55"}`}>{item.name}</button>)}</div><div className="grid gap-4 rounded-[28px] border border-black/10 bg-white/70 p-5 md:grid-cols-2"><Field label="Playtime Hours"><TextInput value={draft.playtime_hours} onChange={(event) => update("playtime_hours", event.target.value)} type="number" step="0.1" /></Field><Field label="Earned Achievements"><TextInput value={draft.earned_achievements} onChange={(event) => update("earned_achievements", event.target.value)} type="number" placeholder={hasAchievements ? `0 / ${draft.total_achievements}` : "No achievements"} /></Field>{status?.name !== "Not Played" && <Field label="First Played"><TextInput value={draft.first_played_at} onChange={(event) => update("first_played_at", event.target.value)} type="date" /></Field>}{status?.name !== "Not Played" && <Field label="Last Played"><TextInput value={draft.last_played_at} onChange={(event) => update("last_played_at", event.target.value)} type="date" /></Field>}{(status?.name === "Completed" || status?.name === "100%") && <Field label="Completed At"><TextInput value={draft.completed_at} onChange={(event) => update("completed_at", event.target.value)} type="date" /></Field>}</div>{!hasAchievements && <Notice>100% is hidden because this game has no achievement total.</Notice>}</div>
+                                    )}
 
-                                    {step.key === "review" && <div className="grid gap-6"><div><div className="text-sm font-black uppercase tracking-[0.28em] text-black/35">Review</div><h3 className="mt-1 text-5xl font-black tracking-[-0.06em]">Ready to save.</h3></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><Metric label="Platform" value={platform?.name || "Missing"} icon={<Gamepad2 />} /><Metric label="Devices" value={selectedDevices.length} icon={<Layers3 />} /><Metric label="Ownership" value={draft.ownership_copies.length} icon={<Database />} /><Metric label="Status" value={status?.name || "Missing"} icon={<ShieldCheck />} /><Metric label="Playtime" value={`${draft.playtime_hours || 0}h`} icon={<Clock3 />} /><Metric label="Achievements" value={`${draft.earned_achievements || 0} / ${draft.total_achievements || "Unknown"}`} icon={<Sparkles />} /></div><div className="rounded-[30px] border border-black/10 bg-white p-6 text-lg font-bold text-black/60"><p><span className="font-black text-black">Game:</span> {draft.title}</p><p><span className="font-black text-black">Provider:</span> {sourceName(draft.source)}</p><p><span className="font-black text-black">Devices:</span> {selectedDevices.length ? selectedDevices.join(", ") : "Missing"}</p><p><span className="font-black text-black">Ownership:</span> {selectedOwnerships.length ? selectedOwnerships.join(", ") : "Missing"}</p><p><span className="font-black text-black">DLC states:</span> {draft.dlcs.filter((dlc) => dlc.state !== "Not Owned").length || "None selected"}</p></div></div>}
+                                    {step.key === "review" && <div className="grid gap-6"><div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Review</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Save receipt.</h3></div><div className="rounded-[30px] border border-black/10 bg-white p-6"><h4 className="text-4xl font-black tracking-[-0.06em]">{draft.title}</h4><div className="mt-5 grid gap-3 text-base font-bold text-black/60 md:grid-cols-2"><p><span className="font-black text-black">Source:</span> {sourceName(draft.source)}</p><p><span className="font-black text-black">Platform:</span> {platform?.name || "Missing"}</p><p><span className="font-black text-black">Devices:</span> {selectedDevices.length ? selectedDevices.join(", ") : "Missing"}</p><p><span className="font-black text-black">Ownership:</span> {selectedOwnerships.length ? selectedOwnerships.join(", ") : "Missing"}</p><p><span className="font-black text-black">Status:</span> {status?.name || "Missing"}</p><p><span className="font-black text-black">Playtime:</span> {draft.playtime_hours || 0}h</p><p><span className="font-black text-black">Achievements:</span> {draft.earned_achievements || 0} / {draft.total_achievements || "Unknown"}</p><p><span className="font-black text-black">Base price:</span> {money(draft.base_price_default)}</p></div></div><div className="grid gap-4 md:grid-cols-3"><Metric label="Cover" value={draft.cover_path ? "Uploaded" : coverPreview ? "Provider" : "Missing"} icon={<Package />} /><Metric label="Devices" value={selectedDevices.length} icon={<Layers3 />} /><Metric label="Copies" value={draft.ownership_copies.length} icon={<Database />} /></div></div>}
 
-                                    {Object.keys(serverErrors).length > 0 && <div className="mt-6 rounded-[24px] border border-red-500/20 bg-red-500/10 p-5 text-sm font-black text-red-700"><div className="mb-2 text-base">Backend rejected the save:</div><ul className="list-inside list-disc space-y-1">{Object.entries(serverErrors).map(([key, value]) => <li key={key}>{key}: {value}</li>)}</ul></div>}
+                                    {Object.keys(serverErrors).length > 0 && <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-5 text-sm font-black text-red-700"><div className="mb-2 text-base">Backend rejected the save:</div><ul className="list-inside list-disc space-y-1">{Object.entries(serverErrors).map(([key, value]) => <li key={key}>{key}: {value}</li>)}</ul></div>}
                                 </section>
                             </div>
                         </main>
 
                         <footer className="flex items-center justify-between gap-5 border-t border-black/10 bg-white px-7 py-5">
-                            <button type="button" onClick={previous} disabled={stepIndex === 0} className="flex items-center gap-3 rounded-[22px] bg-black/[0.06] px-8 py-4 text-lg font-black disabled:opacity-35"><ChevronLeft /> Back</button>
-                            <div className="hidden min-w-0 flex-1 text-center text-sm font-black uppercase tracking-[0.18em] text-black/35 md:block">{currentError ? currentError : `${stepIndex + 1} / ${steps.length}`}</div>
-                            {stepIndex < steps.length - 1 ? <button type="button" onClick={next} disabled={!!currentError} className="flex items-center gap-3 rounded-[22px] bg-black px-8 py-4 text-lg font-black text-white disabled:opacity-35">Next <ChevronRight /></button> : <button type="button" onClick={submit} disabled={!!currentError || saving} className="flex items-center gap-3 rounded-[22px] bg-black px-8 py-4 text-lg font-black text-white disabled:opacity-35">{saving ? <><Loader2 className="animate-spin" /> Saving</> : <><Check /> Save Game</>}</button>}
+                            <button type="button" onClick={previous} disabled={stepIndex === 0} className="flex items-center gap-3 rounded-2xl bg-black/[0.06] px-7 py-3.5 text-base font-black disabled:opacity-35"><ChevronLeft size={18} /> Back</button>
+                            <div className="hidden min-w-0 flex-1 text-center text-xs font-black uppercase tracking-[0.18em] text-black/35 md:block">{currentError ? currentError : `${stepIndex + 1} / ${steps.length}`}</div>
+                            {stepIndex < steps.length - 1 ? <button type="button" onClick={next} disabled={!!currentError} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">Next <ChevronRight size={18} /></button> : <button type="button" onClick={submit} disabled={!!currentError || saving} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">{saving ? <><Loader2 className="animate-spin" size={18} /> Saving</> : <><Check size={18} /> Save Game</>}</button>}
                         </footer>
                     </section>
                 </div>
