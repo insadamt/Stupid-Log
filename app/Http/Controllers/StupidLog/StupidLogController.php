@@ -61,7 +61,7 @@ class StupidLogController extends Controller
 
         return Inertia::render('GameDetails', [
             'libraryGame' => $this->card($libraryGame),
-            'dlcs' => $libraryGame->game->dlcs->map(fn ($dlc) => [
+            'dlcs' => $libraryGame->game->dlcs->map(fn($dlc) => [
                 'id' => $dlc->id,
                 'title' => $dlc->title,
                 'base_price' => $dlc->base_price,
@@ -127,10 +127,12 @@ class StupidLogController extends Controller
 
     public function settings(): Response
     {
-        $igdb = $this->credential($this->localUser(), 'igdb');
+        $user = $this->localUser();
+        $igdb = $this->credential($user, 'igdb');
+        $steam = $this->credential($user, 'steam');
 
         return Inertia::render('Settings', [
-            'user' => $this->localUser()->load('settings'),
+            'user' => $user->load('settings'),
             'currencies' => Currency::orderBy('code')->pluck('code'),
             'providers' => Provider::orderBy('name')->get(),
             'igdbCredential' => [
@@ -138,6 +140,11 @@ class StupidLogController extends Controller
                 'has_client_secret' => (bool) $igdb?->encrypted_client_secret,
                 'last_tested_at' => $igdb?->last_tested_at?->toIso8601String(),
                 'last_test_status' => $igdb?->last_test_status,
+            ],
+            'steamCredential' => [
+                'has_api_key' => (bool) $steam?->encrypted_api_key,
+                'last_tested_at' => $steam?->last_tested_at?->toIso8601String(),
+                'last_test_status' => $steam?->last_test_status,
             ],
         ]);
     }
@@ -147,9 +154,31 @@ class StupidLogController extends Controller
         $validated = $request->validated();
 
         $user = $this->localUser();
+
         $user->update(['username' => $validated['username']]);
-        AppSetting::updateOrCreate(['user_id' => $user->id], ['currency_code' => $validated['currency_code']]);
-        $this->storeCredential($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null, preserveBlankFields: true);
+
+        AppSetting::updateOrCreate(
+            ['user_id' => $user->id],
+            ['currency_code' => $validated['currency_code']]
+        );
+
+        $this->storeCredential(
+            $user,
+            'igdb',
+            $validated['igdb_client_id'] ?? null,
+            $validated['igdb_client_secret'] ?? null,
+            null,
+            preserveBlankFields: true,
+        );
+
+        $this->storeCredential(
+            $user,
+            'steam',
+            null,
+            null,
+            $validated['steam_api_key'] ?? null,
+            preserveBlankFields: true,
+        );
 
         return back();
     }
@@ -185,7 +214,7 @@ class StupidLogController extends Controller
 
             Http::withHeaders([
                 'Client-ID' => $clientId,
-                'Authorization' => 'Bearer '.$token,
+                'Authorization' => 'Bearer ' . $token,
             ])->withBody('fields name; limit 1;', 'text/plain')
                 ->post('https://api.igdb.com/v4/games')
                 ->throw();
@@ -201,7 +230,7 @@ class StupidLogController extends Controller
 
             return response()->json([
                 'ok' => false,
-                'message' => 'IGDB test failed: '.$exception->getMessage(),
+                'message' => 'IGDB test failed: ' . $exception->getMessage(),
             ], 422);
         }
     }
@@ -244,7 +273,7 @@ class StupidLogController extends Controller
 
     private function cards($libraryGames)
     {
-        return $libraryGames->map(fn (LibraryGame $libraryGame) => $this->card($libraryGame))->values();
+        return $libraryGames->map(fn(LibraryGame $libraryGame) => $this->card($libraryGame))->values();
     }
 
     private function card(LibraryGame $libraryGame): array
@@ -256,14 +285,14 @@ class StupidLogController extends Controller
             'title' => $game->title,
             'publisher' => $game->publisher,
             'description' => $game->description,
-            'cover_url' => $game->cover_path ? asset('storage/'.$game->cover_path) : $game->cover_url_original,
+            'cover_url' => $game->cover_path ? asset('storage/' . $game->cover_path) : $game->cover_url_original,
             'platform' => $libraryGame->platform->name,
             'status' => $libraryGame->status->name,
             'playtime_hours' => (float) $libraryGame->playtime_hours,
             'earned_achievements' => $libraryGame->earned_achievements ?? 0,
             'total_achievements' => $game->total_achievements ?? 0,
             'progress' => $game->total_achievements ? round((($libraryGame->earned_achievements ?? 0) / $game->total_achievements) * 100) : 0,
-            'ownership' => $libraryGame->ownershipCopies->map(fn ($copy) => $copy->ownershipType?->name ?? OwnershipType::find($copy->ownership_type_id)?->name)->filter()->values(),
+            'ownership' => $libraryGame->ownershipCopies->map(fn($copy) => $copy->ownershipType?->name ?? OwnershipType::find($copy->ownership_type_id)?->name)->filter()->values(),
             'devices' => $libraryGame->devices->pluck('name')->values(),
             'base_price_default' => $game->base_price_default,
         ];
