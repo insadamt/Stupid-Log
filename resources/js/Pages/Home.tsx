@@ -14,8 +14,9 @@ import {
 import { ComponentType } from 'react';
 import AddGameWizard from '../Components/AddGameWizard';
 import AppLayout from '../Components/AppLayout';
-import { CoverArt } from '../Components/GameCard';
+import GameCard, { CoverArt } from '../Components/GameCard';
 import { GameCardData, ReferenceData, StatsData } from '../types';
+
 
 
 function numberFormat(value: number | string | null | undefined, maximumFractionDigits = 0) {
@@ -85,41 +86,21 @@ function HeaderChip({ label, value }: { label: string; value: string | number })
 }
 
 function MiniGameSlab({ game, side }: { game: GameCardData; side: 'left' | 'right' }) {
-    const progress = Math.min(Math.max(Number(game.progress ?? 0), 0), 100);
     const laneLabel = side === 'left' ? 'Previous File' : 'Next File';
 
     return (
-        <a
-            href={game.id > 0 ? `/games/${game.id}` : '/library'}
+        <div
             className={[
-                'absolute top-[52%] z-10 flex h-[342px] w-[226px] -translate-y-1/2 flex-col overflow-hidden rounded-[34px] bg-[#b7ff63] p-3 shadow-[0_28px_55px_rgb(0_0_0/0.16)] transition duration-300 hover:z-30 hover:scale-105',
-                side === 'left' ? 'left-[4%] -rotate-5' : 'right-[4%] rotate-5',
+                'absolute top-1/2 z-10 -translate-y-1/2 transition duration-300 hover:z-30 hover:scale-105',
+                side === 'left' ? 'left-[3%] -rotate-6' : 'right-[3%] rotate-6',
             ].join(' ')}
         >
-            <div className="relative h-[235px] overflow-hidden rounded-[24px] bg-[#d8ddda]">
-                <CoverArt game={game} titleSize="text-[22px]" />
-                <div className="absolute left-3 top-3 rounded-full bg-black/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-[#b7ff63]">
-                    {laneLabel}
-                </div>
+            <div className="pointer-events-none absolute left-5 top-5 z-30 rounded-full bg-black/85 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#b7ff63] shadow-[0_10px_22px_rgb(0_0_0/0.18)]">
+                {laneLabel}
             </div>
 
-            <div className="mx-auto -mt-4 rounded-full bg-black px-5 py-2 text-sm font-black text-white shadow-[0_12px_22px_rgb(0_0_0/0.18)]">
-                {game.status}
-            </div>
-
-            <div className="mt-auto flex items-center gap-3">
-                <PlatformMark platform={game.platform} />
-                <div className="min-w-0 flex-1">
-                    <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.12em] text-black/52">
-                        <span className="truncate">{game.platform}</span>
-                        <span>{progress}%</span>
-                    </div>
-                    <div className="h-4 overflow-hidden rounded-full bg-black/12">
-                        <div className="h-full rounded-full bg-[#4f8cf7]" style={{ width: `${progress}%` }} />
-                    </div>
-                </div>
-            </div>
-        </a>
+            <GameCard game={game} compact expanded={false} />
+        </div>
     );
 }
 
@@ -311,11 +292,6 @@ export default function Home({ stats, recentGames, references }: { stats: StatsD
                         <div>
                             <p className="text-[12px] font-black uppercase tracking-[0.34em] text-black/38">Stupid Log Command Deck</p>
                             <h1 className="mt-2 text-[64px] font-black leading-[0.88] tracking-[-0.06em]">Home Base</h1>
-                            <div className="mt-5 flex flex-wrap gap-3">
-                                <HeaderChip label="Games" value={stats.library_games ?? 0} />
-                                <HeaderChip label="Hours" value={`${numberFormat(stats.playtime_hours, 1)}H`} />
-                                <HeaderChip label="Complete" value={stats.completed ?? 0} />
-                            </div>
                         </div>
 
                         <div className="flex items-center gap-3 rounded-full bg-black px-4 py-3 text-white shadow-[0_18px_36px_rgb(0_0_0/0.16)]">
