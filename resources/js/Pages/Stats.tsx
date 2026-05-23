@@ -57,7 +57,8 @@ function slices<T extends { label: string }>(items: T[], getter: (item: T) => nu
                 growth: previous ? growth(value, getter(previous)) : null,
             };
         })
-        .filter((slice) => slice.value > 0);
+        .filter((slice) => slice.value > 0)
+        .sort((a, b) => b.value - a.value);
 }
 
 function DeltaBadge({ value, compact = false }: { value?: GrowthMetric | null; compact?: boolean }) {
@@ -73,6 +74,22 @@ function DeltaBadge({ value, compact = false }: { value?: GrowthMetric | null; c
     return (
         <span className={`${compact ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'} inline-flex rounded-full font-black ring-1 ring-black/5 ${positive ? 'bg-[#b7ff63] text-black' : negative ? 'bg-[#ffe0dd] text-[#ad2c21]' : 'bg-[#edf1ec] text-black/50'}`}>
             {positive ? '+' : ''}{num(value.delta, Math.abs(value.delta) % 1 ? 1 : 0)} | {percentage} {arrow}
+        </span>
+    );
+}
+
+function PercentDeltaBadge({ value, compact = false }: { value?: GrowthMetric | null; compact?: boolean }) {
+    if (!value) {
+        return <span className={`${compact ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'} inline-flex rounded-full border border-black/10 bg-white/55 font-black text-black/35`}>—</span>;
+    }
+
+    const positive = value.delta > 0;
+    const negative = value.delta < 0;
+    const arrow = positive ? '▲' : negative ? '▼' : '→';
+
+    return (
+        <span className={`${compact ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'} inline-flex rounded-full font-black ring-1 ring-black/5 ${positive ? 'bg-[#b7ff63] text-black' : negative ? 'bg-[#ffe0dd] text-[#ad2c21]' : 'bg-[#edf1ec] text-black/50'}`}>
+            {positive ? '+' : ''}{num(value.delta, Math.abs(value.delta) % 1 ? 1 : 0)}% {arrow}
         </span>
     );
 }
@@ -123,7 +140,7 @@ function Donut({ data, total, center }: { data: Slice[]; total: string; center: 
     let offset = 0;
 
     return (
-        <div className="relative size-[260px] shrink-0">
+        <div className="relative size-[330px] shrink-0">
             <svg viewBox="0 0 220 220" className="size-full">
                 <circle cx="110" cy="110" r={radius} fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="19" />
                 {sum > 0 && data.map((slice) => {
@@ -149,7 +166,7 @@ function Donut({ data, total, center }: { data: Slice[]; total: string; center: 
             </svg>
             <div className="absolute inset-0 grid place-items-center text-center">
                 <div>
-                    <div className="text-5xl font-black text-white">{total}</div>
+                    <div className="text-6xl font-black text-white">{total}</div>
                     <div className="mt-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/32">{center}</div>
                 </div>
             </div>
@@ -158,35 +175,21 @@ function Donut({ data, total, center }: { data: Slice[]; total: string; center: 
 }
 
 function GameUiChart({ config }: { config: ChartConfig }) {
-    const sum = config.data.reduce((acc, slice) => acc + slice.value, 0);
+    const data = [...config.data].sort((a, b) => b.value - a.value);
+    const sum = data.reduce((acc, slice) => acc + slice.value, 0);
 
     return (
-        <article className="grid h-full min-h-0 grid-cols-[250px_1fr_1.45fr] gap-4 rounded-[30px] bg-black p-4 text-white shadow-[0_24px_75px_rgb(0_0_0/0.2)]">
-            <aside className="min-h-0 rounded-[26px] bg-white/[0.06] p-4 ring-1 ring-white/8">
-                <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]/70">Chart bay</div>
-                <h3 className="mt-2 text-3xl font-black leading-none">Choose Metric</h3>
-                <div className="mt-4 h-px bg-white/10" />
-                <div className="mt-4 grid max-h-[calc(100%-92px)] gap-2 overflow-y-auto pr-1">
-                    {config.data.length === 0 && <div className="rounded-2xl bg-white/7 p-4 text-sm font-bold text-white/35">No metric data yet.</div>}
-                    {config.data.map((slice, index) => (
-                        <div key={slice.label} className={`grid grid-cols-[40px_1fr] items-center gap-3 rounded-[20px] p-3 ring-1 ${index === 0 ? 'bg-[#b7ff63] text-black ring-[#b7ff63]' : 'bg-white/7 text-white/48 ring-white/5'}`}>
-                            <div className={`${index === 0 ? 'bg-black text-[#b7ff63]' : 'bg-black/70 text-white/45'} grid size-9 place-items-center rounded-full text-sm font-black`}>{index + 1}</div>
-                            <div className="min-w-0">
-                                <div className="truncate text-sm font-black">{slice.label}</div>
-                                <div className="mt-0.5 text-[10px] font-black uppercase tracking-[0.14em] opacity-55">{config.format(slice.value)}</div>
-                            </div>
-                        </div>
-                    ))}
+        <article className="grid h-full min-h-0 grid-cols-[0.95fr_1.25fr] gap-4 rounded-[30px] bg-black p-4 text-white shadow-[0_24px_75px_rgb(0_0_0/0.2)]">
+            <section className="grid min-h-0 grid-rows-[auto_1fr] rounded-[26px] bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-5 ring-1 ring-white/8">
+                <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]/70">{config.eyebrow}</div>
+                    <div className="mt-2 flex items-start justify-between gap-3">
+                        <h2 className="text-4xl font-black leading-none text-[#9BE44D]">{config.title}</h2>
+                        <DeltaBadge value={config.delta} compact />
+                    </div>
                 </div>
-            </aside>
-            <section className="min-h-0 rounded-[26px] bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-5 ring-1 ring-white/8">
-                <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]/70">{config.eyebrow}</div>
-                <div className="mt-2 flex items-start justify-between gap-3">
-                    <h2 className="text-4xl font-black leading-none text-[#9BE44D]">{config.title}</h2>
-                    <DeltaBadge value={config.delta} compact />
-                </div>
-                <div className="mt-5 grid h-[calc(100%-82px)] place-items-center">
-                    <Donut data={config.data} total={config.total} center={config.center} />
+                <div className="grid min-h-0 place-items-center">
+                    <Donut data={data} total={config.total} center={config.center} />
                 </div>
             </section>
             <section className="min-h-0 rounded-[26px] bg-white/[0.06] p-4 ring-1 ring-white/8">
@@ -195,8 +198,8 @@ function GameUiChart({ config }: { config: ChartConfig }) {
                     <div className="grid size-11 place-items-center rounded-2xl bg-[#b7ff63] text-black"><BarChart3 size={22} strokeWidth={3} /></div>
                 </div>
                 <div className="mt-4 grid max-h-[calc(100%-60px)] gap-3 overflow-y-auto pr-1">
-                    {config.data.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm font-bold text-white/35">No rows available.</div>}
-                    {config.data.map((slice) => {
+                    {data.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm font-bold text-white/35">No rows available.</div>}
+                    {data.map((slice) => {
                         const percent = sum > 0 ? (slice.value / sum) * 100 : 0;
                         return (
                             <div key={slice.label} className="rounded-[22px] bg-white/[0.07] p-4 ring-1 ring-white/8">
@@ -240,7 +243,7 @@ function Overview({ stats, previous, selectedYear }: { stats: StatView; previous
                             <div className="text-4xl font-black">{num(stats.earned_achievements)} / {num(stats.total_achievements)}</div>
                             <div className="mt-2 text-sm font-bold text-white/42">{num(stats.achievement_progress, 1)}% progression</div>
                         </div>
-                        <DeltaBadge value={metricGrowth('achievement_progress', stats, previous)} />
+                        <PercentDeltaBadge value={metricGrowth('achievement_progress', stats, previous)} />
                     </div>
                     <div className="mt-5 h-5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#b7ff63]" style={{ width: `${Math.max(0, Math.min(100, stats.achievement_progress))}%` }} /></div>
                     {selectedYear && <div className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-white/30">Best of {selectedYear.year} is available in this snapshot</div>}
@@ -303,7 +306,11 @@ function Breakdowns({ stats, previous }: { stats: StatView; previous?: StatView 
 }
 
 function Progression({ stats, previous }: { stats: StatView; previous?: StatView | null }) {
-    const platforms = [...stats.breakdowns.platforms].sort((a, b) => b.library_games - a.library_games);
+    const platforms = [...stats.breakdowns.platforms];
+    const achievementPlatforms = [...platforms]
+        .filter((platform) => platform.total_achievements > 0)
+        .sort((a, b) => b.achievement_progress - a.achievement_progress || b.earned_achievements - a.earned_achievements);
+    const statusPlatforms = [...platforms].sort((a, b) => b.library_games - a.library_games);
     const prevPlatforms = previous?.breakdowns.platforms ?? [];
 
     return (
@@ -315,14 +322,14 @@ function Progression({ stats, previous }: { stats: StatView; previous?: StatView
                         <h2 className="text-4xl font-black leading-none">Platform Progress</h2>
                         <div className="text-right">
                             <div className="text-4xl font-black text-[#b7ff63]">{num(stats.achievement_progress, 1)}%</div>
-                            <DeltaBadge value={metricGrowth('achievement_progress', stats, previous)} compact />
+                            <PercentDeltaBadge value={metricGrowth('achievement_progress', stats, previous)} compact />
                         </div>
                     </div>
                     <div className="mt-4 h-4 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#b7ff63]" style={{ width: `${Math.max(0, Math.min(100, stats.achievement_progress))}%` }} /></div>
                 </div>
                 <div className="mt-5 min-h-0 overflow-y-auto pr-1">
                     <div className="grid gap-3">
-                        {platforms.filter((platform) => platform.total_achievements > 0).map((platform) => {
+                        {achievementPlatforms.map((platform) => {
                             const previousPlatform = prevPlatforms.find((item) => item.label === platform.label);
                             return (
                                 <div key={platform.label} className="rounded-[22px] bg-white/[0.07] p-4 ring-1 ring-white/8">
@@ -333,14 +340,14 @@ function Progression({ stats, previous }: { stats: StatView; previous?: StatView
                                         </div>
                                         <div className="text-right">
                                             <div className="text-xl font-black text-[#b7ff63]">{num(platform.achievement_progress, 1)}%</div>
-                                            <DeltaBadge value={previousPlatform ? growth(platform.achievement_progress, previousPlatform.achievement_progress) : null} compact />
+                                            <PercentDeltaBadge value={previousPlatform ? growth(platform.achievement_progress, previousPlatform.achievement_progress) : null} compact />
                                         </div>
                                     </div>
                                     <div className="mt-3"><ProgressBar value={platform.achievement_progress} /></div>
                                 </div>
                             );
                         })}
-                        {platforms.every((platform) => platform.total_achievements <= 0) && <Empty dark text="No achievement totals are available yet." />}
+                        {achievementPlatforms.length === 0 && <Empty dark text="No achievement totals are available yet." />}
                     </div>
                 </div>
             </section>
@@ -351,8 +358,8 @@ function Progression({ stats, previous }: { stats: StatView; previous?: StatView
                 </div>
                 <div className="mt-4 min-h-0 overflow-y-auto pr-1">
                     <div className="grid gap-3">
-                        {platforms.map((platform) => <StatusStack key={platform.label} platform={platform} previous={prevPlatforms.find((item) => item.label === platform.label)} />)}
-                        {platforms.length === 0 && <Empty text="Add games to build status progression." />}
+                        {statusPlatforms.map((platform) => <StatusStack key={platform.label} platform={platform} previous={prevPlatforms.find((item) => item.label === platform.label)} />)}
+                        {statusPlatforms.length === 0 && <Empty text="Add games to build status progression." />}
                     </div>
                 </div>
             </section>
@@ -361,7 +368,7 @@ function Progression({ stats, previous }: { stats: StatView; previous?: StatView
 }
 
 function StatusStack({ platform, previous }: { platform: PlatformBreakdown; previous?: PlatformBreakdown }) {
-    const statuses = platform.statuses ?? [];
+    const statuses = [...(platform.statuses ?? [])].sort((a, b) => b.library_games - a.library_games);
     const total = Math.max(1, platform.library_games);
 
     return (
@@ -371,54 +378,50 @@ function StatusStack({ platform, previous }: { platform: PlatformBreakdown; prev
                     <div className="text-lg font-black text-black">{platform.label}</div>
                     <div className="text-xs font-bold text-black/42">{num(platform.library_games)} games divided by status</div>
                 </div>
-                <DeltaBadge value={previous ? growth(platform.library_games, previous.library_games) : null} compact />
             </div>
             <div className="mt-3 flex h-5 overflow-hidden rounded-full bg-black/8">
                 {statuses.length === 0 && <div className="h-full w-full bg-black/10" />}
                 {statuses.map((status, index) => <div key={status.label} className="h-full" style={{ width: `${(status.library_games / total) * 100}%`, backgroundColor: palette[index % palette.length] }} />)}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {statuses.map((status, index) => (
-                    <div key={status.label} className="flex items-center justify-between gap-2 rounded-2xl bg-[#f6faf4] px-3 py-2 text-xs font-black text-black/60">
-                        <span className="flex min-w-0 items-center gap-2"><span className="size-2.5 rounded-full" style={{ backgroundColor: palette[index % palette.length] }} /><span className="truncate">{status.label}</span></span>
-                        <span>{num(status.library_games)} · {num((status.library_games / total) * 100, 1)}%</span>
-                    </div>
-                ))}
+                {statuses.map((status, index) => {
+                    const previousStatus = previous?.statuses?.find((item) => item.label === status.label);
+                    return (
+                        <div key={status.label} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-2xl bg-[#f6faf4] px-3 py-2 text-xs font-black text-black/60">
+                            <span className="flex min-w-0 items-center gap-2">
+                                <span className="size-2.5 rounded-full" style={{ backgroundColor: palette[index % palette.length] }} />
+                                <span className="truncate">{status.label}</span>
+                            </span>
+                            <span className="flex items-center gap-2">
+                                <span>{num(status.library_games)} · {num((status.library_games / total) * 100, 1)}%</span>
+                                <DeltaBadge value={previousStatus ? growth(status.library_games, previousStatus.library_games) : null} compact />
+                            </span>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
 }
 
-function Archive({ stats, previous, selectedYear }: { stats: StatView; previous?: StatView | null; selectedYear?: ConfirmedYearStats | null }) {
+function Archive({ stats }: { stats: StatView }) {
     return (
-        <div className="grid h-full min-h-0 grid-rows-[auto_1fr] gap-4">
-            <article className="rounded-[26px] border border-black/10 bg-black p-5 text-white shadow-[0_22px_65px_rgb(9_14_12/0.14)]">
-                <div className="text-xs font-black uppercase tracking-[0.22em] text-[#b7ff63]/70">Game Archive</div>
-                <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
-                    <h2 className="text-3xl font-black">Records only, no filler cards</h2>
-                    <p className="max-w-lg text-sm font-bold text-white/45">{selectedYear ? `Frozen from the ${selectedYear.year} confirmed snapshot` : 'Live all-time library records'}</p>
-                </div>
-            </article>
-            <div className="grid min-h-0 gap-4 xl:grid-cols-3">
-                <ArchiveList title="Most Played" sub="Playtime record" games={stats.archive?.most_played ?? []} metric="playtime" delta={metricGrowth('playtime_hours', stats, previous)} />
-                <ArchiveList title="Biggest Base Price" sub="Base value record" games={stats.archive?.biggest_base_price ?? []} metric="base" delta={metricGrowth('base_value', stats, previous)} />
-                <ArchiveList title="Biggest Paid Price" sub="Paid value record" games={stats.archive?.biggest_paid_price ?? []} metric="paid" delta={metricGrowth('purchased_value', stats, previous)} />
-            </div>
+        <div className="grid h-full min-h-0 gap-4 xl:grid-cols-3">
+            <ArchiveList title="Most Played" sub="Playtime record" games={stats.archive?.most_played ?? []} metric="playtime" />
+            <ArchiveList title="Biggest Base Price" sub="Base value record" games={stats.archive?.biggest_base_price ?? []} metric="base" />
+            <ArchiveList title="Biggest Paid Price" sub="Paid value record" games={stats.archive?.biggest_paid_price ?? []} metric="paid" />
         </div>
     );
 }
 
-function ArchiveList({ title, sub, games, metric, delta }: { title: string; sub: string; games: StatsArchiveGame[]; metric: 'playtime' | 'base' | 'paid'; delta?: GrowthMetric | null }) {
+function ArchiveList({ title, sub, games, metric }: { title: string; sub: string; games: StatsArchiveGame[]; metric: 'playtime' | 'base' | 'paid' }) {
     const value = (game: StatsArchiveGame) => metric === 'playtime' ? hours(game.playtime_hours) : metric === 'base' ? money(game.base_value) : money(game.purchased_value);
 
     return (
-        <section className="grid min-h-0 grid-rows-[auto_1fr] rounded-[28px] border border-black/10 bg-white/80 p-4 shadow-[0_22px_65px_rgb(9_14_12/0.07)]">
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <div className="text-xs font-black uppercase tracking-[0.22em] text-black/38">{sub}</div>
-                    <h3 className="mt-1 text-2xl font-black">{title}</h3>
-                </div>
-                <DeltaBadge value={delta} compact />
+        <section className="grid min-h-0 grid-rows-[auto_1fr] rounded-[28px] border border-black/10 bg-white/80 p-5 shadow-[0_22px_65px_rgb(9_14_12/0.07)]">
+            <div>
+                <div className="text-xs font-black uppercase tracking-[0.22em] text-black/38">{sub}</div>
+                <h3 className="mt-1 text-2xl font-black">{title}</h3>
             </div>
             <div className="mt-4 min-h-0 overflow-y-auto pr-1">
                 <div className="grid gap-3">
@@ -448,8 +451,8 @@ function Empty({ text, dark = false }: { text: string; dark?: boolean }) {
 
 function SlideNav({ active, setActive }: { active: TabKey; setActive: (tab: TabKey) => void }) {
     return (
-        <div className="flex h-[86px] shrink-0 justify-center px-2 py-3">
-            <div className="flex max-w-full items-center gap-2 overflow-x-auto rounded-[26px] border border-black/10 bg-black p-3 shadow-[0_22px_70px_rgb(0_0_0/0.24)]">
+        <div className="flex h-[112px] shrink-0 justify-center px-2 py-5">
+            <div className="flex max-w-full items-center justify-center gap-2 overflow-hidden rounded-[28px] border border-black/10 bg-black px-5 py-4 shadow-[0_22px_70px_rgb(0_0_0/0.24)]">
                 {tabs.map((tab) => (
                     <button key={tab.key} type="button" onClick={() => setActive(tab.key)} className={`min-w-[165px] rounded-[20px] px-5 py-3 text-left transition ${active === tab.key ? 'bg-[#b7ff63] text-black' : 'bg-white/7 text-white/45 hover:text-white'}`}>
                         <div className="text-sm font-black">{tab.title}</div>
@@ -487,12 +490,12 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
             ? <Breakdowns stats={current} previous={previous} />
             : active === 'progression'
                 ? <Progression stats={current} previous={previous} />
-                : <Archive stats={current} previous={previous} selectedYear={selectedYear} />;
+                : <Archive stats={current} />;
 
     return (
         <AppLayout title="Stats" lockViewport>
-            <section className="h-full overflow-hidden px-4 md:pl-[88px] md:pr-6">
-                <div className="mx-auto grid h-full max-w-[1540px] grid-rows-[120px_minmax(0,1fr)_86px] gap-3 overflow-hidden">
+            <section className="h-full overflow-hidden px-4 py-3 md:pl-[88px] md:pr-6">
+                <div className="mx-auto grid h-full max-w-[1540px] grid-rows-[120px_minmax(0,1fr)_112px] gap-4 overflow-hidden">
                     <header className="rounded-[34px] bg-black px-6 py-5 text-white shadow-[0_24px_80px_rgb(0_0_0/0.20)]">
                         <div className="grid h-full gap-5 xl:grid-cols-[1fr_auto] xl:items-center">
                             <div className="min-w-0">
