@@ -463,7 +463,7 @@ function Empty({ text, dark = false }: { text: string; dark?: boolean }) {
 function SlideNav({ active, setActive }: { active: TabKey; setActive: (tab: TabKey) => void }) {
     return (
         <div className="flex h-[112px] shrink-0 justify-center px-2 py-5">
-            <div className="flex max-w-full items-center justify-center gap-2 overflow-hidden rounded-[28px] border border-black/10 bg-black px-5 py-4 shadow-[0_22px_70px_rgb(0_0_0/0.24)]">
+            <div className="flex max-w-full items-center justify-center gap-2 overflow-hidden rounded-[28px] border border-black/10 bg-black px-5 py-4">
                 {tabs.map((tab) => (
                     <button key={tab.key} type="button" onClick={() => setActive(tab.key)} className={`min-w-[165px] rounded-[20px] px-5 py-3 text-left transition ${active === tab.key ? 'bg-[#b7ff63] text-black' : 'bg-white/7 text-white/45 hover:text-white'}`}>
                         <div className="text-sm font-black">{tab.title}</div>

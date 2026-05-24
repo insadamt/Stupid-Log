@@ -55,10 +55,10 @@ export default function AppLayout({
 
                             <span
                                 className={[
-                                    'pointer-events-none absolute left-[64px] rounded-full px-4 py-2 text-base font-black shadow-[0_12px_26px_rgb(0_0_0/0.16)] transition',
+                                    'pointer-events-none absolute left-[64px] rounded-full px-4 py-2 text-base font-black opacity-0 shadow-[0_12px_26px_rgb(0_0_0/0.16)] transition group-hover:opacity-100',
                                     active
-                                        ? 'bg-[#b7ff63] text-black opacity-100'
-                                        : 'bg-black text-white opacity-0 group-hover:opacity-100',
+                                        ? 'bg-[#b7ff63] text-black'
+                                        : 'bg-black text-white',
                                 ].join(' ')}
                             >
                                 {item.label}

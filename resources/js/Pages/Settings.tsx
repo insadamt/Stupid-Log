@@ -9,7 +9,6 @@ import {
     Loader2,
     Save,
     ShieldCheck,
-    Steam,
     UserRound,
 } from 'lucide-react';
 import { FormEvent, MouseEvent, ReactNode, useState } from 'react';
@@ -314,7 +313,7 @@ export default function Settings({
                                         saved={steamSaved}
                                         lastStatus={steamCredential.last_test_status}
                                         lastTestedAt={steamCredential.last_tested_at}
-                                        icon={<Steam size={24} strokeWidth={3} />}
+                                        icon={<KeyRound size={24} strokeWidth={3} />}
                                     />
                                 </div>
                             </div>
@@ -356,7 +355,7 @@ export default function Settings({
                                             <div className="text-[11px] font-black uppercase tracking-[0.24em] text-black/35">Store services</div>
                                             <h3 className="mt-1 text-3xl font-black tracking-[-0.05em]">Steam</h3>
                                         </div>
-                                        <div className="grid size-12 place-items-center rounded-2xl bg-black text-[#b7ff63]"><Steam size={24} strokeWidth={3} /></div>
+                                        <div className="grid size-12 place-items-center rounded-2xl bg-black text-[#b7ff63]"><KeyRound size={24} strokeWidth={3} /></div>
                                     </div>
                                     <div className="mt-5 grid min-h-0 content-start gap-4 overflow-y-auto pr-1">
                                         <Field
