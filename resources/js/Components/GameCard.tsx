@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
 import { ArrowUpRight, Clock3, Gamepad2, ImageOff, Trophy } from 'lucide-react';
-import { statusPillStyle } from '../statusColors';
 import { GameCardData } from '../types';
+import { statusPillStyle } from '../statusColors';
 
 function PlatformIcon({
     platform,
@@ -17,7 +17,7 @@ function PlatformIcon({
     return (
         <span
             className={[
-                'grid shrink-0 place-items-center rounded-full bg-[#b7ff63] font-black text-black shadow-[0_10px_22px_rgb(0_0_0/0.24)] ring-2 ring-black',
+                'grid shrink-0 place-items-center rounded-full bg-black font-black text-[#b7ff63]',
                 large ? 'size-12 text-2xl' : compact ? 'size-10 text-xl' : 'size-10 text-xl',
             ].join(' ')}
         >
@@ -38,12 +38,6 @@ function panelTitle(title: string) {
     return clean.length > 52 ? `${clean.slice(0, 52)}...` : clean;
 }
 
-function formatHours(value: number | string | null | undefined) {
-    const parsed = Number(value ?? 0);
-    if (!Number.isFinite(parsed)) return '0';
-    return Number.isInteger(parsed) ? String(parsed) : parsed.toFixed(1);
-}
-
 export function CoverArt({
     game,
     titleSize = 'text-[25px]',
@@ -56,12 +50,11 @@ export function CoverArt({
     }
 
     return (
-        <div className="relative grid h-full w-full place-items-center overflow-hidden bg-[#dfe5df] p-5 text-center">
-            <div className="absolute inset-0 [background-image:linear-gradient(rgba(0,0,0,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.055)_1px,transparent_1px)] [background-size:26px_26px]" />
-            <div className="absolute inset-x-0 top-0 h-20 bg-[#b7ff63]/30" />
+        <div className="relative grid h-full w-full place-items-center overflow-hidden bg-[#d9dedb] p-5 text-center">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.58),transparent_62%)]" />
 
             <div className="relative z-10 grid max-w-full justify-items-center gap-3">
-                <div className="grid size-14 place-items-center rounded-[20px] bg-black text-[#b7ff63] shadow-[0_14px_24px_rgb(0_0_0/0.16)]">
+                <div className="grid size-14 place-items-center rounded-3xl bg-black/10 text-black/42">
                     <ImageOff size={30} strokeWidth={3} />
                 </div>
 
@@ -97,14 +90,13 @@ export default function GameCard({
     const cardHeight = featured ? 'h-[560px]' : homeSide ? 'h-[500px]' : compact ? 'h-[335px]' : 'h-[410px]';
     const coverHeight = featured ? 'h-[424px]' : homeSide ? 'h-[386px]' : compact ? 'h-[235px]' : 'h-[300px]';
     const padding = featured ? 'p-4' : 'p-3';
-    const radius = featured ? 'rounded-[30px]' : compact ? 'rounded-[26px]' : 'rounded-[24px]';
+    const radius = featured ? 'rounded-[28px]' : compact ? 'rounded-[26px]' : 'rounded-[24px]';
     const panelWidth = compact ? 'w-[310px]' : 'w-[380px]';
 
     const panelPosition =
         panelSide === 'left'
             ? `${compact ? 'right-[200px]' : 'right-[250px]'} rounded-l-[28px]`
             : `${compact ? 'left-[200px]' : 'left-[250px]'} rounded-r-[28px]`;
-
     return (
         <article
             className={[
@@ -117,50 +109,47 @@ export default function GameCard({
             <Link
                 href={href}
                 className={[
-                    'sl-card-shell relative z-10 flex h-full shrink-0 flex-col overflow-hidden bg-black focus:outline-none ring-1 ring-white/10',
+                    'sl-card-shell relative z-10 flex h-full shrink-0 flex-col overflow-hidden bg-[#b7ff63] focus:outline-none',
                     shellWidth,
                     padding,
                     radius,
-                    featured ? 'shadow-[0_34px_80px_rgb(0_0_0/0.24)]' : 'shadow-[0_20px_46px_rgb(0_0_0/0.16)]',
+                    featured ? 'shadow-[0_30px_70px_rgb(0_0_0/0.16)]' : 'shadow-[0_16px_34px_rgb(0_0_0/0.08)]',
                 ].join(' ')}
             >
-                <div className={`${coverHeight} relative z-0 overflow-hidden rounded-[18px] bg-[#dfe5df] ring-1 ring-white/10`}>
+                <div className={`${coverHeight} relative z-0 overflow-hidden rounded-[18px] bg-[#d9dedb]`}>
                     <CoverArt game={game} titleSize={featured ? 'text-[32px]' : compact ? 'text-[24px]' : 'text-[24px]'} />
-                    <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/35 to-transparent" />
                 </div>
 
-                <div className="relative z-20 h-12 shrink-0 bg-[#b7ff63]">
-                    <span
-                        className={[
-                            'absolute left-1/2 top-[62%] max-w-[88%] -translate-x-1/2 -translate-y-1/2 truncate rounded-full px-6 py-2 font-black leading-none shadow-[0_12px_22px_rgb(0_0_0/0.2)]',
-                            featured ? 'text-lg' : compact ? 'text-base' : 'text-base',
-                        ].join(' ')}
-                        style={statusPillStyle(game)}
-                    >
-                        {game.status}
-                    </span>
-                </div>
+                <span
+                    className={[
+                        'relative z-20 mx-auto -mt-4 rounded-full px-6 py-2 font-black leading-none shadow-[0_12px_22px_rgb(0_0_0/0.16)]',
+                        featured ? 'text-lg' : compact ? 'text-base' : 'text-base',
+                    ].join(' ')}
+                    style={statusPillStyle(game)}
+                >
+                    {game.status}
+                </span>
 
-                <div className="relative z-10 mt-auto flex items-center gap-3 pb-1 pt-2 text-white">
+                <div className="relative z-10 mt-auto flex items-center gap-3 pb-1">
                     <PlatformIcon platform={game.platform} large={featured} compact={compact} />
 
                     {hasAchievements ? (
                         <>
-                            <div className="h-5 flex-1 overflow-hidden rounded-full bg-white/12 ring-1 ring-white/10">
-                                <div className="h-full rounded-full bg-[#b7ff63]" style={{ width: `${progress}%` }} />
+                            <div className="h-5 flex-1 overflow-hidden rounded-full bg-[#a8d8ff]">
+                                <div className="h-full rounded-full bg-[#4f8cf7]" style={{ width: `${progress}%` }} />
                             </div>
 
-                            <span className="sl-mini-stat text-base font-black text-[#b7ff63]">{progress}%</span>
+                            <span className="sl-mini-stat text-base font-black">{progress}%</span>
                         </>
                     ) : (
-                        <span className="text-lg font-black leading-none text-white">No Achievements</span>
+                        <span className="text-lg font-black leading-none">No Achievements</span>
                     )}
                 </div>
             </Link>
 
             {!featured && !homeSide && expanded && (
                 <div
-                    className={`sl-card-panel absolute ${panelPosition} top-0 flex h-full ${panelWidth} flex-col overflow-hidden bg-black px-6 py-5 text-[#b7ff63] ring-1 ring-[#b7ff63]/20`}
+                    className={`sl-card-panel absolute ${panelPosition} top-0 flex h-full ${panelWidth} flex-col overflow-hidden bg-black px-6 py-5 text-[#b7ff63]`}
                 >
                     <div className="flex items-center justify-between gap-3">
                         <span className="rounded-full bg-[#b7ff63]/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#b7ff63]/70">
@@ -198,7 +187,7 @@ export default function GameCard({
                         <div className="rounded-[18px] bg-white/10 p-3 text-center ring-1 ring-white/10">
                             <Clock3 className="mx-auto mb-1 text-[#b7ff63]" size={24} />
 
-                            <div className="text-lg font-black text-white">{formatHours(game.playtime_hours)} H</div>
+                            <div className="text-lg font-black text-white">{game.playtime_hours} H</div>
 
                             <div className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#b7ff63]/58">
                                 Playtime
