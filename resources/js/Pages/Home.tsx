@@ -15,6 +15,7 @@ import { ComponentType } from "react";
 import AddGameWizard from "../Components/AddGameWizard";
 import AppLayout from "../Components/AppLayout";
 import GameCard, { CoverArt } from "../Components/GameCard";
+import { statusPillStyle } from "../statusColors";
 import { GameCardData, ReferenceData, StatsData } from "../types";
 
 function numberFormat(
@@ -60,16 +61,6 @@ function PlatformMark({
             {label}
         </div>
     );
-}
-
-function statusClass(status: string) {
-    const value = status.toLowerCase();
-
-    if (value === "100%") return "bg-[#ff3131] text-black";
-    if (value.includes("progress")) return "bg-[#f4df4d] text-black";
-    if (value.includes("completed")) return "bg-black text-[#b7ff63]";
-
-    return "bg-[#d7ddd8] text-black";
 }
 
 function StatTile({
@@ -193,8 +184,8 @@ function FeaturedGamePanel({ game }: { game: GameCardData }) {
                 <span
                     className={[
                         "relative z-20 mx-auto -mt-4 rounded-full px-7 py-2 text-base font-black leading-none shadow-[0_12px_22px_rgb(0_0_0/0.18)]",
-                        statusClass(game.status),
                     ].join(" ")}
+                    style={statusPillStyle(game)}
                 >
                     {game.status}
                 </span>

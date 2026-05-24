@@ -1,6 +1,7 @@
 import { BarChart3, ChevronLeft, ChevronRight, Clock3, DollarSign, Gamepad2, Trophy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import AppLayout from '../Components/AppLayout';
+import { statusColor, statusDotStyle, statusPillStyle } from '../statusColors';
 import { ConfirmedYearStats, GrowthMetric, PlatformBreakdown, StatsArchiveGame, StatsData, StatusBreakdown } from '../types';
 
 type TabKey = 'overview' | 'breakdowns' | 'progression' | 'archive';
@@ -36,6 +37,11 @@ function hours(value: unknown) {
     return `${num(value, n(value) % 1 ? 1 : 0)}H`;
 }
 
+function percentLabel(value: number) {
+    if (value > 0 && value < 0.1) return '<0.1%';
+    return `${num(value, value < 10 ? 2 : 1)}%`;
+}
+
 function growth(current: number, previous: number): GrowthMetric {
     const delta = Number((current - previous).toFixed(1));
     return { delta, percentage: previous > 0 ? Number(((delta / previous) * 100).toFixed(1)) : null };
@@ -45,7 +51,7 @@ function metricGrowth(key: MetricKey, current: StatView, previous?: StatView | n
     return current.growth?.[key] ?? (previous ? growth(n(current[key]), n(previous[key])) : null);
 }
 
-function slices<T extends { label: string }>(items: T[], getter: (item: T) => number, previousItems: T[] = []): Slice[] {
+function slices<T extends { label: string; color_hex?: string | null }>(items: T[], getter: (item: T) => number, previousItems: T[] = []): Slice[] {
     return items
         .map((item, index) => {
             const previous = previousItems.find((candidate) => candidate.label === item.label);
@@ -53,7 +59,7 @@ function slices<T extends { label: string }>(items: T[], getter: (item: T) => nu
             return {
                 label: item.label,
                 value,
-                color: palette[index % palette.length],
+                color: item.color_hex ?? palette[index % palette.length],
                 growth: previous ? growth(value, getter(previous)) : null,
             };
         })
@@ -89,7 +95,7 @@ function PercentDeltaBadge({ value, compact = false }: { value?: GrowthMetric | 
 
     return (
         <span className={`${compact ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'} inline-flex rounded-full font-black ring-1 ring-black/5 ${positive ? 'bg-[#b7ff63] text-black' : negative ? 'bg-[#ffe0dd] text-[#ad2c21]' : 'bg-[#edf1ec] text-black/50'}`}>
-            {positive ? '+' : ''}{num(value.delta, Math.abs(value.delta) % 1 ? 1 : 0)}% {arrow}
+            {positive ? '+' : ''}{num(value.delta, 1)}% {arrow}
         </span>
     );
 }
@@ -134,15 +140,16 @@ function StatCard({ label, value, detail, delta, icon: Icon }: { label: string; 
 }
 
 function Donut({ data, total, center }: { data: Slice[]; total: string; center: string }) {
-    const radius = 67;
+    const radius = 72;
     const circumference = 2 * Math.PI * radius;
     const sum = data.reduce((acc, slice) => acc + slice.value, 0);
     let offset = 0;
+    const centerTextSize = total.length > 8 ? 'text-4xl' : total.length > 5 ? 'text-5xl' : 'text-6xl';
 
     return (
-        <div className="relative size-[330px] shrink-0">
+        <div className="relative size-[min(42vh,380px)] min-h-[330px] min-w-[330px] shrink-0">
             <svg viewBox="0 0 220 220" className="size-full">
-                <circle cx="110" cy="110" r={radius} fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="19" />
+                <circle cx="110" cy="110" r={radius} fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="24" />
                 {sum > 0 && data.map((slice) => {
                     const length = (slice.value / sum) * circumference;
                     const segment = (
@@ -153,10 +160,10 @@ function Donut({ data, total, center }: { data: Slice[]; total: string; center: 
                             r={radius}
                             fill="none"
                             stroke={slice.color}
-                            strokeWidth="19"
+                            strokeWidth="24"
                             strokeDasharray={`${length} ${circumference - length}`}
                             strokeDashoffset={-offset}
-                            strokeLinecap="round"
+                            strokeLinecap="butt"
                             transform="rotate(-90 110 110)"
                         />
                     );
@@ -165,8 +172,8 @@ function Donut({ data, total, center }: { data: Slice[]; total: string; center: 
                 })}
             </svg>
             <div className="absolute inset-0 grid place-items-center text-center">
-                <div>
-                    <div className="text-6xl font-black text-white">{total}</div>
+                <div className="max-w-[58%]">
+                    <div className={`${centerTextSize} truncate font-black leading-none text-white`} title={total}>{total}</div>
                     <div className="mt-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/32">{center}</div>
                 </div>
             </div>
@@ -179,8 +186,8 @@ function GameUiChart({ config }: { config: ChartConfig }) {
     const sum = data.reduce((acc, slice) => acc + slice.value, 0);
 
     return (
-        <article className="grid h-full min-h-0 grid-cols-[0.95fr_1.25fr] gap-4 rounded-[30px] bg-black p-4 text-white shadow-[0_24px_75px_rgb(0_0_0/0.2)]">
-            <section className="grid min-h-0 grid-rows-[auto_1fr] rounded-[26px] bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-5 ring-1 ring-white/8">
+        <article className="grid h-full min-h-0 grid-cols-[1.15fr_1fr] gap-4 rounded-[30px] bg-black p-4 text-white shadow-[0_24px_75px_rgb(0_0_0/0.2)]">
+            <section className="grid min-h-0 grid-rows-[auto_1fr] rounded-[26px] bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-6 ring-1 ring-white/8">
                 <div>
                     <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]/70">{config.eyebrow}</div>
                     <div className="mt-2 flex items-start justify-between gap-3">
@@ -208,7 +215,7 @@ function GameUiChart({ config }: { config: ChartConfig }) {
                                         <span className="size-3 rounded-full" style={{ backgroundColor: slice.color }} />
                                         <span className="truncate">{slice.label}</span>
                                     </span>
-                                    <span className="text-sm font-black text-white/80">{num(percent, 1)}%</span>
+                                    <span className="text-sm font-black text-white/80">{percentLabel(percent)}</span>
                                 </div>
                                 <div className="mt-2 flex items-center justify-between gap-3 text-xs font-black text-white/35">
                                     <span>{config.format(slice.value)}</span>
@@ -381,15 +388,15 @@ function StatusStack({ platform, previous }: { platform: PlatformBreakdown; prev
             </div>
             <div className="mt-3 flex h-5 overflow-hidden rounded-full bg-black/8">
                 {statuses.length === 0 && <div className="h-full w-full bg-black/10" />}
-                {statuses.map((status, index) => <div key={status.label} className="h-full" style={{ width: `${(status.library_games / total) * 100}%`, backgroundColor: palette[index % palette.length] }} />)}
+                {statuses.map((status) => <div key={status.label} className="h-full" style={{ width: `${(status.library_games / total) * 100}%`, backgroundColor: statusColor(status) }} />)}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {statuses.map((status, index) => {
+                {statuses.map((status) => {
                     const previousStatus = previous?.statuses?.find((item) => item.label === status.label);
                     return (
                         <div key={status.label} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-2xl bg-[#f6faf4] px-3 py-2 text-xs font-black text-black/60">
                             <span className="flex min-w-0 items-center gap-2">
-                                <span className="size-2.5 rounded-full" style={{ backgroundColor: palette[index % palette.length] }} />
+                                <span className="size-2.5 rounded-full" style={statusDotStyle(status)} />
                                 <span className="truncate">{status.label}</span>
                             </span>
                             <span className="flex items-center gap-2">
@@ -431,7 +438,11 @@ function ArchiveList({ title, sub, games, metric }: { title: string; sub: string
                             <div className="aspect-square overflow-hidden rounded-2xl bg-black/8">{game.cover_url ? <img src={game.cover_url} alt="" className="size-full object-cover" /> : <div className="grid size-full place-items-center text-sm font-black text-black/35">#{index + 1}</div>}</div>
                             <div className="min-w-0">
                                 <div className="truncate text-base font-black text-black">{game.title}</div>
-                                <div className="mt-1 truncate text-xs font-bold text-black/42">{game.platform} · {game.status}</div>
+                                <div className="mt-1 flex min-w-0 items-center gap-2 text-xs font-bold text-black/42">
+                                    <span className="truncate">{game.platform}</span>
+                                    <span className="shrink-0">·</span>
+                                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em]" style={statusPillStyle(game)}>{game.status}</span>
+                                </div>
                             </div>
                             <div className="text-right">
                                 <div className="text-lg font-black text-black">{value(game)}</div>

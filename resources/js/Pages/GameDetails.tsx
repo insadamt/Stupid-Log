@@ -19,6 +19,7 @@ import {
 import { ReactNode, useMemo, useState } from 'react';
 import AppLayout from '../Components/AppLayout';
 import GameCard from '../Components/GameCard';
+import { statusPillStyle } from '../statusColors';
 import { GameCardData, ReferenceData } from '../types';
 
 type Dlc = {
@@ -957,6 +958,11 @@ export default function GameDetails({
                                                         .filter((status) => gameHasAchievements || status.name !== '100%')
                                                         .map((status) => <option key={status.id} value={status.id} className="text-black">{status.name}</option>)}
                                                 </Select>
+                                                {selectedGameStatus && (
+                                                    <span className="mt-1 inline-flex w-fit rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em]" style={statusPillStyle({ status: selectedGameStatus.name, status_color_hex: selectedGameStatus.color_hex })}>
+                                                        {selectedGameStatus.name}
+                                                    </span>
+                                                )}
                                             </Field>
 
                                             <Field label="Playtime Hours" error={gameErrors['progress.playtime_hours']}>

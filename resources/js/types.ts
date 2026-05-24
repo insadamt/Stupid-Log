@@ -1,3 +1,8 @@
+export type StatusColorData = {
+    color_key?: string | null;
+    color_hex?: string | null;
+};
+
 export type GameCardData = {
     id: number;
     title: string;
@@ -6,6 +11,8 @@ export type GameCardData = {
     cover_url?: string | null;
     platform: string;
     status: string;
+    status_color_key?: string | null;
+    status_color_hex?: string | null;
     playtime_hours: number;
     earned_achievements: number;
     total_achievements: number;
@@ -51,6 +58,8 @@ export type PlatformBreakdown = {
 
 export type StatusBreakdown = {
     label: string;
+    color_key?: string | null;
+    color_hex?: string | null;
     library_games: number;
     playtime_hours: number;
 };
@@ -75,6 +84,8 @@ export type StatsArchiveGame = {
     cover_url?: string | null;
     platform: string;
     status: string;
+    status_color_key?: string | null;
+    status_color_hex?: string | null;
     playtime_hours: number;
     base_value: number;
     purchased_value: number;
@@ -101,7 +112,7 @@ export type ReferenceData = {
     devices: Array<{ id: number; name: string }>;
     ownershipTypes: Array<{ id: number; name: string }>;
     physicalStatuses: Array<{ id: number; name: string }>;
-    statuses: Array<{ id: number; name: string }>;
+    statuses: Array<{ id: number; name: string; color_key?: string | null; color_hex?: string | null }>;
 };
 
 export type SnapshotStatus = 'draft' | 'confirmed';
@@ -149,6 +160,8 @@ export type SnapshotBestGame = {
     cover_url?: string | null;
     platform: string;
     status: string;
+    status_color_key?: string | null;
+    status_color_hex?: string | null;
     playtime_hours: number;
     earned_achievements: number;
     total_achievements: number;
@@ -159,6 +172,8 @@ export type SnapshotGameRow = {
     title: string;
     platform: string;
     status: string;
+    status_color_key?: string | null;
+    status_color_hex?: string | null;
     playtime_hours: number;
     earned_achievements: number;
     total_achievements: number;

@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AddGameWizard from '../Components/AddGameWizard';
 import AppLayout from '../Components/AppLayout';
 import GameCard from '../Components/GameCard';
+import { statusDotStyle, statusPillStyle } from '../statusColors';
 import { GameCardData, ReferenceData } from '../types';
 
 type SortMode = 'title' | 'playtime' | 'progress';
@@ -51,6 +52,8 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
             new Map(merged.map((item) => [item.toLowerCase(), item])).values(),
         );
     }, [libraryGames]);
+
+    const statusByName = useMemo(() => new Map(references.statuses.map((item) => [item.name.toLowerCase(), item])), [references.statuses]);
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -292,26 +295,35 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
                             </div>
 
                             <div className="grid gap-2">
-                                {statusOptions.map((filter) => (
-                                    <button
-                                        key={filter}
-                                        type="button"
-                                        onClick={() => setStatus(filter)}
-                                        className={[
-                                            'flex h-12 items-center justify-between rounded-[18px] px-4 text-left text-sm font-black transition',
-                                            sameStatus(status, filter)
-                                                ? 'bg-[#b7ff63] text-black'
-                                                : 'bg-white/10 text-white/58 hover:bg-white/15',
-                                        ].join(' ')}
-                                    >
-                                        <span>{filter}</span>
-                                        <span>
-                                            {filter === 'All'
-                                                ? libraryGames.length
-                                                : libraryGames.filter((game) => sameStatus(game.status, filter)).length}
-                                        </span>
-                                    </button>
-                                ))}
+                                {statusOptions.map((filter) => {
+                                    const selected = sameStatus(status, filter);
+                                    const statusMeta = statusByName.get(filter.toLowerCase());
+
+                                    return (
+                                        <button
+                                            key={filter}
+                                            type="button"
+                                            onClick={() => setStatus(filter)}
+                                            className={[
+                                                'flex h-12 items-center justify-between rounded-[18px] px-4 text-left text-sm font-black transition',
+                                                selected
+                                                    ? statusMeta ? 'text-black' : 'bg-[#b7ff63] text-black'
+                                                    : 'bg-white/10 text-white/58 hover:bg-white/15',
+                                            ].join(' ')}
+                                            style={selected && statusMeta ? statusPillStyle({ status: statusMeta.name, status_color_hex: statusMeta.color_hex }) : undefined}
+                                        >
+                                            <span className="flex min-w-0 items-center gap-2">
+                                                {statusMeta && <span className="size-2.5 shrink-0 rounded-full" style={statusDotStyle({ status: statusMeta.name, status_color_hex: statusMeta.color_hex })} />}
+                                                <span className="truncate">{filter}</span>
+                                            </span>
+                                            <span>
+                                                {filter === 'All'
+                                                    ? libraryGames.length
+                                                    : libraryGames.filter((game) => sameStatus(game.status, filter)).length}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 

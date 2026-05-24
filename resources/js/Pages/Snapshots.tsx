@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
 import AppLayout from '../Components/AppLayout';
+import { statusPillStyle } from '../statusColors';
 import { ConfirmedYearStats, SnapshotBestGame, SnapshotDetailsData, StatsData } from '../types';
 
 type Snapshot = ConfirmedYearStats;
@@ -109,7 +110,11 @@ function BestGameTile({
             </div>
             <div className="min-w-0">
                 <div className="truncate text-sm font-black">{game.title}</div>
-                <div className="mt-1 truncate text-xs font-bold text-black/45">{game.platform} - {game.status}</div>
+                <div className="mt-1 flex min-w-0 items-center gap-2 text-xs font-bold text-black/45">
+                    <span className="truncate">{game.platform}</span>
+                    <span className="shrink-0">-</span>
+                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em]" style={statusPillStyle(game)}>{game.status}</span>
+                </div>
             </div>
             <div className="text-right">
                 {rank && <div className="text-2xl font-black">#{rank}</div>}
@@ -475,7 +480,9 @@ export default function Snapshots({
                                             <div key={`${game.library_game_id}-${game.title}`} className="grid grid-cols-[1fr_120px_130px_110px] items-center border-t border-black/10 px-5 py-4 text-sm font-black">
                                                 <span className="truncate">{game.title}</span>
                                                 <span className="truncate text-black/50">{game.platform}</span>
-                                                <span className="truncate text-black/50">{game.status}</span>
+                                                <span className="min-w-0">
+                                                    <span className="inline-flex max-w-full rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em]" style={statusPillStyle(game)}>{game.status}</span>
+                                                </span>
                                                 <span className="text-right">{formatNumber(game.playtime_hours, 1)}</span>
                                             </div>
                                         ))}

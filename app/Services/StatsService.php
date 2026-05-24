@@ -138,6 +138,8 @@ class StatsService
                 'games.title',
                 'platforms.name as platform',
                 'statuses.name as status',
+                'statuses.color_key as status_color_key',
+                'statuses.color_hex as status_color_hex',
                 'library_game_snapshots.playtime_hours',
                 'library_game_snapshots.earned_achievements',
                 'library_game_snapshots.total_achievements',
@@ -148,6 +150,8 @@ class StatsService
                 'title' => $row->title,
                 'platform' => $row->platform,
                 'status' => $row->status,
+                'status_color_key' => $row->status_color_key,
+                'status_color_hex' => $row->status_color_hex,
                 'playtime_hours' => (float) $row->playtime_hours,
                 'earned_achievements' => (int) $row->earned_achievements,
                 'total_achievements' => (int) $row->total_achievements,
@@ -178,6 +182,8 @@ class StatsService
                 'games.cover_path',
                 'platforms.name as platform',
                 'statuses.name as status',
+                'statuses.color_key as status_color_key',
+                'statuses.color_hex as status_color_hex',
                 'library_game_snapshots.playtime_hours',
                 'library_game_snapshots.earned_achievements',
                 'library_game_snapshots.total_achievements',
@@ -192,6 +198,8 @@ class StatsService
                 'cover_url' => $row->cover_path ? asset('storage/'.$row->cover_path) : $row->cover_url_original,
                 'platform' => $row->platform,
                 'status' => $row->status,
+                'status_color_key' => $row->status_color_key,
+                'status_color_hex' => $row->status_color_hex,
                 'playtime_hours' => (float) $row->playtime_hours,
                 'earned_achievements' => (int) $row->earned_achievements,
                 'total_achievements' => (int) $row->total_achievements,
@@ -211,11 +219,7 @@ class StatsService
                 ->all(),
             'statuses' => $libraryGames
                 ->groupBy(fn (LibraryGame $libraryGame) => $libraryGame->status->name)
-                ->map(fn (Collection $games, string $label) => [
-                    'label' => $label,
-                    'library_games' => $games->count(),
-                    'playtime_hours' => round((float) $games->sum('playtime_hours'), 1),
-                ])
+                ->map(fn (Collection $games, string $label) => $this->statusBreakdownFromLive($label, $games))
                 ->sortByDesc('library_games')
                 ->values()
                 ->all(),
@@ -259,14 +263,23 @@ class StatsService
             'purchased_value' => round((float) $purchasedWithoutDlcs + (float) $dlcPurchasedValue, 2),
             'statuses' => $games
                 ->groupBy(fn (LibraryGame $libraryGame) => $libraryGame->status->name)
-                ->map(fn (Collection $statusGames, string $statusLabel) => [
-                    'label' => $statusLabel,
-                    'library_games' => $statusGames->count(),
-                    'playtime_hours' => round((float) $statusGames->sum('playtime_hours'), 1),
-                ])
+                ->map(fn (Collection $statusGames, string $statusLabel) => $this->statusBreakdownFromLive($statusLabel, $statusGames))
                 ->sortByDesc('library_games')
                 ->values()
-                ->all(),
+            ->all(),
+        ];
+    }
+
+    private function statusBreakdownFromLive(string $label, Collection $games): array
+    {
+        $status = $games->first()?->status;
+
+        return [
+            'label' => $label,
+            'color_key' => $status?->color_key,
+            'color_hex' => $status?->color_hex,
+            'library_games' => $games->count(),
+            'playtime_hours' => round((float) $games->sum('playtime_hours'), 1),
         ];
     }
 
@@ -319,8 +332,8 @@ class StatsService
         $statusesByPlatform = DB::table('library_game_snapshots')
             ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
             ->where('snapshot_run_id', $snapshot->id)
-            ->groupBy('library_game_snapshots.platform_id', 'statuses.name')
-            ->selectRaw('library_game_snapshots.platform_id, statuses.name as label, count(*) as library_games, sum(playtime_hours) as playtime_hours')
+            ->groupBy('library_game_snapshots.platform_id', 'statuses.name', 'statuses.color_key', 'statuses.color_hex')
+            ->selectRaw('library_game_snapshots.platform_id, statuses.name as label, statuses.color_key, statuses.color_hex, count(*) as library_games, sum(playtime_hours) as playtime_hours')
             ->get()
             ->groupBy('platform_id');
 
@@ -352,6 +365,8 @@ class StatsService
                     'statuses' => ($statusesByPlatform->get($row->id) ?? collect())
                         ->map(fn ($statusRow) => [
                             'label' => $statusRow->label,
+                            'color_key' => $statusRow->color_key,
+                            'color_hex' => $statusRow->color_hex,
                             'library_games' => (int) $statusRow->library_games,
                             'playtime_hours' => round((float) $statusRow->playtime_hours, 1),
                         ])
@@ -370,11 +385,13 @@ class StatsService
         return DB::table('library_game_snapshots')
             ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
             ->where('snapshot_run_id', $snapshot->id)
-            ->groupBy('statuses.name')
-            ->selectRaw('statuses.name as label, count(*) as library_games, sum(playtime_hours) as playtime_hours')
+            ->groupBy('statuses.name', 'statuses.color_key', 'statuses.color_hex')
+            ->selectRaw('statuses.name as label, statuses.color_key, statuses.color_hex, count(*) as library_games, sum(playtime_hours) as playtime_hours')
             ->get()
             ->map(fn ($row) => [
                 'label' => $row->label,
+                'color_key' => $row->color_key,
+                'color_hex' => $row->color_hex,
                 'library_games' => (int) $row->library_games,
                 'playtime_hours' => round((float) $row->playtime_hours, 1),
             ])
@@ -422,6 +439,8 @@ class StatsService
             'cover_url' => $libraryGame->game->cover_path ? asset('storage/'.$libraryGame->game->cover_path) : $libraryGame->game->cover_url_original,
             'platform' => $libraryGame->platform->name,
             'status' => $libraryGame->status->name,
+            'status_color_key' => $libraryGame->status->color_key,
+            'status_color_hex' => $libraryGame->status->color_hex,
             'playtime_hours' => (float) $libraryGame->playtime_hours,
             'base_value' => round($this->liveBaseValue($libraryGame), 2),
             'purchased_value' => round($this->livePurchasedValue($libraryGame), 2),
@@ -443,6 +462,8 @@ class StatsService
                 'games.cover_path',
                 'platforms.name as platform',
                 'statuses.name as status',
+                'statuses.color_key as status_color_key',
+                'statuses.color_hex as status_color_hex',
                 'library_game_snapshots.playtime_hours',
             ])
             ->get();
@@ -475,6 +496,8 @@ class StatsService
                 'cover_url' => $row->cover_path ? asset('storage/'.$row->cover_path) : $row->cover_url_original,
                 'platform' => $row->platform,
                 'status' => $row->status,
+                'status_color_key' => $row->status_color_key,
+                'status_color_hex' => $row->status_color_hex,
                 'playtime_hours' => (float) $row->playtime_hours,
                 'base_value' => round((float) ($copy?->base_value ?? 0) + (float) ($dlc?->base_value ?? 0), 2),
                 'purchased_value' => round((float) ($copy?->purchased_value ?? 0) + (float) ($dlc?->purchased_value ?? 0), 2),
@@ -561,7 +584,7 @@ class StatsService
     {
         return collect(self::GROWTH_KEYS)
             ->mapWithKeys(function (string $key) use ($current, $previous) {
-                $delta = round((float) $current[$key] - (float) $previous[$key], str_contains($key, 'value') || $key === 'playtime_hours' ? 1 : 0);
+                $delta = round((float) $current[$key] - (float) $previous[$key], $this->growthDeltaPrecision($key));
                 $base = (float) $previous[$key];
 
                 return [$key => [
@@ -570,5 +593,10 @@ class StatsService
                 ]];
             })
             ->all();
+    }
+
+    private function growthDeltaPrecision(string $key): int
+    {
+        return str_contains($key, 'value') || in_array($key, ['playtime_hours', 'achievement_progress'], true) ? 1 : 0;
     }
 }

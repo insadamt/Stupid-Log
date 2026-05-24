@@ -628,6 +628,8 @@ class StupidLogController extends Controller
             'cover_url' => $game->cover_path ? asset('storage/'.$game->cover_path) : $game->cover_url_original,
             'platform' => $libraryGame->platform->name,
             'status' => $libraryGame->status->name,
+            'status_color_key' => $libraryGame->status->color_key,
+            'status_color_hex' => $libraryGame->status->color_hex,
             'playtime_hours' => (float) $libraryGame->playtime_hours,
             'earned_achievements' => $libraryGame->earned_achievements ?? 0,
             'total_achievements' => $game->total_achievements ?? 0,

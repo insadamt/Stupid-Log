@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import { ArrowUpRight, Clock3, Gamepad2, ImageOff, Trophy } from 'lucide-react';
 import { GameCardData } from '../types';
+import { statusPillStyle } from '../statusColors';
 
 function PlatformIcon({
     platform,
@@ -65,15 +66,6 @@ export function CoverArt({
     );
 }
 
-function statusClass(status: string) {
-    const value = status.toLowerCase();
-
-    if (value === '100%') return 'bg-[#ff3131] text-black';
-    if (value.includes('progress')) return 'bg-[#f4df4d] text-black';
-
-    return 'bg-[#adadad] text-black';
-}
-
 export default function GameCard({
     game,
     expanded = true,
@@ -130,10 +122,10 @@ export default function GameCard({
 
                 <span
                     className={[
-                        'relative z-20 mx-auto -mt-4 rounded-full px-6 py-2 font-black leading-none',
+                        'relative z-20 mx-auto -mt-4 rounded-full px-6 py-2 font-black leading-none shadow-[0_12px_22px_rgb(0_0_0/0.16)]',
                         featured ? 'text-lg' : compact ? 'text-base' : 'text-base',
-                        statusClass(game.status),
                     ].join(' ')}
+                    style={statusPillStyle(game)}
                 >
                     {game.status}
                 </span>

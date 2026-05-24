@@ -19,8 +19,8 @@ class StupidLogReferenceSeeder extends Seeder
             PhysicalStatus::updateOrCreate(['name' => $name], []);
         }
 
-        foreach (['Not Played', 'In Progress', 'Dropped', 'Completed', '100%'] as $name) {
-            Status::updateOrCreate(['name' => $name], []);
+        foreach ($this->statuses() as $name => $colors) {
+            Status::updateOrCreate(['name' => $name], $colors);
         }
 
         foreach (['manual' => 'Manual', 'igdb' => 'IGDB', 'itad' => 'IsThereAnyDeal', 'steam' => 'Steam'] as $key => $name) {
@@ -59,6 +59,17 @@ class StupidLogReferenceSeeder extends Seeder
     private function platforms(): array
     {
         return ['Steam', 'Epic Games', 'GOG', 'PS Network', 'Xbox', 'EA App', 'Ubisoft Connect', 'Google Play Games', 'Game Center', 'RetroAchievements', 'Itch.io', 'Nintendo', 'Own Launcher', 'Other'];
+    }
+
+    private function statuses(): array
+    {
+        return [
+            'Not Played' => ['color_key' => 'gray', 'color_hex' => '#9CA3AF'],
+            'In Progress' => ['color_key' => 'yellow', 'color_hex' => '#FACC15'],
+            'Dropped' => ['color_key' => 'red', 'color_hex' => '#EF4444'],
+            'Completed' => ['color_key' => 'green', 'color_hex' => '#22C55E'],
+            '100%' => ['color_key' => 'gold', 'color_hex' => '#F59E0B'],
+        ];
     }
 
     private function ownershipTypes(): array
