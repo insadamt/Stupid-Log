@@ -6,32 +6,19 @@ import {
     ChevronLeft,
     ChevronRight,
     Clock3,
-    DollarSign,
     Eye,
-    Gamepad2,
-    Layers3,
     RefreshCw,
+    Save,
     ShieldCheck,
     Trash2,
-    Trophy,
 } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
 import AppLayout from '../Components/AppLayout';
 import { statusPillStyle } from '../statusColors';
-import { ConfirmedYearStats, SnapshotBestGame, SnapshotDetailsData, StatsData } from '../types';
+import { ConfirmedYearStats, SnapshotBestGame, SnapshotDetailsData } from '../types';
 
 type Snapshot = ConfirmedYearStats;
-
-const metrics = [
-    { key: 'library_games', label: 'Library Games', icon: Gamepad2 },
-    { key: 'unique_titles', label: 'Unique Titles', icon: Archive },
-    { key: 'ownership_copies', label: 'Ownership Copies', icon: Layers3 },
-    { key: 'completed', label: 'Completed', icon: Trophy },
-    { key: 'playtime_hours', label: 'Playtime', icon: Clock3 },
-    { key: 'earned_achievements', label: 'Achievements', icon: ShieldCheck },
-    { key: 'base_value', label: 'Base Value', icon: DollarSign },
-    { key: 'purchased_value', label: 'Paid Value', icon: DollarSign },
-] as const;
+type DetailTab = 'best-games' | 'captured-games';
 
 function formatNumber(value: number | string | null | undefined, decimals = 0) {
     const parsed = Number(value ?? 0);
@@ -42,42 +29,104 @@ function formatNumber(value: number | string | null | undefined, decimals = 0) {
     });
 }
 
-function formatMoney(value: number | string | null | undefined) {
-    return `$${formatNumber(value, 2)}`;
-}
-
-function formatMetric(key: string, value: number) {
-    if (key.includes('value')) return formatMoney(value);
-    if (key === 'playtime_hours') return `${formatNumber(value, 1)}H`;
-    return formatNumber(value);
-}
-
 function formatDate(value: string | null | undefined) {
     if (!value) return 'Not confirmed';
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 
-function StatTile({ label, value, icon }: { label: string; value: ReactNode; icon: ReactNode }) {
-    return (
-        <div className="rounded-[26px] border border-black/10 bg-white p-5 shadow-[0_18px_38px_rgb(0_0_0/0.06)]">
-            <div className="flex items-center justify-between gap-3 text-black/35">
-                <div className="text-[10px] font-black uppercase tracking-[0.22em]">{label}</div>
-                {icon}
-            </div>
-            <div className="mt-3 truncate text-3xl font-black tracking-[-0.04em]">{value}</div>
-        </div>
-    );
-}
-
 function StatusPill({ status }: { status: Snapshot['status'] }) {
     return (
         <span className={[
-            'inline-flex items-center rounded-full px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.18em]',
-            status === 'confirmed' ? 'bg-[#b7ff63] text-black' : 'bg-black text-white',
-        ].join(' ')}
-        >
+            'inline-flex items-center rounded-full px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em]',
+            status === 'confirmed' ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-white ring-1 ring-white/10',
+        ].join(' ')}>
             {status}
         </span>
+    );
+}
+
+function ManagerButton({
+    children,
+    onClick,
+    disabled = false,
+    tone = 'dark',
+}: {
+    children: ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+    tone?: 'dark' | 'green' | 'danger' | 'ghost';
+}) {
+    const toneClass = {
+        dark: 'bg-black text-white hover:bg-black/85',
+        green: 'bg-[#b7ff63] text-black hover:brightness-95',
+        danger: 'bg-[#fff0f0] text-[#d92d20] ring-1 ring-red-500/15 hover:bg-[#ffe2e2]',
+        ghost: 'bg-white/70 text-black ring-1 ring-black/10 hover:bg-white',
+    }[tone];
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            className={`${toneClass} inline-flex h-12 items-center justify-center gap-2 rounded-[18px] px-4 text-xs font-black uppercase tracking-[0.14em] transition disabled:cursor-not-allowed disabled:opacity-40`}
+        >
+            {children}
+        </button>
+    );
+}
+
+function SnapshotCard({
+    snapshot,
+    active,
+    confirming,
+    deleting,
+    onConfirm,
+    onDelete,
+}: {
+    snapshot: Snapshot;
+    active: boolean;
+    confirming: boolean;
+    deleting: boolean;
+    onConfirm: () => void;
+    onDelete: () => void;
+}) {
+    return (
+        <article className={`rounded-[26px] border p-4 transition ${active ? 'border-[#b7ff63] bg-black text-white shadow-[0_18px_42px_rgb(0_0_0/0.16)]' : 'border-black/10 bg-white/70 text-black hover:border-black/25'}`}>
+            <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                    <div className="flex items-center gap-3">
+                        <div className="text-4xl font-black tracking-[-0.05em]">{snapshot.year}</div>
+                        <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${snapshot.status === 'confirmed' ? 'bg-[#b7ff63] text-black' : active ? 'bg-white/10 text-white' : 'bg-black text-white'}`}>{snapshot.status}</span>
+                    </div>
+                    <div className={`mt-2 truncate text-[11px] font-black uppercase tracking-[0.16em] ${active ? 'text-white/35' : 'text-black/35'}`}>
+                        {snapshot.status === 'confirmed' ? formatDate(snapshot.confirmed_at) : `Drafted ${formatDate(snapshot.created_at)}`}
+                    </div>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                    <Link href={`/snapshots/${snapshot.snapshot_id}`} preserveScroll className={`grid size-11 place-items-center rounded-2xl ${active ? 'bg-[#b7ff63] text-black' : 'bg-black text-white'}`}>
+                        <Eye size={18} strokeWidth={3} />
+                    </Link>
+                    {snapshot.status === 'draft' && (
+                        <button
+                            type="button"
+                            onClick={onConfirm}
+                            disabled={confirming}
+                            className="grid size-11 place-items-center rounded-2xl bg-[#b7ff63] text-black transition disabled:opacity-40"
+                        >
+                            <Check size={19} strokeWidth={3} />
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={onDelete}
+                        disabled={deleting}
+                        className={`grid size-11 place-items-center rounded-2xl transition disabled:opacity-40 ${active ? 'bg-white/10 text-red-200 ring-1 ring-white/10' : 'bg-[#fff0f0] text-[#d92d20] ring-1 ring-red-500/15'}`}
+                    >
+                        <Trash2 size={18} strokeWidth={3} />
+                    </button>
+                </div>
+            </div>
+        </article>
     );
 }
 
@@ -100,19 +149,19 @@ function BestGameTile({
             onClick={onClick}
             disabled={disabled}
             className={[
-                'grid grid-cols-[56px_1fr_auto] items-center gap-3 rounded-[20px] border p-3 text-left transition',
-                selected ? 'border-black bg-[#b7ff63]' : 'border-black/10 bg-[#fbfcf7] hover:border-black/30',
+                'grid grid-cols-[58px_1fr_auto] items-center gap-3 rounded-[22px] border p-3 text-left transition',
+                selected ? 'border-[#b7ff63] bg-[#b7ff63] text-black' : 'border-black/10 bg-[#f6faf4] hover:border-black/25',
                 disabled ? 'cursor-default' : '',
             ].join(' ')}
         >
-            <div className="grid size-14 place-items-center overflow-hidden rounded-2xl bg-black text-xl font-black text-[#b7ff63]">
+            <div className="grid size-[58px] place-items-center overflow-hidden rounded-2xl bg-black text-xl font-black text-[#b7ff63]">
                 {game.cover_url ? <img src={game.cover_url} alt="" className="size-full object-cover" /> : rank ?? '+'}
             </div>
             <div className="min-w-0">
                 <div className="truncate text-sm font-black">{game.title}</div>
                 <div className="mt-1 flex min-w-0 items-center gap-2 text-xs font-bold text-black/45">
                     <span className="truncate">{game.platform}</span>
-                    <span className="shrink-0">-</span>
+                    <span className="shrink-0">·</span>
                     <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em]" style={statusPillStyle(game)}>{game.status}</span>
                 </div>
             </div>
@@ -124,17 +173,180 @@ function BestGameTile({
     );
 }
 
+function CapturedGamesTable({ selectedSnapshot }: { selectedSnapshot: SnapshotDetailsData }) {
+    return (
+        <div className="grid h-full min-h-0 grid-rows-[auto_1fr] overflow-hidden rounded-[26px] border border-black/10">
+            <div className="grid grid-cols-[1fr_150px_150px_110px] bg-black px-5 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/55">
+                <span>Game</span>
+                <span>Platform</span>
+                <span>Status</span>
+                <span className="text-right">Hours</span>
+            </div>
+            <div className="min-h-0 overflow-y-auto bg-white/55">
+                {selectedSnapshot.games.length === 0 && (
+                    <div className="grid h-full place-items-center p-8 text-center text-sm font-bold text-black/42">No captured games in this snapshot.</div>
+                )}
+                {selectedSnapshot.games.map((game) => (
+                    <div key={`${game.library_game_id}-${game.title}`} className="grid grid-cols-[1fr_150px_150px_110px] items-center border-t border-black/10 px-5 py-4 text-sm font-black">
+                        <span className="truncate">{game.title}</span>
+                        <span className="truncate text-black/50">{game.platform}</span>
+                        <span className="min-w-0">
+                            <span className="inline-flex max-w-full rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em]" style={statusPillStyle(game)}>{game.status}</span>
+                        </span>
+                        <span className="text-right">{formatNumber(game.playtime_hours, 1)}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function SnapshotInspector({
+    selectedSnapshot,
+    detailTab,
+    setDetailTab,
+    bestGameIds,
+    toggleBestGame,
+    saveBestGames,
+    savingBestGames,
+    resnap,
+    resnapping,
+    confirm,
+    confirming,
+    destroy,
+    deleting,
+}: {
+    selectedSnapshot: SnapshotDetailsData | null;
+    detailTab: DetailTab;
+    setDetailTab: (tab: DetailTab) => void;
+    bestGameIds: number[];
+    toggleBestGame: (libraryGameId: number) => void;
+    saveBestGames: () => void;
+    savingBestGames: boolean;
+    resnap: (snapshot: SnapshotDetailsData) => void;
+    resnapping: boolean;
+    confirm: (snapshot: SnapshotDetailsData) => void;
+    confirming: boolean;
+    destroy: (snapshot: SnapshotDetailsData) => void;
+    deleting: boolean;
+}) {
+    if (!selectedSnapshot) {
+        return (
+            <section className="grid h-full min-h-0 place-items-center rounded-[34px] border border-dashed border-black/15 bg-white/45 p-8 text-center">
+                <div>
+                    <div className="mx-auto grid size-20 place-items-center rounded-[28px] bg-black text-[#b7ff63]">
+                        <Archive size={34} strokeWidth={3} />
+                    </div>
+                    <div className="mt-5 text-4xl font-black tracking-[-0.05em]">Select a snapshot</div>
+                    <p className="mx-auto mt-3 max-w-md text-sm font-bold leading-relaxed text-black/45">Open a draft or confirmed year to manage its best games, inspect captured rows, confirm, resnap, or delete.</p>
+                </div>
+            </section>
+        );
+    }
+
+    const bestGames = selectedSnapshot.status === 'confirmed'
+        ? selectedSnapshot.best_games
+        : selectedSnapshot.eligible_best_games;
+
+    return (
+        <section className="grid h-full min-h-0 grid-rows-[auto_auto_1fr] gap-4 rounded-[34px] border border-black/10 bg-white/65 p-5 shadow-[0_20px_44px_rgb(0_0_0/0.07)]">
+            <header className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                    <div className="text-[11px] font-black uppercase tracking-[0.24em] text-black/35">Snapshot manager</div>
+                    <div className="mt-1 flex items-center gap-3">
+                        <h2 className="text-5xl font-black tracking-[-0.06em]">{selectedSnapshot.year}</h2>
+                        <span className={`inline-flex rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] ${selectedSnapshot.status === 'confirmed' ? 'bg-[#b7ff63] text-black' : 'bg-black text-white'}`}>{selectedSnapshot.status}</span>
+                    </div>
+                    <p className="mt-2 truncate text-xs font-black uppercase tracking-[0.16em] text-black/35">
+                        {selectedSnapshot.status === 'confirmed' ? `Confirmed ${formatDate(selectedSnapshot.confirmed_at)}` : `Drafted ${formatDate(selectedSnapshot.created_at)}`}
+                    </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                    {selectedSnapshot.status === 'draft' && (
+                        <ManagerButton onClick={() => resnap(selectedSnapshot)} disabled={resnapping} tone="ghost">
+                            <RefreshCw size={16} strokeWidth={3} />
+                            {resnapping ? 'Resnapping' : 'Resnap'}
+                        </ManagerButton>
+                    )}
+                    {selectedSnapshot.status === 'draft' && (
+                        <ManagerButton onClick={() => confirm(selectedSnapshot)} disabled={confirming} tone="green">
+                            <Check size={16} strokeWidth={3} />
+                            Confirm
+                        </ManagerButton>
+                    )}
+                    <ManagerButton onClick={() => destroy(selectedSnapshot)} disabled={deleting} tone="danger">
+                        <Trash2 size={16} strokeWidth={3} />
+                        Delete
+                    </ManagerButton>
+                </div>
+            </header>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] bg-black p-2">
+                <div className="flex gap-2">
+                    <button type="button" onClick={() => setDetailTab('best-games')} className={`rounded-[18px] px-5 py-3 text-xs font-black uppercase tracking-[0.14em] ${detailTab === 'best-games' ? 'bg-[#b7ff63] text-black' : 'bg-white/8 text-white/45 hover:text-white'}`}>Best Games</button>
+                    <button type="button" onClick={() => setDetailTab('captured-games')} className={`rounded-[18px] px-5 py-3 text-xs font-black uppercase tracking-[0.14em] ${detailTab === 'captured-games' ? 'bg-[#b7ff63] text-black' : 'bg-white/8 text-white/45 hover:text-white'}`}>Captured Games</button>
+                </div>
+                {selectedSnapshot.status === 'draft' && detailTab === 'best-games' && (
+                    <ManagerButton onClick={saveBestGames} disabled={savingBestGames} tone="green">
+                        <Save size={16} strokeWidth={3} />
+                        {savingBestGames ? 'Saving' : 'Save Top 5'}
+                    </ManagerButton>
+                )}
+            </div>
+
+            <div className="min-h-0 overflow-hidden">
+                {detailTab === 'captured-games' ? (
+                    <CapturedGamesTable selectedSnapshot={selectedSnapshot} />
+                ) : (
+                    <div className="grid h-full min-h-0 grid-rows-[auto_1fr] gap-3">
+                        <div className="rounded-[24px] bg-[#f6faf4] p-4 ring-1 ring-black/8">
+                            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-black/35">Best games played</div>
+                            <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
+                                <h3 className="text-2xl font-black tracking-[-0.04em]">Top 5 of {selectedSnapshot.year}</h3>
+                                <span className="rounded-full bg-black px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#b7ff63]">{selectedSnapshot.status === 'confirmed' ? selectedSnapshot.best_games.length : bestGameIds.length}/5 selected</span>
+                            </div>
+                            <p className="mt-1 text-sm font-bold text-black/45">Drafts can be edited. Confirmed years are locked.</p>
+                        </div>
+                        <div className="min-h-0 overflow-y-auto pr-1">
+                            <div className="grid gap-3">
+                                {bestGames.length === 0 && (
+                                    <div className="rounded-2xl border border-dashed border-black/15 bg-white/70 p-5 text-sm font-bold text-black/45">
+                                        {selectedSnapshot.status === 'confirmed' ? 'No best games were selected before this snapshot was confirmed.' : 'No eligible completed games for this year.'}
+                                    </div>
+                                )}
+                                {selectedSnapshot.status === 'confirmed'
+                                    ? selectedSnapshot.best_games.map((game) => <BestGameTile key={game.library_game_id} game={game} selected rank={game.rank} disabled />)
+                                    : selectedSnapshot.eligible_best_games.map((game) => {
+                                        const rank = bestGameIds.indexOf(game.library_game_id) + 1;
+                                        return (
+                                            <BestGameTile
+                                                key={game.library_game_id}
+                                                game={game}
+                                                selected={rank > 0}
+                                                rank={rank > 0 ? rank : undefined}
+                                                onClick={() => toggleBestGame(game.library_game_id)}
+                                            />
+                                        );
+                                    })}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </section>
+    );
+}
+
 export default function Snapshots({
     snapshots,
     currentYear,
     confirmedCurrentYear,
-    liveStats,
     selectedSnapshot = null,
 }: {
     snapshots: Snapshot[];
     currentYear: number;
     confirmedCurrentYear: Snapshot | null;
-    liveStats: StatsData;
+    liveStats: unknown;
     selectedSnapshot?: SnapshotDetailsData | null;
 }) {
     const [snapshotYear, setSnapshotYear] = useState(String(currentYear));
@@ -144,19 +356,24 @@ export default function Snapshots({
     const [resnappingId, setResnappingId] = useState<number | null>(null);
     const [bestGameIds, setBestGameIds] = useState<number[]>([]);
     const [savingBestGames, setSavingBestGames] = useState(false);
-    const latestConfirmed = snapshots.find((snapshot) => snapshot.status === 'confirmed') ?? null;
+    const [detailTab, setDetailTab] = useState<DetailTab>('best-games');
+
+    const sortedSnapshots = [...snapshots].sort((a, b) => b.year - a.year || b.snapshot_id - a.snapshot_id);
     const drafts = snapshots.filter((snapshot) => snapshot.status === 'draft');
     const confirmed = snapshots.filter((snapshot) => snapshot.status === 'confirmed');
     const selectedYear = Number(snapshotYear);
     const selectedYearIsValid = Number.isInteger(selectedYear) && selectedYear >= 1970 && selectedYear <= 2100;
-    const selectedYearConfirmed = snapshots.some((snapshot) => snapshot.year === selectedYear && snapshot.status === 'confirmed');
+    const selectedYearExisting = snapshots.find((snapshot) => snapshot.year === selectedYear) ?? null;
+    const selectedYearConfirmed = selectedYearExisting?.status === 'confirmed' || confirmedCurrentYear?.year === selectedYear;
+    const selectedSnapshotId = selectedSnapshot?.snapshot_id ?? null;
 
     useEffect(() => {
         setBestGameIds(selectedSnapshot?.best_games.map((game) => game.library_game_id) ?? []);
+        setDetailTab('best-games');
     }, [selectedSnapshot?.snapshot_id]);
 
     function createDraft() {
-        if (!selectedYearIsValid || selectedYearConfirmed) return;
+        if (!selectedYearIsValid || selectedYearExisting) return;
 
         setCreating(true);
         router.post('/snapshots', { year: selectedYear }, {
@@ -165,7 +382,7 @@ export default function Snapshots({
         });
     }
 
-    function confirm(snapshot: Snapshot) {
+    function confirm(snapshot: Snapshot | SnapshotDetailsData) {
         setConfirmingId(snapshot.snapshot_id);
         router.patch(`/snapshots/${snapshot.snapshot_id}/confirm`, {}, {
             preserveScroll: true,
@@ -173,7 +390,7 @@ export default function Snapshots({
         });
     }
 
-    function destroy(snapshot: Snapshot) {
+    function destroy(snapshot: Snapshot | SnapshotDetailsData) {
         if (!window.confirm(`Delete the ${snapshot.year} ${snapshot.status} snapshot?`)) return;
 
         setDeletingId(snapshot.snapshot_id);
@@ -190,8 +407,8 @@ export default function Snapshots({
         }
     }
 
-    function resnap(snapshot: Snapshot) {
-        if (!window.confirm(`Replace the ${snapshot.year} draft with the current library stats? Best games selected on this draft will be cleared.`)) return;
+    function resnap(snapshot: SnapshotDetailsData) {
+        if (!window.confirm(`Replace the ${snapshot.year} draft with the current library capture? Best games selected on this draft will be cleared.`)) return;
 
         setResnappingId(snapshot.snapshot_id);
         router.patch(`/snapshots/${snapshot.snapshot_id}/resnap`, {}, {
@@ -202,14 +419,8 @@ export default function Snapshots({
 
     function toggleBestGame(libraryGameId: number) {
         setBestGameIds((current) => {
-            if (current.includes(libraryGameId)) {
-                return current.filter((id) => id !== libraryGameId);
-            }
-
-            if (current.length >= 5) {
-                return current;
-            }
-
+            if (current.includes(libraryGameId)) return current.filter((id) => id !== libraryGameId);
+            if (current.length >= 5) return current;
             return [...current, libraryGameId];
         });
     }
@@ -226,281 +437,107 @@ export default function Snapshots({
         });
     }
 
+    const yearMessage = selectedYearExisting
+        ? `${selectedYear} ${selectedYearExisting.status} exists`
+        : selectedYearIsValid
+            ? 'Ready for draft capture'
+            : 'Year must be 1970-2100';
+
     return (
-        <AppLayout title="Snapshots">
-            <section className="px-4 md:pl-[88px] md:pr-0">
-                <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-                    <div className="rounded-[38px] bg-black p-8 text-white shadow-2xl">
-                        <div className="flex items-start justify-between gap-6">
-                            <div>
-                                <div className="text-sm font-black uppercase tracking-[0.32em] text-[#b7ff63]/60">Yearly archive</div>
-                                <h1 className="mt-3 text-[58px] font-black leading-none tracking-[-0.04em]">Snapshots</h1>
-                                <p className="mt-4 max-w-2xl text-lg font-bold leading-relaxed text-white/55">
-                                    Confirmed snapshots freeze official yearly stats. Drafts copy the current library stats into the selected archive year.
-                                </p>
+        <AppLayout title="Snapshots" lockViewport>
+            <section className="h-full overflow-hidden px-4 py-3 md:pl-[88px] md:pr-6">
+                <div className="mx-auto grid h-full max-w-[1540px] grid-rows-[120px_minmax(0,1fr)] gap-4 overflow-hidden">
+                    <header className="rounded-[34px] bg-black px-6 py-5 text-white shadow-[0_24px_80px_rgb(0_0_0/0.20)]">
+                        <div className="grid h-full gap-5 xl:grid-cols-[1fr_auto] xl:items-center">
+                            <div className="min-w-0">
+                                <div className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]/70">Snapshot manager</div>
+                                <div className="mt-1 flex items-end gap-4">
+                                    <h1 className="text-6xl font-black leading-none tracking-[-0.06em]">Snapshots</h1>
+                                    <p className="mb-2 hidden max-w-2xl truncate text-sm font-bold text-white/38 xl:block">Create, inspect, resnap, confirm, and delete yearly captures. No stats dashboard here.</p>
+                                </div>
                             </div>
-                            <div className="grid gap-3">
-                                <div className="flex items-center gap-2 rounded-[24px] border border-white/10 bg-white/[0.06] p-2">
-                                    <button type="button" onClick={() => shiftYear(-1)} className="grid size-12 place-items-center rounded-[18px] bg-white/10 text-white">
-                                        <ChevronLeft size={18} />
-                                    </button>
+                            <div className="grid gap-2">
+                                <div className="flex items-center gap-2 rounded-[24px] bg-white/8 p-2">
+                                    <button type="button" onClick={() => shiftYear(-1)} className="grid size-11 place-items-center rounded-[18px] bg-black text-white ring-1 ring-white/10 transition hover:text-[#b7ff63]"><ChevronLeft size={18} /></button>
                                     <input
                                         type="number"
                                         min={1970}
                                         max={2100}
                                         value={snapshotYear}
                                         onChange={(event) => setSnapshotYear(event.target.value)}
-                                        className="h-12 w-28 rounded-[18px] border border-white/10 bg-black px-4 text-center text-lg font-black text-white outline-none focus:border-[#b7ff63]"
+                                        className="h-11 w-[122px] rounded-[18px] border border-white/10 bg-white/8 px-4 text-center text-lg font-black text-white outline-none focus:border-[#b7ff63]"
                                     />
-                                    <button type="button" onClick={() => shiftYear(1)} className="grid size-12 place-items-center rounded-[18px] bg-white/10 text-white">
-                                        <ChevronRight size={18} />
-                                    </button>
-                                    <button
-                                        onClick={createDraft}
-                                        disabled={creating || selectedYearConfirmed || !selectedYearIsValid}
-                                        className="inline-flex h-12 items-center gap-3 rounded-[18px] bg-[#b7ff63] px-5 text-sm font-black uppercase tracking-[0.16em] text-black transition hover:brightness-95 disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/35"
-                                    >
-                                        <CalendarClock size={20} strokeWidth={3} />
-                                        {creating ? 'Creating' : 'Draft'}
-                                    </button>
+                                    <button type="button" onClick={() => shiftYear(1)} className="grid size-11 place-items-center rounded-[18px] bg-black text-white ring-1 ring-white/10 transition hover:text-[#b7ff63]"><ChevronRight size={18} /></button>
+                                    <ManagerButton onClick={createDraft} disabled={creating || !!selectedYearExisting || selectedYearConfirmed || !selectedYearIsValid} tone="green">
+                                        <CalendarClock size={16} strokeWidth={3} />
+                                        {creating ? 'Creating' : 'Create Draft'}
+                                    </ManagerButton>
                                 </div>
-                                <div className="text-right text-[11px] font-black uppercase tracking-[0.18em] text-white/35">
-                                    {selectedYearConfirmed ? `${selectedYear} locked` : selectedYearIsValid ? 'Select archive year' : 'Year must be 1970-2100'}
-                                </div>
+                                <div className="text-right text-[10px] font-black uppercase tracking-[0.18em] text-white/35">{yearMessage}</div>
                             </div>
                         </div>
+                    </header>
 
-                        <div className="mt-8 grid grid-cols-2 gap-4 xl:grid-cols-4">
-                            {metrics.slice(0, 4).map((metric) => {
-                                const Icon = metric.icon;
-                                const value = liveStats[metric.key as keyof StatsData] as number;
-
-                                return (
-                                    <div key={metric.key} className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-                                        <div className="flex items-center justify-between text-white/35">
-                                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{metric.label}</span>
-                                            <Icon size={18} />
-                                        </div>
-                                        <div className="mt-3 text-3xl font-black tracking-[-0.04em] text-[#b7ff63]">{formatMetric(metric.key, value)}</div>
+                    <main className="grid min-h-0 gap-4 overflow-hidden rounded-[34px] border border-black/8 bg-white/35 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.58)] xl:grid-cols-[430px_minmax(0,1fr)]">
+                        <aside className="grid min-h-0 grid-rows-[auto_1fr] rounded-[34px] bg-black p-5 text-white shadow-[0_24px_70px_rgb(0_0_0/0.18)]">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#b7ff63]/70">Archive runs</div>
+                                    <h2 className="mt-1 text-3xl font-black tracking-[-0.05em]">Snapshot List</h2>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-center">
+                                    <div className="rounded-2xl bg-white/8 px-3 py-2 ring-1 ring-white/8">
+                                        <div className="text-lg font-black text-[#b7ff63]">{confirmed.length}</div>
+                                        <div className="text-[9px] font-black uppercase tracking-[0.14em] text-white/35">Locked</div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    <div className="rounded-[38px] border border-black/10 bg-white p-8 shadow-[0_24px_48px_rgb(0_0_0/0.08)]">
-                        <div className="flex items-center justify-between gap-4">
-                            <div>
-                                <div className="text-[11px] font-black uppercase tracking-[0.24em] text-black/35">Latest official year</div>
-                                <div className="mt-2 text-4xl font-black tracking-[-0.04em]">{latestConfirmed?.year ?? 'None'}</div>
+                                    <div className="rounded-2xl bg-white/8 px-3 py-2 ring-1 ring-white/8">
+                                        <div className="text-lg font-black text-white">{drafts.length}</div>
+                                        <div className="text-[9px] font-black uppercase tracking-[0.14em] text-white/35">Drafts</div>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="grid size-16 place-items-center rounded-[24px] bg-black text-[#b7ff63]">
-                                <ShieldCheck size={30} strokeWidth={3} />
-                            </div>
-                        </div>
-                        <div className="mt-6 grid grid-cols-2 gap-4">
-                            <StatTile label="Confirmed" value={confirmed.length} icon={<Check size={18} />} />
-                            <StatTile label="Drafts" value={drafts.length} icon={<Clock3 size={18} />} />
-                        </div>
-                        {latestConfirmed && (
-                            <Link
-                                href={`/snapshots/${latestConfirmed.snapshot_id}`}
-                                className="mt-5 inline-flex w-full items-center justify-center gap-3 rounded-[20px] bg-black px-5 py-4 text-sm font-black uppercase tracking-[0.16em] text-white"
-                            >
-                                <Eye size={18} strokeWidth={3} />
-                                Inspect Latest
-                            </Link>
-                        )}
-                    </div>
-                </div>
-
-                <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-                    <div className="rounded-[34px] border border-black/10 bg-white p-6 shadow-[0_20px_44px_rgb(0_0_0/0.07)]">
-                        <div className="mb-5 flex items-center justify-between">
-                            <h2 className="text-3xl font-black tracking-[-0.04em]">Snapshot Runs</h2>
-                            <span className="text-sm font-black text-black/35">{snapshots.length} total</span>
-                        </div>
-
-                        <div className="grid gap-3">
-                            {snapshots.length === 0 && (
-                                <div className="rounded-[26px] border border-dashed border-black/15 p-8 text-center">
-                                    <div className="text-2xl font-black">No snapshots yet</div>
-                                    <p className="mt-2 text-sm font-bold text-black/45">Create a draft from the current library, then confirm it when the year is ready to lock.</p>
-                                </div>
-                            )}
-
-                            {snapshots.map((snapshot) => (
-                                <article key={snapshot.snapshot_id} className="rounded-[26px] border border-black/10 bg-[#fbfcf7] p-5">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="text-4xl font-black tracking-[-0.05em]">{snapshot.year}</div>
-                                                <StatusPill status={snapshot.status} />
+                            <div className="mt-5 min-h-0 overflow-y-auto pr-1">
+                                <div className="grid gap-3">
+                                    {sortedSnapshots.length === 0 && (
+                                        <div className="grid min-h-[320px] place-items-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.04] p-6 text-center">
+                                            <div>
+                                                <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#b7ff63] text-black"><Clock3 size={26} strokeWidth={3} /></div>
+                                                <div className="mt-4 text-2xl font-black">No snapshots yet</div>
+                                                <p className="mt-2 text-sm font-bold text-white/38">Create a draft capture for a year to start the archive.</p>
                                             </div>
-                                            <div className="mt-2 text-xs font-black uppercase tracking-[0.18em] text-black/35">
-                                                {snapshot.status === 'confirmed' ? formatDate(snapshot.confirmed_at) : `Drafted ${formatDate(snapshot.created_at)}`}
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <Link href={`/snapshots/${snapshot.snapshot_id}`} className="grid size-12 place-items-center rounded-2xl bg-black text-white">
-                                                <Eye size={19} />
-                                            </Link>
-                                            {snapshot.status === 'draft' && (
-                                                <button
-                                                    onClick={() => confirm(snapshot)}
-                                                    disabled={confirmingId === snapshot.snapshot_id}
-                                                    className="grid size-12 place-items-center rounded-2xl bg-[#b7ff63] text-black disabled:opacity-45"
-                                                >
-                                                    <Check size={20} strokeWidth={3} />
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => destroy(snapshot)}
-                                                disabled={deletingId === snapshot.snapshot_id}
-                                                className="grid size-12 place-items-center rounded-2xl bg-white text-[#d92d20] ring-1 ring-black/10 transition hover:bg-[#fff0f0] disabled:opacity-45"
-                                            >
-                                                <Trash2 size={19} strokeWidth={3} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="mt-4 grid grid-cols-3 gap-3 text-sm font-black">
-                                        <div className="rounded-2xl bg-white p-3">{formatNumber(snapshot.library_games)} games</div>
-                                        <div className="rounded-2xl bg-white p-3">{formatNumber(snapshot.playtime_hours, 1)} hours</div>
-                                        <div className="rounded-2xl bg-white p-3">{formatMoney(snapshot.purchased_value)} paid</div>
-                                    </div>
-                                </article>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="rounded-[34px] border border-black/10 bg-white p-6 shadow-[0_20px_44px_rgb(0_0_0/0.07)]">
-                        {selectedSnapshot ? (
-                            <>
-                                <div className="mb-5 flex items-start justify-between gap-4">
-                                    <div>
-                                        <div className="text-[11px] font-black uppercase tracking-[0.24em] text-black/35">Inspection</div>
-                                        <h2 className="mt-2 text-4xl font-black tracking-[-0.05em]">{selectedSnapshot.year} Snapshot</h2>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <StatusPill status={selectedSnapshot.status} />
-                                        <button
-                                            onClick={() => destroy(selectedSnapshot)}
-                                            disabled={deletingId === selectedSnapshot.snapshot_id}
-                                            className="grid size-11 place-items-center rounded-2xl bg-[#fff0f0] text-[#d92d20] ring-1 ring-red-500/15 transition hover:bg-[#ffe2e2] disabled:opacity-45"
-                                        >
-                                            <Trash2 size={18} strokeWidth={3} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-                                    {metrics.map((metric) => {
-                                        const Icon = metric.icon;
-                                        const value = selectedSnapshot[metric.key as keyof Snapshot] as number;
-
-                                        return (
-                                            <StatTile key={metric.key} label={metric.label} value={formatMetric(metric.key, value)} icon={<Icon size={18} />} />
-                                        );
-                                    })}
-                                </div>
-
-                                {selectedSnapshot.status === 'draft' && (
-                                    <div className="mt-5 rounded-[22px] border border-black/10 bg-[#fff7df] p-5 text-sm font-bold text-black/60">
-                                        Confirming locks this year, all captured game rows, ownership copies, DLC ownership, totals, charts, and selected best games. Use Resnap before confirming if the current library changed.
-                                    </div>
-                                )}
-
-                                <div className="mt-6 rounded-[26px] border border-black/10 bg-[#fbfcf7] p-5">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div>
-                                            <div className="text-[11px] font-black uppercase tracking-[0.24em] text-black/35">Best games played</div>
-                                            <h3 className="mt-1 text-2xl font-black tracking-[-0.04em]">Top 5 of {selectedSnapshot.year}</h3>
-                                            <p className="mt-1 text-sm font-bold text-black/45">Only games completed or 100% in this snapshot year can be selected. A title can win once across all years.</p>
-                                        </div>
-                                    {selectedSnapshot.status === 'draft' && (
-                                            <div className="flex flex-wrap justify-end gap-2">
-                                                <button
-                                                    onClick={() => resnap(selectedSnapshot)}
-                                                    disabled={resnappingId === selectedSnapshot.snapshot_id}
-                                                    className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-black ring-1 ring-black/10 disabled:opacity-45"
-                                                >
-                                                    <RefreshCw size={16} />
-                                                    {resnappingId === selectedSnapshot.snapshot_id ? 'Resnapping' : 'Resnap'}
-                                                </button>
-                                                <button
-                                                    onClick={saveBestGames}
-                                                    disabled={savingBestGames}
-                                                    className="rounded-2xl bg-black px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-white disabled:opacity-45"
-                                                >
-                                                    {savingBestGames ? 'Saving' : 'Save'}
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {selectedSnapshot.status === 'confirmed' ? (
-                                        <div className="mt-5 grid gap-3">
-                                            {selectedSnapshot.best_games.length === 0 && (
-                                                <div className="rounded-2xl border border-dashed border-black/15 p-5 text-sm font-bold text-black/45">No best games were selected before this snapshot was confirmed.</div>
-                                            )}
-                                            {selectedSnapshot.best_games.map((game) => (
-                                                <BestGameTile key={game.library_game_id} game={game} selected rank={game.rank} disabled />
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="mt-5 grid gap-3">
-                                            {selectedSnapshot.eligible_best_games.length === 0 && (
-                                                <div className="rounded-2xl border border-dashed border-black/15 p-5 text-sm font-bold text-black/45">No eligible completed games for this year.</div>
-                                            )}
-                                            {selectedSnapshot.eligible_best_games.map((game) => {
-                                                const rank = bestGameIds.indexOf(game.library_game_id) + 1;
-                                                return (
-                                                    <BestGameTile
-                                                        key={game.library_game_id}
-                                                        game={game}
-                                                        selected={rank > 0}
-                                                        rank={rank > 0 ? rank : undefined}
-                                                        onClick={() => toggleBestGame(game.library_game_id)}
-                                                    />
-                                                );
-                                            })}
                                         </div>
                                     )}
-                                </div>
-
-                                <div className="mt-6 overflow-hidden rounded-[26px] border border-black/10">
-                                    <div className="grid grid-cols-[1fr_120px_130px_110px] bg-black px-5 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/55">
-                                        <span>Game</span>
-                                        <span>Platform</span>
-                                        <span>Status</span>
-                                        <span className="text-right">Hours</span>
-                                    </div>
-                                    <div className="max-h-[420px] overflow-auto">
-                                        {selectedSnapshot.games.map((game) => (
-                                            <div key={`${game.library_game_id}-${game.title}`} className="grid grid-cols-[1fr_120px_130px_110px] items-center border-t border-black/10 px-5 py-4 text-sm font-black">
-                                                <span className="truncate">{game.title}</span>
-                                                <span className="truncate text-black/50">{game.platform}</span>
-                                                <span className="min-w-0">
-                                                    <span className="inline-flex max-w-full rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em]" style={statusPillStyle(game)}>{game.status}</span>
-                                                </span>
-                                                <span className="text-right">{formatNumber(game.playtime_hours, 1)}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="grid min-h-[520px] place-items-center rounded-[28px] border border-dashed border-black/15 bg-[#fbfcf7] p-8 text-center">
-                                <div>
-                                    <div className="mx-auto grid size-16 place-items-center rounded-[24px] bg-black text-[#b7ff63]">
-                                        <Archive size={30} strokeWidth={3} />
-                                    </div>
-                                    <div className="mt-5 text-3xl font-black tracking-[-0.04em]">Select a snapshot</div>
-                                    <p className="mx-auto mt-3 max-w-md text-sm font-bold leading-relaxed text-black/45">Open any draft or confirmed run to inspect the frozen totals and captured library rows.</p>
+                                    {sortedSnapshots.map((snapshot) => (
+                                        <SnapshotCard
+                                            key={snapshot.snapshot_id}
+                                            snapshot={snapshot}
+                                            active={snapshot.snapshot_id === selectedSnapshotId}
+                                            confirming={confirmingId === snapshot.snapshot_id}
+                                            deleting={deletingId === snapshot.snapshot_id}
+                                            onConfirm={() => confirm(snapshot)}
+                                            onDelete={() => destroy(snapshot)}
+                                        />
+                                    ))}
                                 </div>
                             </div>
-                        )}
-                    </div>
+                        </aside>
+
+                        <SnapshotInspector
+                            selectedSnapshot={selectedSnapshot}
+                            detailTab={detailTab}
+                            setDetailTab={setDetailTab}
+                            bestGameIds={bestGameIds}
+                            toggleBestGame={toggleBestGame}
+                            saveBestGames={saveBestGames}
+                            savingBestGames={savingBestGames}
+                            resnap={resnap}
+                            resnapping={selectedSnapshot ? resnappingId === selectedSnapshot.snapshot_id : false}
+                            confirm={confirm}
+                            confirming={selectedSnapshot ? confirmingId === selectedSnapshot.snapshot_id : false}
+                            destroy={destroy}
+                            deleting={selectedSnapshot ? deletingId === selectedSnapshot.snapshot_id : false}
+                        />
+                    </main>
                 </div>
             </section>
         </AppLayout>
