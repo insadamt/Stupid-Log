@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AddGameWizard from '../Components/AddGameWizard';
 import AppLayout from '../Components/AppLayout';
 import GameCard from '../Components/GameCard';
+import PlatformIcon from '../Components/PlatformIcon';
 import { statusDotStyle, statusPillStyle } from '../statusColors';
 import { GameCardData, ReferenceData } from '../types';
 
@@ -374,7 +375,10 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
                                                         : 'bg-white/10 text-white/58 hover:bg-white/15 hover:text-white',
                                                 ].join(' ')}
                                             >
-                                                <span className="truncate">{item.label}</span>
+                                                <span className="flex min-w-0 items-center gap-2">
+                                                    <PlatformIcon platform={item.label} surface={selected ? 'lime' : 'dark'} size="sm" />
+                                                    <span className="truncate">{item.label}</span>
+                                                </span>
                                                 <span>{item.count}</span>
                                             </button>
                                         );

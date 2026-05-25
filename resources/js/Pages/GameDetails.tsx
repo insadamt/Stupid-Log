@@ -19,6 +19,7 @@ import {
 import { ReactNode, useMemo, useState } from 'react';
 import AppLayout from '../Components/AppLayout';
 import GameCard from '../Components/GameCard';
+import PlatformIcon from '../Components/PlatformIcon';
 import { statusPillStyle } from '../statusColors';
 import { GameCardData, ReferenceData } from '../types';
 
@@ -108,7 +109,7 @@ function Chip({ children, active = false }: { children: ReactNode; active?: bool
     return (
         <span
             className={[
-                'inline-flex items-center rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em]',
+                'inline-flex items-center gap-2 rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em]',
                 active ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-white/68',
             ].join(' ')}
         >
@@ -882,7 +883,7 @@ export default function GameDetails({
                                     <div className="text-[10px] font-black uppercase tracking-[0.24em] text-[#b7ff63]">Current Entry</div>
                                     <div className="mt-2 truncate text-3xl font-black leading-[0.92] tracking-[-0.06em]">{libraryGame.title}</div>
                                     <div className="mt-3 flex flex-wrap gap-2">
-                                        <Chip active>{libraryGame.platform}</Chip>
+                                        <Chip active><PlatformIcon platform={libraryGame.platform} surface="lime" size="xs" className="-ml-2" />{libraryGame.platform}</Chip>
                                         {devices.slice(0, 2).map((device) => <Chip key={device}>{device}</Chip>)}
                                     </div>
                                 </div>
@@ -1033,9 +1034,14 @@ export default function GameDetails({
                                                                             active ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-white/55 hover:text-white'
                                                                         }`}
                                                                     >
-                                                                        <span className="block truncate">{platform.name}</span>
-                                                                        <span className={`mt-1 block text-[10px] uppercase tracking-[0.16em] ${active ? 'text-black/45' : 'text-white/30'}`}>
-                                                                            {platform.devices.length} devices
+                                                                        <span className="flex min-w-0 items-center gap-3">
+                                                                            <PlatformIcon platform={platform.name} surface={active ? 'lime' : 'dark'} size="sm" />
+                                                                            <span className="min-w-0">
+                                                                                <span className="block truncate">{platform.name}</span>
+                                                                                <span className={`mt-1 block text-[10px] uppercase tracking-[0.16em] ${active ? 'text-black/45' : 'text-white/30'}`}>
+                                                                                    {platform.devices.length} devices
+                                                                                </span>
+                                                                            </span>
                                                                         </span>
                                                                     </button>
                                                                 );

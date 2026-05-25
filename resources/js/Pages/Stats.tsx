@@ -1,6 +1,7 @@
 import { BarChart3, ChevronLeft, ChevronRight, Clock3, DollarSign, Gamepad2, Trophy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import AppLayout from '../Components/AppLayout';
+import PlatformIcon from '../Components/PlatformIcon';
 import { statusColor, statusDotStyle, statusPillStyle } from '../statusColors';
 import { ConfirmedYearStats, GrowthMetric, PlatformBreakdown, StatsArchiveGame, StatsData, StatusBreakdown } from '../types';
 
@@ -8,7 +9,7 @@ type TabKey = 'overview' | 'breakdowns' | 'progression' | 'archive';
 type MetricKey = 'library_games' | 'completed' | 'hundred_percent' | 'playtime_hours' | 'earned_achievements' | 'total_achievements' | 'achievement_progress' | 'base_value' | 'purchased_value';
 type StatView = StatsData & { year?: number; growth?: Record<string, GrowthMetric>; best_games?: ConfirmedYearStats['best_games'] };
 type Slice = { label: string; value: number; color: string; growth?: GrowthMetric | null };
-type ChartConfig = { title: string; eyebrow: string; data: Slice[]; total: string; center: string; delta?: GrowthMetric | null; format: (value: number) => string };
+type ChartConfig = { title: string; eyebrow: string; data: Slice[]; total: string; center: string; delta?: GrowthMetric | null; format: (value: number) => string; showPlatformIcons?: boolean };
 
 const tabs: Array<{ key: TabKey; title: string; sub: string }> = [
     { key: 'overview', title: 'Overview', sub: 'core totals' },
@@ -212,7 +213,7 @@ function GameUiChart({ config }: { config: ChartConfig }) {
                             <div key={slice.label} className="rounded-[22px] bg-white/[0.07] p-4 ring-1 ring-white/8">
                                 <div className="flex items-center justify-between gap-3">
                                     <span className="flex min-w-0 items-center gap-3 text-sm font-black text-white/75">
-                                        <span className="size-3 rounded-full" style={{ backgroundColor: slice.color }} />
+                                        {config.showPlatformIcons ? <PlatformIcon platform={slice.label} surface="dark" size="sm" /> : <span className="size-3 rounded-full" style={{ backgroundColor: slice.color }} />}
                                         <span className="truncate">{slice.label}</span>
                                     </span>
                                     <span className="text-sm font-black text-white/80">{percentLabel(percent)}</span>
@@ -281,19 +282,19 @@ function Breakdowns({ stats, previous }: { stats: StatView; previous?: StatView 
     const chartConfig: ChartConfig = (() => {
         if (chart === 'games') {
             const data = gamesMode === 'platform' ? slices<PlatformBreakdown>(platforms, (item) => item.library_games, prevPlatforms) : slices<StatusBreakdown>(statuses, (item) => item.library_games, prevStatuses);
-            return { title: 'Total Games', eyebrow: gamesMode === 'platform' ? 'By platform' : 'By status', data, total: num(stats.library_games), center: 'games', delta: metricGrowth('library_games', stats, previous), format: (value: number) => num(value) };
+            return { title: 'Total Games', eyebrow: gamesMode === 'platform' ? 'By platform' : 'By status', data, total: num(stats.library_games), center: 'games', delta: metricGrowth('library_games', stats, previous), format: (value: number) => num(value), showPlatformIcons: gamesMode === 'platform' };
         }
         if (chart === 'playtime') {
-            return { title: 'Playtime Pool', eyebrow: 'Only by platform', data: slices<PlatformBreakdown>(platforms, (item) => item.playtime_hours, prevPlatforms), total: hours(stats.playtime_hours), center: 'hours played', delta: metricGrowth('playtime_hours', stats, previous), format: hours };
+            return { title: 'Playtime Pool', eyebrow: 'Only by platform', data: slices<PlatformBreakdown>(platforms, (item) => item.playtime_hours, prevPlatforms), total: hours(stats.playtime_hours), center: 'hours played', delta: metricGrowth('playtime_hours', stats, previous), format: hours, showPlatformIcons: true };
         }
         if (chart === 'achievements') {
             const key = achievementMode === 'total' ? 'total_achievements' : 'earned_achievements';
-            return { title: 'Achievement Pool', eyebrow: `Only by platform · ${achievementMode}`, data: slices<PlatformBreakdown>(platforms, (item) => n(item[key]), prevPlatforms), total: num(achievementMode === 'total' ? stats.total_achievements : stats.earned_achievements), center: achievementMode === 'total' ? 'available achievements' : 'earned achievements', delta: metricGrowth(achievementMode === 'total' ? 'total_achievements' : 'earned_achievements', stats, previous), format: (value: number) => num(value) };
+            return { title: 'Achievement Pool', eyebrow: `Only by platform · ${achievementMode}`, data: slices<PlatformBreakdown>(platforms, (item) => n(item[key]), prevPlatforms), total: num(achievementMode === 'total' ? stats.total_achievements : stats.earned_achievements), center: achievementMode === 'total' ? 'available achievements' : 'earned achievements', delta: metricGrowth(achievementMode === 'total' ? 'total_achievements' : 'earned_achievements', stats, previous), format: (value: number) => num(value), showPlatformIcons: true };
         }
         const data = slices<PlatformBreakdown>(platforms, valueGetter, prevPlatforms);
         const total = data.reduce((sum, item) => sum + item.value, 0);
         const prevTotal = prevPlatforms.reduce((sum, item) => sum + valueGetter(item), 0);
-        return { title: 'Library Value', eyebrow: `Only by platform · ${valueMode}`, data, total: money(total), center: includeDlcs ? 'with DLCs' : 'no DLCs', delta: previous ? growth(total, prevTotal) : null, format: money };
+        return { title: 'Library Value', eyebrow: `Only by platform · ${valueMode}`, data, total: money(total), center: includeDlcs ? 'with DLCs' : 'no DLCs', delta: previous ? growth(total, prevTotal) : null, format: money, showPlatformIcons: true };
     })();
 
     return (
@@ -341,9 +342,12 @@ function Progression({ stats, previous }: { stats: StatView; previous?: StatView
                             return (
                                 <div key={platform.label} className="rounded-[22px] bg-white/[0.07] p-4 ring-1 ring-white/8">
                                     <div className="flex items-center justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="truncate text-lg font-black">{platform.label}</div>
-                                            <div className="text-xs font-bold text-white/38">{num(platform.earned_achievements)} / {num(platform.total_achievements)} achievements</div>
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <PlatformIcon platform={platform.label} surface="dark" size="sm" />
+                                            <div className="min-w-0">
+                                                <div className="truncate text-lg font-black">{platform.label}</div>
+                                                <div className="text-xs font-bold text-white/38">{num(platform.earned_achievements)} / {num(platform.total_achievements)} achievements</div>
+                                            </div>
                                         </div>
                                         <div className="text-right">
                                             <div className="text-xl font-black text-[#b7ff63]">{num(platform.achievement_progress, 1)}%</div>
@@ -381,9 +385,12 @@ function StatusStack({ platform, previous }: { platform: PlatformBreakdown; prev
     return (
         <div className="rounded-[24px] bg-white/78 p-4 ring-1 ring-black/8">
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <div className="text-lg font-black text-black">{platform.label}</div>
-                    <div className="text-xs font-bold text-black/42">{num(platform.library_games)} games divided by status</div>
+                <div className="flex min-w-0 items-center gap-3">
+                    <PlatformIcon platform={platform.label} surface="light" size="sm" />
+                    <div className="min-w-0">
+                        <div className="truncate text-lg font-black text-black">{platform.label}</div>
+                        <div className="text-xs font-bold text-black/42">{num(platform.library_games)} games divided by status</div>
+                    </div>
                 </div>
             </div>
             <div className="mt-3 flex h-5 overflow-hidden rounded-full bg-black/8">
@@ -439,6 +446,7 @@ function ArchiveList({ title, sub, games, metric }: { title: string; sub: string
                             <div className="min-w-0">
                                 <div className="truncate text-base font-black text-black">{game.title}</div>
                                 <div className="mt-1 flex min-w-0 items-center gap-2 text-xs font-bold text-black/42">
+                                    <PlatformIcon platform={game.platform} surface="light" size="xs" />
                                     <span className="truncate">{game.platform}</span>
                                     <span className="shrink-0">·</span>
                                     <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em]" style={statusPillStyle(game)}>{game.status}</span>

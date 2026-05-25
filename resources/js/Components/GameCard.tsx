@@ -1,30 +1,8 @@
 import { Link } from '@inertiajs/react';
 import { ArrowUpRight, Clock3, Gamepad2, ImageOff, Trophy } from 'lucide-react';
+import PlatformIcon from './PlatformIcon';
 import { GameCardData } from '../types';
 import { statusPillStyle } from '../statusColors';
-
-function PlatformIcon({
-    platform,
-    large = false,
-    compact = false,
-}: {
-    platform: string;
-    large?: boolean;
-    compact?: boolean;
-}) {
-    const label = platform === 'Steam' ? 'S' : platform === 'Xbox' ? 'X' : platform.slice(0, 1);
-
-    return (
-        <span
-            className={[
-                'grid shrink-0 place-items-center rounded-full bg-black font-black text-[#b7ff63]',
-                large ? 'size-12 text-2xl' : compact ? 'size-10 text-xl' : 'size-10 text-xl',
-            ].join(' ')}
-        >
-            {label}
-        </span>
-    );
-}
 
 function coverTitle(title: string) {
     const clean = title.trim();
@@ -131,7 +109,7 @@ export default function GameCard({
                 </span>
 
                 <div className="relative z-10 mt-auto flex items-center gap-3 pb-1">
-                    <PlatformIcon platform={game.platform} large={featured} compact={compact} />
+                    <PlatformIcon platform={game.platform} surface="lime" size={featured ? 'lg' : compact ? 'md' : 'md'} />
 
                     {hasAchievements ? (
                         <>
@@ -156,7 +134,8 @@ export default function GameCard({
                             Inspect
                         </span>
 
-                        <span className="max-w-[120px] truncate rounded-full border border-[#b7ff63]/30 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#b7ff63]/70">
+                        <span className="inline-flex max-w-[150px] items-center gap-2 rounded-full border border-[#b7ff63]/30 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#b7ff63]/70">
+                            <PlatformIcon platform={game.platform} surface="dark" size="xs" className="-ml-1" />
                             {game.platform}
                         </span>
                     </div>
