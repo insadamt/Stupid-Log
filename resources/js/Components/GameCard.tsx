@@ -100,7 +100,7 @@ export default function GameCard({
 
                 <span
                     className={[
-                        'relative z-20 mx-auto -mt-4 rounded-full px-6 py-2 font-black leading-none shadow-[0_12px_22px_rgb(0_0_0/0.16)]',
+                        'relative z-20 mx-auto -mt-4 rounded-full px-6 py-2 font-black leading-none outline-4 outline-[#b7ff63]',
                         featured ? 'text-lg' : compact ? 'text-base' : 'text-base',
                     ].join(' ')}
                     style={statusPillStyle(game)}
