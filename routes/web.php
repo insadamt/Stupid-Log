@@ -8,6 +8,7 @@ Route::post('/setup', [StupidLogController::class, 'storeSetup'])->name('setup.s
 
 Route::get('/', [StupidLogController::class, 'home'])->name('home');
 Route::get('/library', [StupidLogController::class, 'library'])->name('library');
+Route::get('/library-games', [StupidLogController::class, 'libraryGames'])->name('library-games.index');
 Route::post('/library-games', [StupidLogController::class, 'storeLibraryGame'])->name('library-games.store');
 Route::post('/library-games/cover', [StupidLogController::class, 'uploadGameCover'])->name('library-games.cover.store');
 Route::get('/library-games/manual-duplicates', [StupidLogController::class, 'manualDuplicates'])->name('library-games.manual-duplicates');
@@ -25,8 +26,11 @@ Route::patch('/owned-dlcs/{ownedDlc}', [StupidLogController::class, 'updateOwned
 Route::delete('/owned-dlcs/{ownedDlc}', [StupidLogController::class, 'destroyOwnedDlc'])->name('owned-dlcs.destroy');
 Route::get('/stats', [StupidLogController::class, 'stats'])->name('stats');
 Route::get('/snapshots', [StupidLogController::class, 'snapshots'])->name('snapshots');
+Route::get('/snapshots-feed', [StupidLogController::class, 'snapshotFeed'])->name('snapshots.feed');
 Route::post('/snapshots', [StupidLogController::class, 'createSnapshot'])->name('snapshots.store');
 Route::get('/snapshots/{snapshotRun}', [StupidLogController::class, 'snapshotDetails'])->name('snapshots.show');
+Route::get('/snapshots/{snapshotRun}/games', [StupidLogController::class, 'snapshotGames'])->name('snapshots.games');
+Route::get('/snapshots/{snapshotRun}/eligible-best-games', [StupidLogController::class, 'snapshotEligibleBestGames'])->name('snapshots.eligible-best-games');
 Route::patch('/snapshots/{snapshotRun}/resnap', [StupidLogController::class, 'resnapSnapshot'])->name('snapshots.resnap');
 Route::patch('/snapshots/{snapshotRun}/confirm', [StupidLogController::class, 'confirmSnapshot'])->name('snapshots.confirm');
 Route::patch('/snapshots/{snapshotRun}/best-games', [StupidLogController::class, 'updateSnapshotBestGames'])->name('snapshots.best-games.update');

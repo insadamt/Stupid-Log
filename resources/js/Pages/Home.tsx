@@ -15,6 +15,7 @@ import { ComponentType } from "react";
 import AddGameWizard from "../Components/AddGameWizard";
 import AppLayout from "../Components/AppLayout";
 import GameCard, { CoverArt } from "../Components/GameCard";
+import PlatformIcon from "../Components/PlatformIcon";
 import { statusPillStyle } from "../statusColors";
 import { GameCardData, ReferenceData, StatsData } from "../types";
 
@@ -32,35 +33,6 @@ function moneyFormat(value: number | string | null | undefined) {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
     })}`;
-}
-
-function PlatformMark({
-    platform,
-    size = "md",
-}: {
-    platform: string;
-    size?: "sm" | "md" | "lg";
-}) {
-    const label =
-        platform === "Steam"
-            ? "S"
-            : platform === "Xbox"
-              ? "X"
-              : platform.slice(0, 1);
-    const sizeClass =
-        size === "lg"
-            ? "size-14 text-3xl"
-            : size === "sm"
-              ? "size-10 text-xl"
-              : "size-12 text-2xl";
-
-    return (
-        <div
-            className={`grid ${sizeClass} shrink-0 place-items-center rounded-full bg-black font-black text-[#b7ff63]`}
-        >
-            {label}
-        </div>
-    );
 }
 
 function StatTile({
@@ -191,7 +163,9 @@ function FeaturedGamePanel({ game }: { game: GameCardData }) {
                 </span>
 
                 <div className="mt-auto grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[26px] bg-black px-4 py-3 text-white">
-                    <PlatformMark platform={game.platform} size="md" />
+                    <span className="grid size-12 shrink-0 place-items-center rounded-full bg-black p-1">
+                        <PlatformIcon platform={game.platform} surface="dark" size="lg" />
+                    </span>
 
                     <div className="min-w-0">
                         <div className="flex items-end justify-between gap-3">

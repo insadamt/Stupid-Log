@@ -1065,9 +1065,18 @@ export default function AddGameWizard({
                     <section className="grid max-h-[94vh] w-full max-w-[1320px] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[42px] border border-white/20 bg-[#eff1ea] shadow-[0_44px_150px_rgb(0_0_0/0.55)]">
                     <header className="border-b border-black/10 bg-[#b7ff63] px-8 py-5">
                             <div className="flex items-start justify-between gap-6">
-                                <div>
-                                    <div className="text-xs font-black uppercase tracking-[0.35em] text-black/45">Stupid Log Archive Builder</div>
-                                    <h2 className="mt-1 text-[46px] font-black leading-none tracking-[-0.065em] text-black">Add Game</h2>
+                                <div className="flex min-w-0 items-center gap-4">
+                                    <div className="grid size-16 shrink-0 place-items-center rounded-[22px] bg-black p-1.5 shadow-[0_16px_30px_rgb(0_0_0/0.2)]">
+                                        <img
+                                            src="/images/stupid-log/stupid-log.png"
+                                            alt=""
+                                            className="size-full object-contain"
+                                        />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-xs font-black uppercase tracking-[0.35em] text-black/45">Stupid Log Archive Builder</div>
+                                        <h2 className="mt-1 text-[46px] font-black leading-none tracking-[-0.065em] text-black">Add Game</h2>
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <Pill>{step.label}</Pill>

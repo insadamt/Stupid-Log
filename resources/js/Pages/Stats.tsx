@@ -1,11 +1,11 @@
-import { BarChart3, ChevronLeft, ChevronRight, Clock3, DollarSign, Gamepad2, Trophy } from 'lucide-react';
+import { BarChart3, ChevronLeft, ChevronRight, Clock3, DollarSign, Gamepad2, Medal, Trophy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import AppLayout from '../Components/AppLayout';
 import PlatformIcon from '../Components/PlatformIcon';
 import { statusColor, statusDotStyle, statusPillStyle } from '../statusColors';
-import { ConfirmedYearStats, GrowthMetric, PlatformBreakdown, StatsArchiveGame, StatsData, StatusBreakdown } from '../types';
+import { ConfirmedYearStats, GrowthMetric, PlatformBreakdown, SnapshotBestGame, StatsArchiveGame, StatsData, StatusBreakdown } from '../types';
 
-type TabKey = 'overview' | 'breakdowns' | 'progression' | 'archive';
+type TabKey = 'overview' | 'breakdowns' | 'progression' | 'best-games' | 'archive';
 type MetricKey = 'library_games' | 'completed' | 'hundred_percent' | 'playtime_hours' | 'earned_achievements' | 'total_achievements' | 'achievement_progress' | 'base_value' | 'purchased_value';
 type StatView = StatsData & { year?: number; growth?: Record<string, GrowthMetric>; best_games?: ConfirmedYearStats['best_games'] };
 type Slice = { label: string; value: number; color: string; growth?: GrowthMetric | null };
@@ -15,6 +15,7 @@ const tabs: Array<{ key: TabKey; title: string; sub: string }> = [
     { key: 'overview', title: 'Overview', sub: 'core totals' },
     { key: 'breakdowns', title: 'Breakdowns', sub: 'charts' },
     { key: 'progression', title: 'Progression', sub: 'completion' },
+    { key: 'best-games', title: 'Best Games', sub: 'top picks' },
     { key: 'archive', title: 'Game Archive', sub: 'records' },
 ];
 
@@ -418,6 +419,74 @@ function StatusStack({ platform, previous }: { platform: PlatformBreakdown; prev
     );
 }
 
+function BestGames({ year }: { year?: ConfirmedYearStats | null }) {
+    return (
+        <div className="grid h-full min-h-0 grid-rows-[auto_1fr] gap-4">
+            <section className="rounded-[30px] bg-black p-5 text-white shadow-[0_24px_70px_rgb(0_0_0/0.18)]">
+                <div className="flex items-center justify-between gap-4">
+                    <div>
+                        <div className="text-xs font-black uppercase tracking-[0.22em] text-[#b7ff63]/70">Best Games</div>
+                        <h2 className="mt-1 text-4xl font-black leading-none tracking-[-0.05em]">
+                            {year ? `Top 5 of ${year.year}` : 'Latest Snapshot'}
+                        </h2>
+                    </div>
+                    <div className="grid size-12 place-items-center rounded-[18px] bg-[#b7ff63] text-black"><Medal size={25} strokeWidth={3} /></div>
+                </div>
+            </section>
+
+            {year
+                ? <BestGameGrid games={year.best_games ?? []} empty={`No best games were selected for ${year.year}.`} />
+                : <Empty text="Confirm a yearly snapshot and select best games to build this list." />}
+        </div>
+    );
+}
+
+function BestGameGrid({ games, empty }: { games: SnapshotBestGame[]; empty: string }) {
+    if (games.length === 0) {
+        return <Empty text={empty} />;
+    }
+
+    return (
+        <div className="grid min-h-0 items-start gap-4 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-5">
+            {games.map((game, index) => <BestGameCard key={`${game.library_game_id}-${game.rank ?? index}`} game={game} />)}
+        </div>
+    );
+}
+
+function BestGameCard({ game }: { game: SnapshotBestGame }) {
+    const progress = game.total_achievements > 0 ? Math.round((game.earned_achievements / game.total_achievements) * 100) : 0;
+
+    return (
+        <article className="grid gap-2">
+            <div className="relative aspect-[3/4] min-h-0 overflow-hidden rounded-[24px] bg-black shadow-[0_22px_55px_rgb(9_14_12/0.16)] ring-1 ring-black/10">
+                {game.cover_url ? <img src={game.cover_url} alt="" className="size-full object-cover" /> : <div className="grid size-full place-items-center bg-[#d9dedb] text-5xl font-black text-black/28">#{game.rank ?? '?'}</div>}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/78 via-transparent to-transparent" />
+                <span className="absolute left-3 top-3 rounded-full bg-[#b7ff63] px-3 py-1 text-sm font-black text-black shadow-[0_10px_24px_rgb(0_0_0/0.22)]">#{game.rank ?? '?'}</span>
+                <div className="absolute inset-x-0 bottom-0 grid gap-3 p-4 text-white">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em]" style={statusPillStyle(game)}>{game.status}</span>
+                        <span className="rounded-full bg-white/14 px-2.5 py-1 text-xs font-black text-white">{hours(game.playtime_hours)}</span>
+                    </div>
+                    <div className="grid gap-1.5">
+                        <div className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-[0.12em] text-white/58">
+                            <span>Achievements</span>
+                            <span>{game.earned_achievements}/{game.total_achievements || 0}</span>
+                        </div>
+                        <div className="h-2.5 overflow-hidden rounded-full bg-white/18"><div className="h-full rounded-full bg-[#b7ff63]" style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} /></div>
+                    </div>
+                </div>
+            </div>
+            <div className="grid h-[100px] grid-rows-[44px_auto] rounded-[20px] bg-black p-4 text-white shadow-[0_16px_34px_rgb(0_0_0/0.14)]">
+                <h3 className="line-clamp-2 text-lg font-black leading-[1.04]">{game.title}</h3>
+                <div className="mt-2 flex min-w-0 items-center gap-2 text-xs font-bold text-[#b7ff63]/78">
+                    <PlatformIcon platform={game.platform} surface="dark" size="xs" />
+                    <span className="truncate">{game.platform}</span>
+                </div>
+            </div>
+        </article>
+    );
+}
+
 function Archive({ stats }: { stats: StatView }) {
     return (
         <div className="grid h-full min-h-0 gap-4 xl:grid-cols-3">
@@ -485,15 +554,19 @@ function SlideNav({ active, setActive }: { active: TabKey; setActive: (tab: TabK
 
 export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData; confirmedYears?: ConfirmedYearStats[] }) {
     const [view, setView] = useState<'all-time' | string>('all-time');
+    const [bestGamesView, setBestGamesView] = useState<'latest' | string>('latest');
     const [active, setActive] = useState<TabKey>('overview');
     const yearsAsc = useMemo(() => [...confirmedYears].sort((a, b) => a.year - b.year), [confirmedYears]);
     const yearsDesc = useMemo(() => [...confirmedYears].sort((a, b) => b.year - a.year), [confirmedYears]);
     const selectedYear = view === 'all-time' ? null : confirmedYears.find((year) => String(year.year) === view) ?? null;
     const previousYear = selectedYear ? [...yearsAsc].filter((year) => year.year < selectedYear.year).pop() ?? null : null;
     const latestYear = yearsDesc[0] ?? null;
+    const bestGamesMode = active === 'best-games';
+    const selectedBestGamesYear = bestGamesView === 'latest' ? latestYear : confirmedYears.find((year) => String(year.year) === bestGamesView) ?? latestYear;
+    const headerSnapshot = bestGamesMode ? selectedBestGamesYear : selectedYear;
     const current: StatView = selectedYear ?? stats;
     const previous: StatView | null = selectedYear ? previousYear : latestYear;
-    const displayedYear = selectedYear?.year ?? latestYear?.year ?? null;
+    const displayedYear = bestGamesMode ? selectedBestGamesYear?.year ?? null : selectedYear?.year ?? latestYear?.year ?? null;
     const yearIndex = displayedYear ? yearsAsc.findIndex((year) => year.year === displayedYear) : -1;
 
     const stepYear = (direction: number) => {
@@ -503,13 +576,22 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
         setView(String(yearsAsc[next].year));
     };
 
+    const stepBestGamesYear = (direction: number) => {
+        if (yearsAsc.length === 0) return;
+        const base = selectedBestGamesYear ? yearsAsc.findIndex((year) => year.year === selectedBestGamesYear.year) : yearsAsc.length - 1;
+        const next = Math.max(0, Math.min(yearsAsc.length - 1, base + direction));
+        setBestGamesView(String(yearsAsc[next].year));
+    };
+
     const panel = active === 'overview'
         ? <Overview stats={current} previous={previous} selectedYear={selectedYear} />
         : active === 'breakdowns'
             ? <Breakdowns stats={current} previous={previous} />
             : active === 'progression'
                 ? <Progression stats={current} previous={previous} />
-                : <Archive stats={current} />;
+                : active === 'best-games'
+                    ? <BestGames year={selectedBestGamesYear} />
+                    : <Archive stats={current} />;
 
     return (
         <AppLayout title="Stats" lockViewport>
@@ -518,19 +600,27 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                     <header className="rounded-[34px] bg-black px-6 py-5 text-white shadow-[0_24px_80px_rgb(0_0_0/0.20)]">
                         <div className="grid h-full gap-5 xl:grid-cols-[1fr_auto] xl:items-center">
                             <div className="min-w-0">
-                                <div className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]/70">{selectedYear ? `${selectedYear.year} confirmed snapshot` : 'All-time live profile'}</div>
+                                <div className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]/70">{headerSnapshot ? `${headerSnapshot.year} confirmed snapshot` : 'All-time live profile'}</div>
                                 <div className="mt-1 flex items-end gap-4">
                                     <h1 className="text-6xl font-black leading-none tracking-[-0.06em]">Stats</h1>
                                     <p className="mb-2 hidden max-w-2xl truncate text-sm font-bold text-white/38 xl:block">Fixed screen modules. Data overflow stays inside game-style containers.</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
-                                <button type="button" onClick={() => setView('all-time')} className={`rounded-[22px] px-6 py-4 text-sm font-black uppercase tracking-[0.16em] transition ${view === 'all-time' ? 'bg-[#b7ff63] text-black' : 'bg-white/8 text-white/50 hover:text-white'}`}>All Time</button>
-                                <div className="flex items-center gap-2 rounded-[24px] bg-white/8 p-2">
-                                    <button type="button" onClick={() => stepYear(-1)} disabled={yearsAsc.length === 0 || yearIndex <= 0} className="grid size-11 place-items-center rounded-[18px] bg-black text-white ring-1 ring-white/10 transition hover:text-[#b7ff63] disabled:cursor-not-allowed disabled:opacity-25"><ChevronLeft size={18} /></button>
-                                    <button type="button" onClick={() => displayedYear && setView(String(displayedYear))} disabled={!displayedYear} className={`min-w-[116px] rounded-[18px] px-5 py-3 text-center text-lg font-black tracking-[0.1em] transition disabled:cursor-not-allowed disabled:opacity-35 ${selectedYear ? 'bg-[#b7ff63] text-black' : 'bg-white/7 text-white/55 hover:text-white'}`}>{displayedYear ?? '—'}</button>
-                                    <button type="button" onClick={() => stepYear(1)} disabled={yearsAsc.length === 0 || yearIndex >= yearsAsc.length - 1} className="grid size-11 place-items-center rounded-[18px] bg-black text-white ring-1 ring-white/10 transition hover:text-[#b7ff63] disabled:cursor-not-allowed disabled:opacity-25"><ChevronRight size={18} /></button>
-                                </div>
+                                {!bestGamesMode && <button type="button" onClick={() => setView('all-time')} className={`rounded-[22px] px-6 py-4 text-sm font-black uppercase tracking-[0.16em] transition ${view === 'all-time' ? 'bg-[#b7ff63] text-black' : 'bg-white/8 text-white/50 hover:text-white'}`}>All Time</button>}
+                                {bestGamesMode ? (
+                                    <div className="flex items-center gap-2 rounded-[24px] bg-white/8 p-2">
+                                        <button type="button" onClick={() => stepBestGamesYear(-1)} disabled={yearsAsc.length === 0 || yearIndex <= 0} className="grid size-11 place-items-center rounded-[18px] bg-black text-white ring-1 ring-white/10 transition hover:text-[#b7ff63] disabled:cursor-not-allowed disabled:opacity-25"><ChevronLeft size={18} /></button>
+                                        <span className="block min-w-[116px] rounded-[18px] bg-[#b7ff63] px-5 py-3 text-center text-lg font-black tracking-[0.1em] text-black">{displayedYear ?? '—'}</span>
+                                        <button type="button" onClick={() => stepBestGamesYear(1)} disabled={yearsAsc.length === 0 || yearIndex >= yearsAsc.length - 1} className="grid size-11 place-items-center rounded-[18px] bg-black text-white ring-1 ring-white/10 transition hover:text-[#b7ff63] disabled:cursor-not-allowed disabled:opacity-25"><ChevronRight size={18} /></button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 rounded-[24px] bg-white/8 p-2">
+                                        <button type="button" onClick={() => stepYear(-1)} disabled={yearsAsc.length === 0 || yearIndex <= 0} className="grid size-11 place-items-center rounded-[18px] bg-black text-white ring-1 ring-white/10 transition hover:text-[#b7ff63] disabled:cursor-not-allowed disabled:opacity-25"><ChevronLeft size={18} /></button>
+                                        <button type="button" onClick={() => displayedYear && setView(String(displayedYear))} disabled={!displayedYear} className={`min-w-[116px] rounded-[18px] px-5 py-3 text-center text-lg font-black tracking-[0.1em] transition disabled:cursor-not-allowed disabled:opacity-35 ${selectedYear ? 'bg-[#b7ff63] text-black' : 'bg-white/7 text-white/55 hover:text-white'}`}>{displayedYear ?? '—'}</button>
+                                        <button type="button" onClick={() => stepYear(1)} disabled={yearsAsc.length === 0 || yearIndex >= yearsAsc.length - 1} className="grid size-11 place-items-center rounded-[18px] bg-black text-white ring-1 ring-white/10 transition hover:text-[#b7ff63] disabled:cursor-not-allowed disabled:opacity-25"><ChevronRight size={18} /></button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </header>

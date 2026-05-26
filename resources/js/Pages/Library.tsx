@@ -1,7 +1,5 @@
 import {
     ArrowDownAZ,
-    ChevronLeft,
-    ChevronRight,
     Clock3,
     Filter,
     Gamepad2,
@@ -12,7 +10,7 @@ import {
     Trophy,
     X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { ReactNode, UIEvent, useEffect, useMemo, useRef, useState } from 'react';
 import AddGameWizard from '../Components/AddGameWizard';
 import AppLayout from '../Components/AppLayout';
 import GameCard from '../Components/GameCard';
@@ -22,6 +20,14 @@ import { GameCardData, ReferenceData } from '../types';
 
 type SortMode = 'title' | 'playtime' | 'progress';
 
+type LibraryMeta = {
+    total: number;
+    completed: number;
+    playtime_hours: number;
+    statuses: Record<string, number>;
+    platforms: Record<string, number>;
+};
+
 const preferredStatuses = ['All', 'Not Played', 'In Progress', 'Completed', 'Dropped', '100%'];
 
 const sortOptions: Array<{ value: SortMode; label: string; icon: typeof ArrowDownAZ }> = [
@@ -30,17 +36,105 @@ const sortOptions: Array<{ value: SortMode; label: string; icon: typeof ArrowDow
     { value: 'progress', label: 'Progress', icon: Trophy },
 ];
 
-function sortGames(games: GameCardData[], sort: SortMode) {
-    return [...games].sort((a, b) => {
-        if (sort === 'playtime') return Number(b.playtime_hours ?? 0) - Number(a.playtime_hours ?? 0);
-        if (sort === 'progress') return Number(b.progress ?? 0) - Number(a.progress ?? 0);
-
-        return a.title.localeCompare(b.title);
-    });
-}
-
 function sameStatus(a: string, b: string) {
     return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function useDebouncedValue(value: string, delay = 240) {
+    const [debounced, setDebounced] = useState(value);
+
+    useEffect(() => {
+        const timeout = window.setTimeout(() => setDebounced(value), delay);
+
+        return () => window.clearTimeout(timeout);
+    }, [delay, value]);
+
+    return debounced;
+}
+
+function VirtualCardGrid({
+    items,
+    columns,
+    hasMore,
+    loading,
+    empty,
+    onNearEnd,
+}: {
+    items: GameCardData[];
+    columns: number;
+    hasMore: boolean;
+    loading: boolean;
+    empty: ReactNode;
+    onNearEnd: () => void;
+}) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [scrollTop, setScrollTop] = useState(0);
+    const [viewportHeight, setViewportHeight] = useState(0);
+    const cardWidth = 200;
+    const rowHeight = 355;
+    const gapX = 24;
+    const totalRows = Math.ceil(items.length / columns);
+    const totalHeight = Math.max(1, totalRows) * rowHeight + (hasMore || loading ? 76 : 0);
+    const startRow = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
+    const endRow = Math.min(totalRows, Math.ceil((scrollTop + viewportHeight) / rowHeight) + 2);
+    const startIndex = startRow * columns;
+    const endIndex = Math.min(items.length, endRow * columns);
+
+    useEffect(() => {
+        const node = ref.current;
+        if (!node) return;
+
+        const resizeObserver = new ResizeObserver(() => setViewportHeight(node.clientHeight));
+        setViewportHeight(node.clientHeight);
+        resizeObserver.observe(node);
+
+        return () => resizeObserver.disconnect();
+    }, []);
+
+    function handleScroll(event: UIEvent<HTMLDivElement>) {
+        const node = event.currentTarget;
+        setScrollTop(node.scrollTop);
+
+        if (node.scrollTop + node.clientHeight > node.scrollHeight - 700) {
+            onNearEnd();
+        }
+    }
+
+    if (items.length === 0 && !loading) {
+        return <div className="grid h-full place-items-center">{empty}</div>;
+    }
+
+    return (
+        <div ref={ref} onScroll={handleScroll} className="sl-scrollbar relative h-full min-h-0 overflow-y-auto overflow-x-hidden px-16 py-10">
+            <div className="relative mx-auto" style={{ width: columns * cardWidth + (columns - 1) * gapX, height: totalHeight }}>
+                {items.slice(startIndex, endIndex).map((game, offset) => {
+                    const index = startIndex + offset;
+                    const row = Math.floor(index / columns);
+                    const column = index % columns;
+
+                    return (
+                        <div
+                            key={game.id}
+                            className="absolute"
+                            style={{
+                                left: column * (cardWidth + gapX),
+                                top: row * rowHeight,
+                                width: cardWidth,
+                                height: 335,
+                            }}
+                        >
+                            <GameCard game={game} compact panelSide={column === columns - 1 ? 'left' : 'right'} />
+                        </div>
+                    );
+                })}
+                {(loading || hasMore) && (
+                    <div className="absolute left-0 right-0 grid h-14 place-items-center rounded-[22px] bg-black/5 text-xs font-black uppercase tracking-[0.16em] text-black/35" style={{ top: totalRows * rowHeight }}>
+                        {loading ? 'Loading' : 'Scroll for more'}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 }
 
 function formatHours(value: number | string | null | undefined) {
@@ -62,25 +156,25 @@ function StatPill({ label, value, icon: Icon }: { label: string; value: string |
     );
 }
 
-export default function Library({ libraryGames, references }: { libraryGames: GameCardData[]; references: ReferenceData }) {
+export default function Library({ libraryGames, libraryMeta, references }: { libraryGames: GameCardData[]; libraryMeta: LibraryMeta; references: ReferenceData }) {
     const [query, setQuery] = useState('');
     const [sort, setSort] = useState<SortMode>('title');
     const [status, setStatus] = useState('All');
     const [platform, setPlatform] = useState('All');
     const [filtersOpen, setFiltersOpen] = useState(false);
-    const [page, setPage] = useState(0);
-    const cardsPerRow = filtersOpen ? 4 : 5;
-    const pageSize = cardsPerRow * 2;
+    const [games, setGames] = useState<GameCardData[]>(libraryGames);
+    const [nextCursor, setNextCursor] = useState<string | null>(null);
+    const [hasMore, setHasMore] = useState(libraryGames.length < libraryMeta.total);
+    const [loading, setLoading] = useState(false);
+    const cardsPerRow = filtersOpen ? 5 : 6;
+    const debouncedQuery = useDebouncedValue(query);
+    const requestKey = `${debouncedQuery}|${status}|${platform}|${sort}`;
 
     const statusOptions = useMemo(() => {
-        const existing = libraryGames
-            .map((game) => game.status)
-            .filter(Boolean);
-
-        const merged = [...preferredStatuses, ...existing];
+        const merged = [...preferredStatuses, ...Object.keys(libraryMeta.statuses)];
 
         return Array.from(new Map(merged.map((item) => [item.toLowerCase(), item])).values());
-    }, [libraryGames]);
+    }, [libraryMeta.statuses]);
 
     const statusByName = useMemo(
         () => new Map(references.statuses.map((item) => [item.name.toLowerCase(), item])),
@@ -88,71 +182,80 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
     );
 
     const platformOptions = useMemo(() => {
-        const existing = libraryGames
-            .map((game) => game.platform)
-            .filter(Boolean);
-
-        return ['All', ...Array.from(new Set(existing)).sort((a, b) => a.localeCompare(b))];
-    }, [libraryGames]);
-
-    const filtered = useMemo(() => {
-        const q = query.trim().toLowerCase();
-
-        const matches = libraryGames.filter((game) => {
-            const matchesQuery =
-                !q ||
-                [game.title, game.publisher, game.platform, ...game.devices, ...game.ownership]
-                    .filter(Boolean)
-                    .some((value) => String(value).toLowerCase().includes(q));
-
-            const matchesStatus = status === 'All' || sameStatus(game.status, status);
-            const matchesPlatform = platform === 'All' || game.platform === platform;
-
-            return matchesQuery && matchesStatus && matchesPlatform;
-        });
-
-        return sortGames(matches, sort);
-    }, [libraryGames, platform, query, sort, status]);
-
-    const totals = useMemo(() => {
-        const achievements = libraryGames.reduce((sum, game) => sum + Number(game.earned_achievements ?? 0), 0);
-        const playtime = libraryGames.reduce((sum, game) => sum + Number(game.playtime_hours ?? 0), 0);
-        const completed = libraryGames.filter((game) => ['Completed', '100%'].some((item) => sameStatus(game.status, item))).length;
-
-        return { achievements, playtime, completed };
-    }, [libraryGames]);
+        return ['All', ...Object.keys(libraryMeta.platforms).sort((a, b) => a.localeCompare(b))];
+    }, [libraryMeta.platforms]);
 
     const statusCounts = useMemo(
         () => statusOptions.map((item) => ({
             label: item,
             count: item === 'All'
-                ? libraryGames.filter((game) => platform === 'All' || game.platform === platform).length
-                : libraryGames.filter((game) => sameStatus(game.status, item) && (platform === 'All' || game.platform === platform)).length,
+                ? libraryMeta.total
+                : libraryMeta.statuses[item] ?? 0,
             status: statusByName.get(item.toLowerCase()),
         })),
-        [libraryGames, platform, statusByName, statusOptions],
+        [libraryMeta.statuses, libraryMeta.total, statusByName, statusOptions],
     );
 
     const platformCounts = useMemo(
         () => platformOptions.map((item) => ({
             label: item,
             count: item === 'All'
-                ? libraryGames.filter((game) => status === 'All' || sameStatus(game.status, status)).length
-                : libraryGames.filter((game) => game.platform === item && (status === 'All' || sameStatus(game.status, status))).length,
+                ? libraryMeta.total
+                : libraryMeta.platforms[item] ?? 0,
         })),
-        [libraryGames, platformOptions, status],
+        [libraryMeta.platforms, libraryMeta.total, platformOptions],
     );
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    const safePage = Math.min(page, totalPages - 1);
-    const visibleGames = filtered.slice(safePage * pageSize, safePage * pageSize + pageSize);
-
     useEffect(() => {
-        setPage(0);
-    }, [filtersOpen, platform, query, sort, status]);
+        let canceled = false;
+        const params = new URLSearchParams({
+            query: debouncedQuery,
+            status,
+            platform,
+            sort,
+            limit: '40',
+        });
 
-    const nextPage = () => setPage((current) => Math.min(current + 1, totalPages - 1));
-    const previousPage = () => setPage((current) => Math.max(current - 1, 0));
+        setLoading(true);
+        fetch(`/library-games?${params.toString()}`, { headers: { Accept: 'application/json' } })
+            .then((response) => response.json())
+            .then((payload) => {
+                if (canceled) return;
+                setGames(payload.items ?? []);
+                setNextCursor(payload.next_cursor ?? null);
+                setHasMore(Boolean(payload.has_more));
+            })
+            .finally(() => {
+                if (!canceled) setLoading(false);
+            });
+
+        return () => {
+            canceled = true;
+        };
+    }, [requestKey]);
+
+    function loadMore() {
+        if (!hasMore || loading || !nextCursor) return;
+
+        const params = new URLSearchParams({
+            query: debouncedQuery,
+            status,
+            platform,
+            sort,
+            cursor: nextCursor,
+            limit: '40',
+        });
+
+        setLoading(true);
+        fetch(`/library-games?${params.toString()}`, { headers: { Accept: 'application/json' } })
+            .then((response) => response.json())
+            .then((payload) => {
+                setGames((current) => [...current, ...(payload.items ?? [])]);
+                setNextCursor(payload.next_cursor ?? null);
+                setHasMore(Boolean(payload.has_more));
+            })
+            .finally(() => setLoading(false));
+    }
 
     return (
         <AppLayout title="Library" lockViewport>
@@ -166,9 +269,9 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-3">
-                            <StatPill label="Games" value={libraryGames.length} icon={Gamepad2} />
-                            <StatPill label="Cleared" value={totals.completed} icon={ShieldCheck} />
-                            <StatPill label="Playtime" value={formatHours(totals.playtime)} icon={Clock3} />
+                            <StatPill label="Games" value={libraryMeta.total} icon={Gamepad2} />
+                            <StatPill label="Cleared" value={libraryMeta.completed} icon={ShieldCheck} />
+                            <StatPill label="Playtime" value={formatHours(libraryMeta.playtime_hours)} icon={Clock3} />
                         </div>
                     </div>
                 </header>
@@ -255,60 +358,22 @@ export default function Library({ libraryGames, references }: { libraryGames: Ga
                                     Clear Filters
                                 </button>
                             )}
-
-                            <span className="rounded-full bg-[#b7ff63] px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-black">
-                                {safePage + 1} / {totalPages}
-                            </span>
                         </div>
 
                         <div className="relative z-10 h-full min-h-0">
-                            <div className="relative flex h-full min-h-0 items-center justify-center overflow-visible px-16 py-0">
-                                <button
-                                    type="button"
-                                    onClick={previousPage}
-                                    disabled={safePage === 0}
-                                    aria-label="Previous library page"
-                                    className="absolute left-4 z-30 grid size-[54px] place-items-center rounded-full bg-black text-white shadow-[0_18px_30px_rgb(0_0_0/0.22)] transition hover:scale-105 hover:text-[#b7ff63] disabled:cursor-not-allowed disabled:opacity-25"
-                                >
-                                    <ChevronLeft size={32} strokeWidth={3} />
-                                </button>
-
-                                {visibleGames.length > 0 ? (
-                                    <div
-                                        className="grid justify-center gap-x-6 gap-y-5 overflow-visible transition-all duration-300"
-                                        style={{
-                                            gridTemplateColumns: `repeat(${cardsPerRow}, 200px)`,
-                                            gridTemplateRows: 'repeat(2, 335px)',
-                                        }}
-                                    >
-                                        {visibleGames.map((game, index) => (
-                                            <GameCard
-                                                key={`${game.id}-${safePage}-${index}`}
-                                                game={game}
-                                                compact
-                                                panelSide={(index + 1) % cardsPerRow === 0 ? 'left' : 'right'}
-                                            />
-                                        ))}
+                            <VirtualCardGrid
+                                items={games}
+                                columns={cardsPerRow}
+                                hasMore={hasMore}
+                                loading={loading}
+                                onNearEnd={loadMore}
+                                empty={
+                                    <div className="max-w-md rounded-[30px] bg-black p-8 text-center text-white shadow-[0_24px_55px_rgb(0_0_0/0.22)]">
+                                        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]">No Match</p>
+                                        <h3 className="mt-3 text-3xl font-black tracking-[-0.04em]">No games found.</h3>
                                     </div>
-                                ) : (
-                                    <div className="grid h-full place-items-center">
-                                        <div className="max-w-md rounded-[30px] bg-black p-8 text-center text-white shadow-[0_24px_55px_rgb(0_0_0/0.22)]">
-                                            <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]">No Match</p>
-                                            <h3 className="mt-3 text-3xl font-black tracking-[-0.04em]">No games found.</h3>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <button
-                                    type="button"
-                                    onClick={nextPage}
-                                    disabled={safePage >= totalPages - 1}
-                                    aria-label="Next library page"
-                                    className="absolute right-4 z-30 grid size-[54px] place-items-center rounded-full bg-black text-white shadow-[0_18px_30px_rgb(0_0_0/0.22)] transition hover:scale-105 hover:text-[#b7ff63] disabled:cursor-not-allowed disabled:opacity-25"
-                                >
-                                    <ChevronRight size={32} strokeWidth={3} />
-                                </button>
-                            </div>
+                                }
+                            />
                         </div>
                     </section>
 

@@ -181,7 +181,9 @@ export type SnapshotGameRow = {
 
 export type SnapshotDetailsData = ConfirmedYearStats & {
     games: SnapshotGameRow[];
+    games_next_cursor?: string | null;
     eligible_best_games: SnapshotBestGame[];
+    eligible_best_games_next_cursor?: string | null;
 };
 
 export type ProviderSearchResult = {

@@ -35,6 +35,20 @@ export default function AppLayout({
             ].join(' ')}
         >
             <nav className="fixed left-7 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-3 rounded-[28px] bg-black p-3 shadow-[0_24px_45px_rgb(0_0_0/0.22)]">
+                <Link
+                    href="/"
+                    aria-label="Stupid Log home"
+                    className="grid size-[52px] place-items-center rounded-[18px] bg-white p-1.5 transition hover:bg-[#b7ff63]"
+                >
+                    <img
+                        src="/images/stupid-log/stupid-log.png"
+                        alt=""
+                        className="size-full object-contain"
+                    />
+                </Link>
+
+                <div className="mx-auto h-px w-8 bg-white/16" />
+
                 {nav.map((item) => {
                     const Icon = item.icon;
                     const active = item.label === title;

@@ -702,6 +702,45 @@ class LibraryGameRulesTest extends TestCase
         $this->assertSame('Steam', $detailsPage['props']['selectedSnapshot']['games'][0]['platform']);
     }
 
+    public function test_snapshot_summary_cache_is_refreshed_after_snapshot_changes(): void
+    {
+        $year = (int) now()->format('Y');
+        $completed = Status::where('name', 'Completed')->firstOrFail();
+        $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Cached Snapshot Game',
+                'source' => 'manual',
+                'total_achievements' => 10,
+                'create_duplicate_anyway' => true,
+            ],
+            'progress' => [
+                'status_id' => $completed->id,
+                'playtime_hours' => 8,
+                'earned_achievements' => 4,
+                'completed_at' => "{$year}-04-12",
+            ],
+        ]));
+
+        $snapshotService = app(SnapshotService::class);
+        $snapshot = $snapshotService->createDraft($this->user, $year)->refresh();
+
+        $this->assertIsArray($snapshot->summary_json);
+        $this->assertSame(1, $snapshot->summary_json['library_games']);
+        $this->assertSame('draft', $snapshot->summary_json['status']);
+
+        $snapshotService->updateBestGames($snapshot, [$libraryGame->id]);
+        $snapshot = $snapshot->refresh();
+
+        $this->assertCount(1, $snapshot->summary_json['best_games']);
+        $this->assertSame('Cached Snapshot Game', $snapshot->summary_json['best_games'][0]['title']);
+
+        $snapshotService->confirm($snapshot);
+        $snapshot = $snapshot->refresh();
+
+        $this->assertSame('confirmed', $snapshot->summary_json['status']);
+        $this->assertSame('confirmed', app(StatsService::class)->snapshotSummary($snapshot)['status']);
+    }
+
     public function test_snapshot_routes_can_create_selected_years_and_delete_runs(): void
     {
         app(LibraryGameCreator::class)->create($this->user, $this->payload());
@@ -723,6 +762,67 @@ class LibraryGameRulesTest extends TestCase
 
         $this->post('/snapshots', ['year' => $year + 1])->assertRedirect();
         $this->assertDatabaseHas('snapshot_runs', ['year' => $year + 1, 'status' => 'draft']);
+    }
+
+    public function test_library_games_cursor_endpoint_orders_filters_and_continues_without_duplicates(): void
+    {
+        $creator = app(LibraryGameCreator::class);
+        $completed = Status::where('name', 'Completed')->firstOrFail();
+
+        $creator->create($this->user, $this->payload([
+            'game' => ['title' => 'Cursor Alpha', 'source' => 'manual', 'create_duplicate_anyway' => true],
+            'progress' => ['status_id' => $completed->id, 'playtime_hours' => 1, 'earned_achievements' => 0, 'completed_at' => now()->format('Y-m-d')],
+        ]));
+        $creator->create($this->user, $this->payload([
+            'game' => ['title' => 'Cursor Beta', 'source' => 'manual', 'create_duplicate_anyway' => true],
+            'progress' => ['status_id' => $completed->id, 'playtime_hours' => 2, 'earned_achievements' => 0, 'completed_at' => now()->format('Y-m-d')],
+        ]));
+        $creator->create($this->user, $this->payload([
+            'game' => ['title' => 'Other Gamma', 'source' => 'manual', 'create_duplicate_anyway' => true],
+        ]));
+
+        $first = $this->getJson('/library-games?query=Cursor&status=Completed&sort=title&limit=1')
+            ->assertOk()
+            ->assertJsonPath('items.0.title', 'Cursor Alpha')
+            ->json();
+
+        $second = $this->getJson('/library-games?query=Cursor&status=Completed&sort=title&limit=1&cursor='.$first['next_cursor'])
+            ->assertOk()
+            ->assertJsonPath('items.0.title', 'Cursor Beta')
+            ->json();
+
+        $this->assertNotSame($first['items'][0]['id'], $second['items'][0]['id']);
+        $this->assertNull($second['next_cursor']);
+    }
+
+    public function test_snapshot_captured_games_cursor_endpoint_returns_stable_batches(): void
+    {
+        $creator = app(LibraryGameCreator::class);
+
+        foreach (['Snapshot Alpha', 'Snapshot Beta', 'Snapshot Gamma'] as $title) {
+            $creator->create($this->user, $this->payload([
+                'game' => ['title' => $title, 'source' => 'manual', 'create_duplicate_anyway' => true],
+            ]));
+        }
+
+        $snapshot = app(SnapshotService::class)->createDraft($this->user, (int) now()->format('Y'));
+
+        $first = $this->getJson("/snapshots/{$snapshot->id}/games?limit=2")
+            ->assertOk()
+            ->assertJsonPath('items.0.title', 'Snapshot Alpha')
+            ->assertJsonPath('items.1.title', 'Snapshot Beta')
+            ->json();
+
+        $second = $this->getJson("/snapshots/{$snapshot->id}/games?limit=2&cursor=".$first['next_cursor'])
+            ->assertOk()
+            ->assertJsonPath('items.0.title', 'Snapshot Gamma')
+            ->json();
+
+        $firstIds = collect($first['items'])->pluck('library_game_id');
+        $secondIds = collect($second['items'])->pluck('library_game_id');
+
+        $this->assertTrue($firstIds->intersect($secondIds)->isEmpty());
+        $this->assertNull($second['next_cursor']);
     }
 
     public function test_snapshot_best_games_are_limited_to_completed_games_for_that_year_and_unique_by_global_game(): void
