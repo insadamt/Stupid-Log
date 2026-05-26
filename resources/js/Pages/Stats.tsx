@@ -1,5 +1,6 @@
 import { BarChart3, ChevronLeft, ChevronRight, Clock3, DollarSign, Gamepad2, Medal, Trophy } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { gsap, prefersReducedMotion, useGSAP } from '../animation';
 import AppLayout from '../Components/AppLayout';
 import PlatformIcon from '../Components/PlatformIcon';
 import { statusColor, statusDotStyle, statusPillStyle } from '../statusColors';
@@ -553,6 +554,9 @@ function SlideNav({ active, setActive }: { active: TabKey; setActive: (tab: TabK
 }
 
 export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData; confirmedYears?: ConfirmedYearStats[] }) {
+    const panelShellRef = useRef<HTMLElement>(null);
+    const panelContentRef = useRef<HTMLDivElement>(null);
+    const pendingTabTransition = useRef<{ enterFrom: number; exitTo: number; clone: HTMLElement | null } | null>(null);
     const [view, setView] = useState<'all-time' | string>('all-time');
     const [bestGamesView, setBestGamesView] = useState<'latest' | string>('latest');
     const [active, setActive] = useState<TabKey>('overview');
@@ -568,6 +572,82 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
     const previous: StatView | null = selectedYear ? previousYear : latestYear;
     const displayedYear = bestGamesMode ? selectedBestGamesYear?.year ?? null : selectedYear?.year ?? latestYear?.year ?? null;
     const yearIndex = displayedYear ? yearsAsc.findIndex((year) => year.year === displayedYear) : -1;
+
+    useGSAP(() => {
+        const transition = pendingTabTransition.current;
+        const content = panelContentRef.current;
+
+        if (!transition || !content) return;
+
+        pendingTabTransition.current = null;
+
+        if (prefersReducedMotion()) {
+            transition.clone?.remove();
+            gsap.set(content, { autoAlpha: 1, clearProps: 'transform,visibility,opacity' });
+            return;
+        }
+
+        const timeline = gsap.timeline({
+            defaults: { duration: 0.48, ease: 'power3.inOut' },
+            onComplete: () => transition.clone?.remove(),
+        });
+
+        timeline.fromTo(
+            content,
+            { xPercent: transition.enterFrom, autoAlpha: 1 },
+            { xPercent: 0, autoAlpha: 1, clearProps: 'transform,visibility,opacity' },
+            0,
+        );
+
+        if (transition.clone) {
+            timeline.to(
+                transition.clone,
+                { xPercent: transition.exitTo, autoAlpha: 1 },
+                0,
+            );
+        }
+    }, { scope: panelShellRef, dependencies: [active] });
+
+    function setActiveTab(next: TabKey) {
+        if (next === active) return;
+
+        const currentIndex = tabs.findIndex((tab) => tab.key === active);
+        const nextIndex = tabs.findIndex((tab) => tab.key === next);
+
+        if (currentIndex < 0 || nextIndex < 0 || prefersReducedMotion()) {
+            setActive(next);
+            return;
+        }
+
+        const shell = panelShellRef.current;
+        const content = panelContentRef.current;
+        const nextIsRight = nextIndex > currentIndex;
+        const clone = content?.cloneNode(true) as HTMLElement | undefined;
+
+        if (shell && content && clone) {
+            const bounds = content.getBoundingClientRect();
+            const shellBounds = shell.getBoundingClientRect();
+
+            clone.style.position = 'absolute';
+            clone.style.left = `${bounds.left - shellBounds.left}px`;
+            clone.style.top = `${bounds.top - shellBounds.top}px`;
+            clone.style.width = `${bounds.width}px`;
+            clone.style.height = `${bounds.height}px`;
+            clone.style.zIndex = '20';
+            clone.style.pointerEvents = 'none';
+            clone.style.margin = '0';
+
+            shell.appendChild(clone);
+        }
+
+        pendingTabTransition.current = {
+            enterFrom: nextIsRight ? 100 : -100,
+            exitTo: nextIsRight ? -100 : 100,
+            clone: clone ?? null,
+        };
+
+        setActive(next);
+    }
 
     const stepYear = (direction: number) => {
         if (yearsAsc.length === 0) return;
@@ -624,10 +704,12 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                             </div>
                         </div>
                     </header>
-                    <main className="min-h-0 overflow-hidden rounded-[34px] border border-black/8 bg-white/35 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.58)]">
-                        {panel}
+                    <main ref={panelShellRef} className="relative min-h-0 overflow-hidden rounded-[34px] border border-black/8 bg-white/35 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.58)]">
+                        <div ref={panelContentRef} className="relative z-10 h-full min-h-0">
+                            {panel}
+                        </div>
                     </main>
-                    <SlideNav active={active} setActive={setActive} />
+                    <SlideNav active={active} setActive={setActiveTab} />
                 </div>
             </section>
         </AppLayout>

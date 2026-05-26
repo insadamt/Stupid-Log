@@ -17,6 +17,7 @@ import {
     X,
 } from "lucide-react";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { gsap, prefersReducedMotion, useGSAP } from "../animation";
 import {
     ProviderSearchResponse,
     ProviderSearchResult,
@@ -519,6 +520,12 @@ export default function AddGameWizard({
     const [completionDateDraft, setCompletionDateDraft] = useState(today());
     const searchId = useRef(0);
     const coverInputRef = useRef<HTMLInputElement | null>(null);
+    const backdropRef = useRef<HTMLDivElement | null>(null);
+    const panelRef = useRef<HTMLElement | null>(null);
+    const stepShellRef = useRef<HTMLDivElement | null>(null);
+    const stepContentRef = useRef<HTMLElement | null>(null);
+    const stepExitClone = useRef<HTMLElement | null>(null);
+    const stepDirection = useRef(1);
 
     const step = steps[stepIndex];
     const platform = useMemo(() => references.platforms.find((item) => item.id === draft.platform_id), [draft.platform_id, references.platforms]);
@@ -535,6 +542,141 @@ export default function AddGameWizard({
     const ownedDlcCount = draft.owned_dlcs.length;
     const coverPreview = localCoverPreview || draft.cover_url_original;
     const showSidePanel = !["search", "basics"].includes(step.key);
+
+    useGSAP(() => {
+        if (!open) return;
+
+        const backdrop = backdropRef.current;
+        const panel = panelRef.current;
+        if (!backdrop || !panel) return;
+
+        if (prefersReducedMotion()) {
+            gsap.set([backdrop, panel], { autoAlpha: 1, clearProps: "transform,visibility,opacity" });
+            return;
+        }
+
+        const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+
+        timeline
+            .fromTo(backdrop, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.22, clearProps: "visibility,opacity" }, 0)
+            .fromTo(
+                panel,
+                { autoAlpha: 0, y: 24, scale: 0.965 },
+                { autoAlpha: 1, y: 0, scale: 1, duration: 0.42, clearProps: "transform,visibility,opacity" },
+                0.04,
+            );
+    }, { scope: backdropRef, dependencies: [open] });
+
+    useGSAP(() => {
+        if (!open) return;
+
+        const stepNode = stepContentRef.current;
+        if (!stepNode) return;
+
+        if (prefersReducedMotion()) {
+            stepExitClone.current?.remove();
+            stepExitClone.current = null;
+            gsap.set(stepNode, { autoAlpha: 1, clearProps: "transform,visibility,opacity" });
+            return;
+        }
+
+        const children = Array.from(stepNode.firstElementChild?.children ?? []);
+        const direction = stepDirection.current >= 0 ? 1 : -1;
+        const exitClone = stepExitClone.current;
+        const timeline = gsap.timeline({
+            defaults: { ease: "power3.inOut" },
+            onComplete: () => {
+                exitClone?.remove();
+                if (stepExitClone.current === exitClone) stepExitClone.current = null;
+                stepShellRef.current?.style.removeProperty("min-height");
+            },
+        });
+
+        if (exitClone) {
+            timeline.to(
+                exitClone,
+                {
+                    autoAlpha: 0,
+                    xPercent: -12 * direction,
+                    scale: 0.985,
+                    duration: 0.42,
+                },
+                0,
+            );
+        }
+
+        timeline.fromTo(
+            stepNode,
+            { autoAlpha: exitClone ? 0.35 : 0, xPercent: 12 * direction, scale: exitClone ? 0.985 : 1 },
+            { autoAlpha: 1, xPercent: 0, scale: 1, duration: 0.42, clearProps: "transform,visibility,opacity" },
+            0,
+        );
+
+        if (!exitClone && children.length) {
+            timeline.fromTo(
+                children,
+                { autoAlpha: 0, y: 10 },
+                {
+                    autoAlpha: 1,
+                    y: 0,
+                    duration: 0.28,
+                    stagger: 0.035,
+                    clearProps: "transform,visibility,opacity",
+                },
+                0.08,
+            );
+        }
+    }, { scope: stepContentRef, dependencies: [open, step.key] });
+
+    function closeWizard() {
+        const backdrop = backdropRef.current;
+        const panel = panelRef.current;
+
+        if (!backdrop || !panel || prefersReducedMotion()) {
+            setOpen(false);
+            return;
+        }
+
+        gsap.timeline({
+            defaults: { ease: "power3.inOut" },
+            onComplete: () => setOpen(false),
+        })
+            .to(panel, { autoAlpha: 0, y: 18, scale: 0.975, duration: 0.24 }, 0)
+            .to(backdrop, { autoAlpha: 0, duration: 0.2 }, 0.04);
+    }
+
+    function setWizardStep(index: number) {
+        if (index === stepIndex) return;
+
+        const direction = index >= stepIndex ? 1 : -1;
+        stepDirection.current = direction;
+
+        const shell = stepShellRef.current;
+        const currentStep = stepContentRef.current;
+        if (open && shell && currentStep && !prefersReducedMotion()) {
+            stepExitClone.current?.remove();
+
+            const shellRect = shell.getBoundingClientRect();
+            const stepRect = currentStep.getBoundingClientRect();
+            const clone = currentStep.cloneNode(true) as HTMLElement;
+
+            clone.style.position = "absolute";
+            clone.style.left = `${stepRect.left - shellRect.left}px`;
+            clone.style.top = `${stepRect.top - shellRect.top}px`;
+            clone.style.width = `${stepRect.width}px`;
+            clone.style.minHeight = `${stepRect.height}px`;
+            clone.style.margin = "0";
+            clone.style.pointerEvents = "none";
+            clone.style.zIndex = "20";
+            clone.setAttribute("aria-hidden", "true");
+
+            shell.style.minHeight = `${stepRect.height}px`;
+            shell.appendChild(clone);
+            stepExitClone.current = clone;
+        }
+
+        setStepIndex(index);
+    }
 
     function update<K extends keyof Draft>(key: K, value: Draft[K]) {
         setDraft((current) => ({ ...current, [key]: value }));
@@ -954,11 +1096,11 @@ export default function AddGameWizard({
     const currentError = errorFor(step.key);
 
     function next() {
-        if (!currentError) setStepIndex((current) => Math.min(current + 1, steps.length - 1));
+        if (!currentError) setWizardStep(Math.min(stepIndex + 1, steps.length - 1));
     }
 
     function previous() {
-        setStepIndex((current) => Math.max(current - 1, 0));
+        setWizardStep(Math.max(stepIndex - 1, 0));
     }
 
     async function submit(forceCreateDuplicate = false) {
@@ -1021,7 +1163,7 @@ export default function AddGameWizard({
             preserveScroll: true,
             onStart: () => { setSaving(true); setServerErrors({}); },
             onFinish: () => setSaving(false),
-            onSuccess: () => setOpen(false),
+            onSuccess: () => closeWizard(),
             onError: (errors) => setServerErrors(errors),
         });
     }
@@ -1061,9 +1203,9 @@ export default function AddGameWizard({
             </button>
 
             {open && (
-                <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4 py-5 backdrop-blur-md">
-                    <section className="grid max-h-[94vh] w-full max-w-[1320px] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[42px] border border-white/20 bg-[#eff1ea] shadow-[0_44px_150px_rgb(0_0_0/0.55)]">
-                    <header className="border-b border-black/10 bg-[#b7ff63] px-8 py-5">
+                <div ref={backdropRef} className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 py-5 backdrop-blur-md">
+                    <section ref={panelRef} className="grid max-h-[94vh] w-full max-w-[1320px] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[42px] border border-white/15 bg-[#e9eee9] shadow-[0_44px_150px_rgb(0_0_0/0.6)]">
+                    <header className="relative overflow-hidden border-b border-black/10 bg-[#b7ff63] px-8 py-5">
                             <div className="flex items-start justify-between gap-6">
                                 <div className="flex min-w-0 items-center gap-4">
                                     <div className="grid size-16 shrink-0 place-items-center rounded-[22px] bg-black p-1.5 shadow-[0_16px_30px_rgb(0_0_0/0.2)]">
@@ -1080,15 +1222,15 @@ export default function AddGameWizard({
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <Pill>{step.label}</Pill>
-                                    <button type="button" onClick={() => setOpen(false)} className="grid size-11 place-items-center rounded-full bg-black text-white transition hover:scale-105"><X size={20} /></button>
+                                    <button type="button" onClick={closeWizard} className="grid size-11 place-items-center rounded-full bg-black text-white transition hover:scale-105"><X size={20} /></button>
                                 </div>
                             </div>
                             <div className="mt-5 grid grid-cols-9 gap-2">
-                                {steps.map((item, index) => <button key={item.key} type="button" disabled={!canOpenStep(index)} onClick={() => canOpenStep(index) && setStepIndex(index)} className={`h-1.5 rounded-full transition ${index <= stepIndex ? "bg-black" : "bg-white/65"} ${!canOpenStep(index) ? "cursor-not-allowed opacity-50" : ""}`} aria-label={item.label} />)}
+                                {steps.map((item, index) => <button key={item.key} type="button" disabled={!canOpenStep(index)} onClick={() => canOpenStep(index) && setWizardStep(index)} className={`h-1.5 rounded-full transition ${index <= stepIndex ? "bg-black" : "bg-white/65"} ${!canOpenStep(index) ? "cursor-not-allowed opacity-50" : ""}`} aria-label={item.label} />)}
                             </div>
                         </header>
 
-                        <main className="overflow-y-auto p-7">
+                        <main className="overflow-y-auto bg-[#e8eee8] p-7">
                             <div className={showSidePanel ? "grid gap-7 lg:grid-cols-[280px_1fr]" : "grid gap-5"}>
                                 {showSidePanel && (
                                     <aside className="space-y-4">
@@ -1103,7 +1245,8 @@ export default function AddGameWizard({
                                     </aside>
                                 )}
 
-                                <section className="min-w-0">
+                                <div ref={stepShellRef} className="relative min-w-0 overflow-hidden">
+                                <section ref={stepContentRef} className="relative z-10 min-w-0">
                                 {step.key === "search" && (
     <div className="grid gap-5">
         <section className="relative overflow-hidden rounded-[38px] bg-black p-6 text-white shadow-[0_28px_80px_rgb(0_0_0/0.24)]">
@@ -1352,10 +1495,11 @@ export default function AddGameWizard({
 
                                     {Object.keys(serverErrors).length > 0 && <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-5 text-sm font-black text-red-700"><div className="mb-2 text-base">Backend rejected the save:</div><ul className="list-inside list-disc space-y-1">{Object.entries(serverErrors).map(([key, value]) => <li key={key}>{key}: {value}</li>)}</ul></div>}
                                 </section>
+                                </div>
                             </div>
                         </main>
 
-                        <footer className="flex items-center justify-between gap-5 border-t border-black/10 bg-white px-7 py-5">
+                        <footer className="flex items-center justify-between gap-5 border-t border-black/10 bg-[#f6faf4] px-7 py-5">
                             <button type="button" onClick={previous} disabled={stepIndex === 0} className="flex items-center gap-3 rounded-2xl bg-black/[0.06] px-7 py-3.5 text-base font-black disabled:opacity-35"><ChevronLeft size={18} /> Back</button>
                             <div className={`hidden min-w-0 flex-1 text-center text-xs font-black uppercase tracking-[0.18em] md:block ${currentError ? "rounded-full bg-red-500/10 px-4 py-2 text-red-700" : "text-black/35"}`}>{currentError ? currentError : `${stepIndex + 1} / ${steps.length}`}</div>
                             {stepIndex < steps.length - 1 ? <button type="button" onClick={next} disabled={!!currentError} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">Next <ChevronRight size={18} /></button> : <button type="button" onClick={() => void submit()} disabled={!!currentError || saving || checkingDuplicates} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">{saving || checkingDuplicates ? <><Loader2 className="animate-spin" size={18} /> Saving</> : <><Check size={18} /> Save Game</>}</button>}

@@ -11,6 +11,7 @@ import {
     X,
 } from 'lucide-react';
 import { ReactNode, UIEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useStaggerRefresh } from '../animation';
 import AddGameWizard from '../Components/AddGameWizard';
 import AppLayout from '../Components/AppLayout';
 import GameCard from '../Components/GameCard';
@@ -55,6 +56,7 @@ function useDebouncedValue(value: string, delay = 240) {
 function VirtualCardGrid({
     items,
     columns,
+    refreshKey,
     hasMore,
     loading,
     empty,
@@ -62,12 +64,14 @@ function VirtualCardGrid({
 }: {
     items: GameCardData[];
     columns: number;
+    refreshKey: string;
     hasMore: boolean;
     loading: boolean;
     empty: ReactNode;
     onNearEnd: () => void;
 }) {
     const ref = useRef<HTMLDivElement>(null);
+    const gridRef = useRef<HTMLDivElement>(null);
     const [scrollTop, setScrollTop] = useState(0);
     const [viewportHeight, setViewportHeight] = useState(0);
     const cardWidth = 200;
@@ -79,6 +83,9 @@ function VirtualCardGrid({
     const endRow = Math.min(totalRows, Math.ceil((scrollTop + viewportHeight) / rowHeight) + 2);
     const startIndex = startRow * columns;
     const endIndex = Math.min(items.length, endRow * columns);
+    const visibleItems = items.slice(startIndex, endIndex);
+
+    useStaggerRefresh(gridRef, refreshKey);
 
     useEffect(() => {
         const node = ref.current;
@@ -106,8 +113,8 @@ function VirtualCardGrid({
 
     return (
         <div ref={ref} onScroll={handleScroll} className="sl-scrollbar relative h-full min-h-0 overflow-y-auto overflow-x-hidden px-16 py-10">
-            <div className="relative mx-auto" style={{ width: columns * cardWidth + (columns - 1) * gapX, height: totalHeight }}>
-                {items.slice(startIndex, endIndex).map((game, offset) => {
+            <div ref={gridRef} className="relative mx-auto" style={{ width: columns * cardWidth + (columns - 1) * gapX, height: totalHeight }}>
+                {visibleItems.map((game, offset) => {
                     const index = startIndex + offset;
                     const row = Math.floor(index / columns);
                     const column = index % columns;
@@ -115,6 +122,7 @@ function VirtualCardGrid({
                     return (
                         <div
                             key={game.id}
+                            data-refresh-item={game.id}
                             className="absolute"
                             style={{
                                 left: column * (cardWidth + gapX),
@@ -127,9 +135,9 @@ function VirtualCardGrid({
                         </div>
                     );
                 })}
-                {(loading || hasMore) && (
+                {hasMore && (
                     <div className="absolute left-0 right-0 grid h-14 place-items-center rounded-[22px] bg-black/5 text-xs font-black uppercase tracking-[0.16em] text-black/35" style={{ top: totalRows * rowHeight }}>
-                        {loading ? 'Loading' : 'Scroll for more'}
+                        Scroll for more
                     </div>
                 )}
             </div>
@@ -169,6 +177,7 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
     const cardsPerRow = filtersOpen ? 5 : 6;
     const debouncedQuery = useDebouncedValue(query);
     const requestKey = `${debouncedQuery}|${status}|${platform}|${sort}`;
+    const refreshKey = games.map((game) => game.id).join(',');
 
     const statusOptions = useMemo(() => {
         const merged = [...preferredStatuses, ...Object.keys(libraryMeta.statuses)];
@@ -364,6 +373,7 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                             <VirtualCardGrid
                                 items={games}
                                 columns={cardsPerRow}
+                                refreshKey={refreshKey}
                                 hasMore={hasMore}
                                 loading={loading}
                                 onNearEnd={loadMore}

@@ -16,7 +16,8 @@ import {
     Trophy,
     X,
 } from 'lucide-react';
-import { ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useMemo, useRef, useState } from 'react';
+import { gsap, prefersReducedMotion, useGSAP } from '../animation';
 import AppLayout from '../Components/AppLayout';
 import GameCard from '../Components/GameCard';
 import PlatformIcon from '../Components/PlatformIcon';
@@ -262,6 +263,14 @@ export default function GameDetails({
     references: ReferenceData;
     dlcs: Dlc[];
 }) {
+    const pageRef = useRef<HTMLElement>(null);
+    const layoutRef = useRef<HTMLElement>(null);
+    const metricsRef = useRef<HTMLElement>(null);
+    const stageRef = useRef<HTMLElement>(null);
+    const detailsPanelRef = useRef<HTMLElement>(null);
+    const previousStageRect = useRef<DOMRect | null>(null);
+    const modeDirection = useRef(0);
+    const firstModeRender = useRef(true);
     const [mode, setMode] = useState<Mode>('overview');
     const [filter, setFilter] = useState('All');
     const [query, setQuery] = useState('');
@@ -322,6 +331,160 @@ export default function GameDetails({
     const filteredDevices = (selectedPlatform?.devices ?? []).filter((device) =>
         device.name.toLowerCase().includes(deviceQuery.toLowerCase().trim()),
     );
+
+    useGSAP(() => {
+        const page = pageRef.current;
+        if (!page) return;
+
+        const header = page.querySelector('[data-details-header]');
+        const stage = page.querySelector('[data-details-stage]');
+        const card = page.querySelector('[data-details-card]');
+        const panels = page.querySelectorAll('[data-details-panel]');
+
+        if (prefersReducedMotion()) {
+            gsap.set([page, header, stage, card, panels], { autoAlpha: 1, clearProps: 'transform,visibility,opacity' });
+            return;
+        }
+
+        const timeline = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+        timeline
+            .fromTo(
+                page,
+                { autoAlpha: 0 },
+                { autoAlpha: 1, duration: 0.28, clearProps: 'visibility,opacity' },
+                0,
+            )
+            .fromTo(
+                header,
+                { autoAlpha: 0, y: -18 },
+                { autoAlpha: 1, y: 0, duration: 0.46, clearProps: 'transform,visibility,opacity' },
+                0.06,
+            )
+            .fromTo(
+                stage,
+                { autoAlpha: 0, scale: 0.94, y: 18 },
+                { autoAlpha: 1, scale: 1, y: 0, duration: 0.58, clearProps: 'transform,visibility,opacity' },
+                0.12,
+            )
+            .fromTo(
+                card,
+                { autoAlpha: 0, scale: 0.9, rotation: -1.5 },
+                { autoAlpha: 1, scale: 1, rotation: 0, duration: 0.62, clearProps: 'transform,visibility,opacity' },
+                0.16,
+            )
+            .fromTo(
+                panels,
+                { autoAlpha: 0 },
+                {
+                    autoAlpha: 1,
+                    duration: 0.36,
+                    stagger: 0.06,
+                    clearProps: 'visibility,opacity',
+                },
+                0.24,
+            );
+    }, { scope: pageRef, dependencies: [libraryGame.id] });
+
+    useGSAP(() => {
+        const stage = stageRef.current;
+        const detailsPanel = detailsPanelRef.current;
+
+        if (!stage || firstModeRender.current) {
+            firstModeRender.current = false;
+            previousStageRect.current = null;
+            return;
+        }
+
+        if (prefersReducedMotion()) {
+            previousStageRect.current = null;
+            gsap.set([stage, detailsPanel], { autoAlpha: 1, clearProps: 'transform,visibility,opacity' });
+            return;
+        }
+
+        const nextRect = stage.getBoundingClientRect();
+        const previousRect = previousStageRect.current;
+        const timeline = gsap.timeline({
+            defaults: { ease: 'power3.inOut' },
+            onComplete: () => gsap.set(stage, { zIndex: 20 }),
+        });
+
+        gsap.set(stage, { zIndex: 40 });
+
+        if (previousRect) {
+            timeline.fromTo(
+                stage,
+                {
+                    x: previousRect.left - nextRect.left,
+                    y: previousRect.top - nextRect.top,
+                },
+                {
+                    x: 0,
+                    y: 0,
+                    duration: 0.48,
+                    clearProps: 'transform',
+                },
+                0,
+            );
+        }
+
+        if (detailsPanel) {
+            timeline.fromTo(
+                detailsPanel,
+                {
+                    autoAlpha: 0,
+                    x: mode === 'overview' ? -80 : -120,
+                    scale: 0.96,
+                    transformOrigin: 'left center',
+                },
+                {
+                    autoAlpha: 1,
+                    x: 0,
+                    scale: 1,
+                    duration: 0.36,
+                    clearProps: 'transform,visibility,opacity',
+                },
+                0.18,
+            );
+        }
+
+        previousStageRect.current = null;
+    }, { scope: pageRef, dependencies: [mode] });
+
+    function changeMode(nextMode: Mode) {
+        if (nextMode === mode) return;
+
+        const order: Mode[] = ['overview', 'ownership', 'dlcs'];
+        previousStageRect.current = stageRef.current?.getBoundingClientRect() ?? null;
+        modeDirection.current = order.indexOf(nextMode) > order.indexOf(mode) ? 1 : -1;
+
+        if (mode === 'overview' && nextMode !== 'overview' && layoutRef.current && metricsRef.current && !prefersReducedMotion()) {
+            const layoutBounds = layoutRef.current.getBoundingClientRect();
+            const metricsBounds = metricsRef.current.getBoundingClientRect();
+            const clone = metricsRef.current.cloneNode(true) as HTMLElement;
+
+            clone.style.position = 'absolute';
+            clone.style.left = `${metricsBounds.left - layoutBounds.left}px`;
+            clone.style.top = `${metricsBounds.top - layoutBounds.top}px`;
+            clone.style.width = `${metricsBounds.width}px`;
+            clone.style.height = `${metricsBounds.height}px`;
+            clone.style.zIndex = '15';
+            clone.style.pointerEvents = 'none';
+            clone.style.margin = '0';
+
+            layoutRef.current.appendChild(clone);
+            gsap.to(clone, {
+                autoAlpha: 0,
+                x: -28,
+                duration: 0.38,
+                delay: 0.08,
+                ease: 'power3.out',
+                onComplete: () => clone.remove(),
+            });
+        }
+
+        setMode(nextMode);
+    }
 
 
     function updateOwnershipForm(patch: Partial<OwnershipForm>) {
@@ -549,11 +712,11 @@ export default function GameDetails({
 
     return (
         <AppLayout title={libraryGame.title} lockViewport>
-            <section className="relative isolate h-full overflow-hidden rounded-[44px] border border-black/10 bg-[#e8eee8] px-7 pb-24 pt-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.75)]">
+            <section ref={pageRef} className="relative isolate h-full overflow-hidden rounded-[44px] border border-black/10 bg-[#e8eee8] px-7 pb-24 pt-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.75)]">
                 <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_42%,rgba(183,255,99,0.24),transparent_34%),radial-gradient(circle_at_82%_16%,rgba(0,0,0,0.08),transparent_24%),linear-gradient(rgba(0,0,0,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.035)_1px,transparent_1px)] bg-[length:auto,auto,38px_38px,38px_38px]" />
                 <div className="pointer-events-none absolute left-[42%] top-[53%] -z-10 h-[380px] w-[740px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#b7ff63]/18 blur-3xl" />
 
-                <header className="mx-auto grid h-[72px] w-full max-w-[1430px] grid-cols-[96px_1fr_auto_auto] overflow-hidden rounded-full bg-[#b7ff63] shadow-[0_18px_52px_rgb(0_0_0/0.12)]">
+                <header data-details-header className="mx-auto grid h-[72px] w-full max-w-[1430px] grid-cols-[96px_1fr_auto_auto] overflow-hidden rounded-full bg-[#b7ff63] shadow-[0_18px_52px_rgb(0_0_0/0.12)]">
                     <Link href="/library" className="grid place-items-center border-r border-black/15 transition hover:bg-black hover:text-[#b7ff63]" aria-label="Back to library">
                         <ChevronLeft size={36} strokeWidth={4} />
                     </Link>
@@ -571,13 +734,14 @@ export default function GameDetails({
                 </header>
 
                 <main
+                    ref={layoutRef}
                     className={[
-                        'mx-auto mt-8 grid h-[calc(100%-128px)] w-full max-w-[1460px] items-center',
+                        'relative mx-auto mt-8 grid h-[calc(100%-128px)] w-full max-w-[1460px] items-center',
                         mode === 'overview' ? 'grid-cols-[260px_370px_minmax(0,1fr)] gap-10' : 'grid-cols-[370px_minmax(0,1fr)] gap-9',
                     ].join(' ')}
                 >
                     {mode === 'overview' && (
-                        <aside className="grid min-w-0 gap-3 self-center">
+                        <aside ref={metricsRef} data-details-panel className="relative z-10 grid min-w-0 gap-3 self-center">
                             <MetricTile icon={<Trophy size={22} fill="currentColor" />} value={achievements} label="Achievements" />
                             <MetricTile icon={<Clock3 size={22} />} value={formatHours(libraryGame.playtime_hours)} label="Playtime" />
                             <MetricTile icon={<DollarSign size={22} />} value={formatMoney(libraryGame.base_price_default)} label="Base Value" />
@@ -586,19 +750,20 @@ export default function GameDetails({
                     )}
 
                     <section
+                        data-details-stage
+                        ref={stageRef}
                         className={[
-                            'relative grid h-[610px] w-full place-items-center self-center',
-                            mode === 'overview'
-                                ? 'rounded-[44px] border border-black/10 bg-black/[0.035] p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.45)]'
-                                : 'place-items-center',
+                            'relative z-20 grid h-[610px] w-full place-items-center self-center rounded-[44px] border border-black/10 bg-black/[0.035] p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.45)]',
                         ].join(' ')}
                     >
                         <div className="pointer-events-none absolute inset-x-8 top-8 h-24 rounded-full bg-[#b7ff63]/28 blur-3xl" />
                         <div className="absolute -bottom-6 h-12 w-[300px] rounded-full bg-black/16 blur-xl" />
-                        <GameCard game={libraryGame} featured expanded={false} />
+                        <div data-details-card>
+                            <GameCard game={libraryGame} featured expanded={false} />
+                        </div>
                     </section>
 
-                    <section className="min-w-0 self-center">
+                    <section data-details-panel ref={detailsPanelRef} className="relative z-10 min-w-0 self-center">
                         {mode === 'overview' && (
                             <article className="overflow-hidden rounded-[40px] bg-black text-white shadow-[0_34px_90px_rgb(0_0_0/0.24)]">
                                 <div className="p-7">
@@ -625,32 +790,37 @@ export default function GameDetails({
                         )}
 
                         {mode === 'ownership' && (
-                            <article className="rounded-[40px] bg-black p-6 text-white shadow-[0_34px_90px_rgb(0_0_0/0.24)]">
-                                <div className="flex items-start justify-between gap-5 border-b border-white/10 pb-5">
+                            <article className="grid h-[610px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[40px] bg-black p-5 text-white shadow-[0_34px_90px_rgb(0_0_0/0.24)]">
+                                <div className="flex items-center justify-between gap-5 border-b border-white/10 pb-4">
                                     <div>
                                         <div className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]">Vault</div>
-                                        <h2 className="mt-2 text-[46px] font-black leading-none tracking-[-0.065em]">Ownership & Prices</h2>
+                                        <h2 className="mt-1 text-[34px] font-black leading-none tracking-[-0.055em]">Ownership & Prices</h2>
                                     </div>
                                     <button type="button" onClick={startAddCopy} className="flex items-center gap-2 rounded-[18px] bg-[#b7ff63] px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:-translate-y-0.5">
                                         <Plus size={18} strokeWidth={3} /> Add Copy
                                     </button>
                                 </div>
 
-                                <div className="mt-5 grid max-h-[472px] gap-3 overflow-auto pr-1">
+                                <div className="min-h-0 overflow-auto pr-1 pt-4">
+                                    <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_112px_112px_92px] gap-3 rounded-[18px] bg-[#b7ff63] px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-black">
+                                        <span>Copy</span>
+                                        <span>Base</span>
+                                        <span>Paid</span>
+                                        <span className="text-right">Actions</span>
+                                    </div>
+                                    <div className="mt-3 grid gap-2">
                                     {details.ownership_copies.map((copy, index) => (
-                                        <div key={copy.id} className="grid gap-3 rounded-[26px] border border-white/10 bg-white/[0.06] p-4 md:grid-cols-[1fr_132px_132px_112px] md:items-center">
+                                        <div key={copy.id} className="grid grid-cols-[minmax(0,1fr)_112px_112px_92px] items-center gap-3 rounded-[20px] border border-white/10 bg-white/[0.06] p-3">
                                             <div>
                                                 <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">Copy {index + 1}</div>
-                                                <div className="mt-1 text-2xl font-black tracking-[-0.04em]">{copy.ownership_type || 'Unknown'}</div>
-                                                <div className="mt-1 text-xs font-black text-white/35">{copy.edition_name || copy.physical_status || 'Standard'}</div>
+                                                <div className="mt-1 truncate text-xl font-black tracking-[-0.04em]">{copy.ownership_type || 'Unknown'}</div>
+                                                <div className="mt-1 truncate text-xs font-black text-white/35">{copy.edition_name || copy.physical_status || 'Standard'}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">Base Value</div>
-                                                <div className="mt-1 text-xl font-black text-[#b7ff63]">{formatMoney(copy.base_price)}</div>
+                                                <div className="text-base font-black text-[#b7ff63]">{formatMoney(copy.base_price)}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">Paid</div>
-                                                <div className="mt-1 text-xl font-black text-white/70">{formatMoney(copy.purchased_price)}</div>
+                                                <div className="text-base font-black text-white/70">{formatMoney(copy.purchased_price)}</div>
                                             </div>
                                             <div className="flex gap-2 md:justify-end">
                                                 <button type="button" onClick={() => startEditCopy(copy)} className="grid size-11 place-items-center rounded-2xl bg-white/10 text-white/70 hover:text-white"><Edit3 size={18} /></button>
@@ -658,16 +828,17 @@ export default function GameDetails({
                                             </div>
                                         </div>
                                     ))}
+                                    </div>
                                 </div>
                             </article>
                         )}
 
                         {mode === 'dlcs' && (
-                            <article className="rounded-[40px] bg-black p-6 text-white shadow-[0_34px_90px_rgb(0_0_0/0.24)]">
-                                <div className="flex flex-wrap items-center gap-3 border-b border-white/10 pb-5">
+                            <article className="grid h-[610px] grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden rounded-[40px] bg-black p-5 text-white shadow-[0_34px_90px_rgb(0_0_0/0.24)]">
+                                <div className="flex flex-wrap items-center gap-3 border-b border-white/10 pb-4">
                                     <div className="mr-auto">
                                         <div className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]">Expansion Bay</div>
-                                        <h2 className="mt-1 text-[42px] font-black leading-none tracking-[-0.065em]">DLC Archive</h2>
+                                        <h2 className="mt-1 text-[34px] font-black leading-none tracking-[-0.055em]">DLC Archive</h2>
                                     </div>
                                     <label className="flex h-14 min-w-[260px] items-center gap-3 rounded-full bg-white/10 px-5 text-base font-black shadow-[inset_0_0_0_1px_rgb(255_255_255/0.12)]">
                                         <Search size={22} />
@@ -678,7 +849,7 @@ export default function GameDetails({
                                         {refreshingDlcs ? 'Refreshing' : 'Refresh'}
                                     </button>
                                 </div>
-                                <div className="mt-4 flex flex-wrap gap-2">
+                                <div className="flex flex-wrap gap-2 py-4">
                                     {['All', 'Owned', 'Edition Included', 'Free', 'Not Owned'].map((item) => (
                                         <button key={item} type="button" onClick={() => setFilter(item)} className={`rounded-full px-5 py-3 text-sm font-black ${filter === item ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-white/45 hover:text-white'}`}>
                                             {item}
@@ -687,12 +858,20 @@ export default function GameDetails({
                                 </div>
                                 {dlcErrors.dlcs && <div className="mt-3 rounded-[18px] border border-[#ff6068]/40 bg-[#ff6068]/10 px-4 py-3 text-sm font-black text-[#ff858b]">{dlcErrors.dlcs}</div>}
 
-                                <div className="mt-5 max-h-[420px] space-y-3 overflow-auto pr-1">
+                                <div className="min-h-0 overflow-auto pr-1">
+                                    <div className="sticky top-0 z-10 grid grid-cols-[92px_minmax(0,1fr)_150px_112px_88px] gap-3 rounded-[18px] bg-[#b7ff63] px-3 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-black">
+                                        <span>Cover</span>
+                                        <span>Title</span>
+                                        <span>Status</span>
+                                        <span>Value</span>
+                                        <span className="text-right">Actions</span>
+                                    </div>
+                                    <div className="mt-3 grid gap-2">
                                     {filteredDlcs.map((dlc) => (
-                                        <div key={dlc.id} className="rounded-[26px] border border-white/10 bg-white/[0.06] p-4 text-lg font-black">
-                                            <div className="grid gap-4 md:grid-cols-[104px_minmax(0,1fr)_165px_120px_100px] md:items-center">
+                                        <div key={dlc.id} className="rounded-[20px] border border-white/10 bg-white/[0.06] p-3 text-sm font-black">
+                                            <div className="grid grid-cols-[92px_minmax(0,1fr)_150px_112px_88px] items-center gap-3">
                                                 <DlcCover dlc={dlc} />
-                                                <span className="truncate">{dlc.title}</span>
+                                                <span className="truncate text-base">{dlc.title}</span>
                                                 <span className={`rounded-full px-4 py-2 text-center text-xs uppercase tracking-[0.12em] ring-1 ${statusTone(dlc.state)}`}>{dlc.state}</span>
                                                 <span className="text-right text-white/72">{formatMoney(dlc.purchased_price ?? dlc.base_price)}</span>
                                                 <div className="flex justify-end gap-2">
@@ -703,6 +882,7 @@ export default function GameDetails({
                                         </div>
                                     ))}
                                     {!filteredDlcs.length && <div className="rounded-[26px] border border-white/10 bg-white/[0.06] p-8 text-2xl font-black">No DLCs saved for this game.</div>}
+                                    </div>
                                 </div>
                             </article>
                         )}
@@ -710,9 +890,9 @@ export default function GameDetails({
                 </main>
 
                 <div className="fixed bottom-7 left-1/2 z-30 flex -translate-x-1/2 rounded-[24px] bg-black p-2 shadow-[0_18px_34px_rgb(0_0_0/0.25)]">
-                    <ModeButton active={mode === 'overview'} onClick={() => setMode('overview')}>Game Page</ModeButton>
-                    <ModeButton active={mode === 'ownership'} onClick={() => setMode('ownership')}>Ownership</ModeButton>
-                    <ModeButton active={mode === 'dlcs'} onClick={() => setMode('dlcs')}>DLCs Page</ModeButton>
+                    <ModeButton active={mode === 'overview'} onClick={() => changeMode('overview')}>Game Page</ModeButton>
+                    <ModeButton active={mode === 'ownership'} onClick={() => changeMode('ownership')}>Ownership</ModeButton>
+                    <ModeButton active={mode === 'dlcs'} onClick={() => changeMode('dlcs')}>DLCs Page</ModeButton>
                 </div>
 
                 {editingCopyId && (
