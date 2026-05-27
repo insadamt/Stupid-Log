@@ -172,6 +172,15 @@ function interpolatedDonutLayout(transitions: DonutTweenSlice[], progress: numbe
         .filter((slice) => slice.value > 0.001), order);
 }
 
+function revealedDonutLayout(layout: DonutArcLayout[], progress: number) {
+    const sweep = clampPercent(progress * 100) * 3.6;
+
+    return layout.map((arc) => ({
+        ...arc,
+        end: sweep <= arc.start ? arc.start : Math.min(arc.end, sweep),
+    }));
+}
+
 function pointOnCircle(cx: number, cy: number, radius: number, angle: number) {
     const radians = (angle - 90) * (Math.PI / 180);
 
@@ -386,22 +395,15 @@ function Donut({ data, total, center }: { data: Slice[]; total: string; center: 
         gsap.killTweensOf(tweenState);
 
         if (!hasRevealed.current) {
-            const revealTransitions: DonutTweenSlice[] = data.map((slice) => ({
-                label: slice.label,
-                from: 0,
-                to: slice.value,
-                color: slice.color,
-            }));
-
-            setRenderLayout([]);
+            setRenderLayout(revealedDonutLayout(targetLayout, 0));
 
             gsap.to(tweenState, {
                 progress: 1,
-                duration: 0.68,
+                duration: 0.82,
                 delay: revealDelay,
-                ease: 'power3.inOut',
+                ease: 'power3.out',
                 onUpdate: () => {
-                    setRenderLayout(interpolatedDonutLayout(revealTransitions, tweenState.progress, orderedLabels));
+                    setRenderLayout(revealedDonutLayout(targetLayout, tweenState.progress));
                 },
                 onComplete: () => {
                     previousSlices.current = data;
