@@ -1,0 +1,13 @@
+/* DLC covers are intentionally hidden in V1 for import speed.
+   Game covers remain unchanged; DLCs render as compact archive rows. */
+[data-details-panel] [class*="grid-cols-[92px_minmax"] {
+    grid-template-columns: minmax(0, 1fr) 150px 112px 88px !important;
+}
+
+[data-details-panel] [class*="grid-cols-[92px_minmax"] > :first-child {
+    display: none !important;
+}
+
+section.max-w-4xl aside > div:first-child {
+    display: none !important;
+}
