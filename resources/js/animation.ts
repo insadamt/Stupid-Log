@@ -11,6 +11,7 @@ type PageTransition = {
     to: string;
     enterFrom: number;
     exitTo: number;
+    kind?: 'nav' | 'setup-complete';
 };
 
 export const pageTransition = {
@@ -28,6 +29,10 @@ export function prefersReducedMotion() {
 
 export function storePageTransition(transition: PageTransition) {
     window.sessionStorage.setItem(transitionKey, JSON.stringify(transition));
+}
+
+export function clearPageTransition() {
+    window.sessionStorage.removeItem(transitionKey);
 }
 
 export function createPageTransitionLayer(page: HTMLElement) {
@@ -78,6 +83,10 @@ export function takePageTransitionLayer() {
         layer,
         clone: layer?.firstElementChild as HTMLElement | null,
     };
+}
+
+export function removePageTransitionLayer() {
+    document.getElementById(layerId)?.remove();
 }
 
 export function useStaggerRefresh<T extends HTMLElement>(

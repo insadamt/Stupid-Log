@@ -6,7 +6,14 @@ import {
     Home as HomeIcon,
     Settings,
 } from 'lucide-react';
-import { ComponentType, MouseEvent, PropsWithChildren, useRef } from 'react';
+import {
+    ComponentType,
+    createContext,
+    MouseEvent,
+    PropsWithChildren,
+    useContext,
+    useRef,
+} from 'react';
 import {
     createPageTransitionLayer,
     gsap,
@@ -32,11 +39,24 @@ const nav: NavItem[] = [
     { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
+type MainPageTransitionContextValue = {
+    navigateWithTransition: (event: MouseEvent<HTMLAnchorElement>, href: string) => void;
+};
+
+const MainPageTransitionContext = createContext<MainPageTransitionContextValue>({
+    navigateWithTransition: () => undefined,
+});
+
+export function useMainPageTransition() {
+    return useContext(MainPageTransitionContext);
+}
+
 export default function AppLayout({
     title,
     children,
     lockViewport = false,
 }: PropsWithChildren<{ title: string; lockViewport?: boolean }>) {
+    const layoutRef = useRef<HTMLElement>(null);
     const pageRef = useRef<HTMLDivElement>(null);
     const currentIndex = nav.findIndex((item) => item.label === title);
 
@@ -53,6 +73,46 @@ export default function AppLayout({
 
         if (transition) {
             const { layer, clone } = takePageTransitionLayer();
+
+            if (transition.kind === 'setup-complete') {
+                const layout = layoutRef.current ?? page;
+                const timeline = gsap.timeline({
+                    defaults: { ease: 'power3.out' },
+                    onComplete: () => layer?.remove(),
+                });
+
+                timeline.fromTo(
+                    layout,
+                    { autoAlpha: 0.72, filter: 'blur(10px)' },
+                    {
+                        autoAlpha: 1,
+                        filter: 'blur(0px)',
+                        duration: 0.72,
+                        clearProps: 'visibility,opacity,filter',
+                    },
+                    0,
+                );
+
+                if (clone) {
+                    const mark = clone.querySelector<HTMLElement>('[data-launch-mark]');
+                    const copy = clone.querySelectorAll<HTMLElement>('[data-launch-copy]');
+                    const loader = clone.querySelector<HTMLElement>('[data-launch-loader]');
+                    const progress = clone.querySelector<HTMLElement>('[data-launch-progress]');
+                    const pulse = clone.querySelector<HTMLElement>('[data-launch-pulse]');
+
+                    timeline
+                        .to(progress, { width: '100%', duration: 0.28, ease: 'power2.out' }, 0)
+                        .to(pulse, { autoAlpha: 0, duration: 0.14 }, 0.14)
+                        .to(clone, { yPercent: -100, duration: 0.68, ease: 'power3.inOut' }, 0.18)
+                        .to(mark, { scale: 0.86, autoAlpha: 0, duration: 0.3, ease: 'power2.in' }, 0.16)
+                        .to(copy, { y: -14, autoAlpha: 0, duration: 0.24, stagger: 0.03, ease: 'power2.in' }, 0.14)
+                        .to(loader, { y: -10, autoAlpha: 0, duration: 0.2, ease: 'power2.in' }, 0.2)
+                        .to(clone, { autoAlpha: 0, duration: 0.12 }, 0.74);
+                }
+
+                return;
+            }
+
             const timeline = gsap.timeline({
                 defaults: {
                     duration: pageTransition.duration,
@@ -103,7 +163,7 @@ export default function AppLayout({
         );
     }, { scope: pageRef, dependencies: [title] });
 
-    function navigateMainPage(event: MouseEvent<HTMLAnchorElement>, item: NavItem) {
+    function navigateWithTransition(event: MouseEvent<HTMLAnchorElement>, href: string) {
         if (
             event.defaultPrevented ||
             event.button !== 0 ||
@@ -115,7 +175,7 @@ export default function AppLayout({
             return;
         }
 
-        const targetIndex = nav.findIndex((candidate) => candidate.href === item.href);
+        const targetIndex = nav.findIndex((candidate) => candidate.href === href);
         const samePage = targetIndex === currentIndex;
 
         if (samePage || currentIndex < 0 || targetIndex < 0 || prefersReducedMotion()) {
@@ -131,7 +191,7 @@ export default function AppLayout({
 
         storePageTransition({
             from: nav[currentIndex].href,
-            to: item.href,
+            to: href,
             enterFrom,
             exitTo,
         });
@@ -140,11 +200,16 @@ export default function AppLayout({
             createPageTransitionLayer(page);
         }
 
-        router.visit(item.href);
+        router.visit(href);
+    }
+
+    function navigateMainPage(event: MouseEvent<HTMLAnchorElement>, item: NavItem) {
+        navigateWithTransition(event, item.href);
     }
 
     return (
         <main
+            ref={layoutRef}
             className={[
                 'bg-[#fbfcf7] text-[#050505]',
                 lockViewport ? 'h-screen overflow-hidden' : 'min-h-screen overflow-x-hidden',
@@ -200,15 +265,17 @@ export default function AppLayout({
                 })}
             </nav>
 
-            <div
-                ref={pageRef}
-                className={[
-                    'mx-auto max-w-[1680px] px-8',
-                    lockViewport ? 'h-screen py-8' : 'py-8 pb-10',
-                ].join(' ')}
-            >
-                {children}
-            </div>
+            <MainPageTransitionContext.Provider value={{ navigateWithTransition }}>
+                <div
+                    ref={pageRef}
+                    className={[
+                        'mx-auto max-w-[1680px] px-8',
+                        lockViewport ? 'h-screen py-8' : 'py-8 pb-10',
+                    ].join(' ')}
+                >
+                    {children}
+                </div>
+            </MainPageTransitionContext.Provider>
         </main>
     );
 }

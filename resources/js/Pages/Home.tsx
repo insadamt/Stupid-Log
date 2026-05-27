@@ -1,3 +1,4 @@
+import { Link } from "@inertiajs/react";
 import {
     Activity,
     ArrowUpRight,
@@ -13,7 +14,7 @@ import {
 } from "lucide-react";
 import { ComponentType } from "react";
 import AddGameWizard from "../Components/AddGameWizard";
-import AppLayout from "../Components/AppLayout";
+import AppLayout, { useMainPageTransition } from "../Components/AppLayout";
 import GameCard, { CoverArt } from "../Components/GameCard";
 import PlatformIcon from "../Components/PlatformIcon";
 import { statusPillStyle } from "../statusColors";
@@ -357,6 +358,30 @@ function BriefPanel({
     );
 }
 
+function LibraryArchiveLink() {
+    const { navigateWithTransition } = useMainPageTransition();
+
+    return (
+        <Link
+            href="/library"
+            onClick={(event) => navigateWithTransition(event, "/library")}
+            className="group flex items-center justify-between rounded-[24px] bg-[#b7ff63] px-5 py-4 text-black transition hover:-translate-y-0.5"
+        >
+            <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-black/45">
+                    Open
+                </p>
+                <p className="text-lg font-black">
+                    Library Archive
+                </p>
+            </div>
+            <span className="grid size-11 place-items-center rounded-full bg-black text-[#b7ff63] transition group-hover:rotate-45">
+                <ArrowUpRight size={23} strokeWidth={3} />
+            </span>
+        </Link>
+    );
+}
+
 export default function Home({
     stats,
     recentGames,
@@ -409,12 +434,6 @@ export default function Home({
 
                     <div className="relative z-10 mt-0 grid flex-1 grid-rows-[minmax(0,1fr)_auto]">
                         <div className="relative flex min-h-0 items-center justify-center">
-                            <div
-                                className="absolute left-[8%] top-[52%] hidden size-[66px] -translate-y-1/2 place-items-center rounded-full bg-black text-white shadow-[0_18px_28px_rgb(0_0_0/0.18)] transition hover:scale-105 xl:grid"
-                                aria-hidden="true"
-                            >
-                                <ChevronLeft size={39} strokeWidth={3.2} />
-                            </div>
 
                             {featuredGame ? (
                                 <>
@@ -435,13 +454,6 @@ export default function Home({
                             ) : (
                                 <EmptyArchiveCard />
                             )}
-
-                            <div
-                                className="absolute right-[8%] top-[52%] hidden size-[66px] -translate-y-1/2 place-items-center rounded-full bg-black text-white shadow-[0_18px_28px_rgb(0_0_0/0.18)] transition hover:scale-105 xl:grid"
-                                aria-hidden="true"
-                            >
-                                <ChevronRight size={39} strokeWidth={3.2} />
-                            </div>
                         </div>
 
                         <footer className="relative z-20 mx-auto -mt-1 grid w-full max-w-[940px] grid-cols-[1fr_auto_1fr] items-center gap-5 rounded-[30px] bg-black p-3 text-white shadow-[0_24px_50px_rgb(0_0_0/0.22)]">
@@ -468,22 +480,7 @@ export default function Home({
                                 </h2>
                             </div>
 
-                            <a
-                                href="/library"
-                                className="group flex items-center justify-between rounded-[24px] bg-[#b7ff63] px-5 py-4 text-black transition hover:-translate-y-0.5"
-                            >
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-black/45">
-                                        Open
-                                    </p>
-                                    <p className="text-lg font-black">
-                                        Library Archive
-                                    </p>
-                                </div>
-                                <span className="grid size-11 place-items-center rounded-full bg-black text-[#b7ff63] transition group-hover:rotate-45">
-                                    <ArrowUpRight size={23} strokeWidth={3} />
-                                </span>
-                            </a>
+                            <LibraryArchiveLink />
                         </footer>
                     </div>
                 </section>

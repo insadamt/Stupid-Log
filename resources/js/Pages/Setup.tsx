@@ -14,10 +14,18 @@ import {
     UserRound,
 } from 'lucide-react';
 import { FormEvent, ReactNode, useRef, useState } from 'react';
-import { gsap, prefersReducedMotion, useGSAP } from '../animation';
+import {
+    clearPageTransition,
+    createPageTransitionLayer,
+    gsap,
+    prefersReducedMotion,
+    removePageTransitionLayer,
+    storePageTransition,
+    useGSAP,
+} from '../animation';
 
 type Provider = 'igdb' | 'steam';
-type Scene = 'intro' | 'wizard';
+type Scene = 'intro' | 'wizard' | 'launch';
 
 type SetupForm = {
     username: string;
@@ -147,6 +155,9 @@ export default function Setup() {
     const [step, setStep] = useState(0);
     const [testing, setTesting] = useState<Provider | null>(null);
     const [testResult, setTestResult] = useState<TestResult | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const submittingRef = useRef(false);
+    const launchStartedRef = useRef(false);
     const [form, setForm] = useState<SetupForm>({
         username: 'Player One',
         igdb_client_id: '',
@@ -205,6 +216,74 @@ export default function Setup() {
         gsap.fromTo(items, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.34, stagger: 0.055, ease: 'power3.out', clearProps: 'transform,visibility,opacity' });
     }, { scope: rootRef, dependencies: [scene, step] });
 
+    useGSAP(() => {
+        const root = rootRef.current;
+        if (!root || scene !== 'launch' || launchStartedRef.current) return;
+
+        launchStartedRef.current = true;
+
+        const frame = root.querySelector<HTMLElement>('[data-launch-frame]');
+        const mark = root.querySelector<HTMLElement>('[data-launch-mark]');
+        const copy = root.querySelectorAll<HTMLElement>('[data-launch-copy]');
+        const loader = root.querySelector<HTMLElement>('[data-launch-loader]');
+        const progress = root.querySelector<HTMLElement>('[data-launch-progress]');
+        const pulse = root.querySelector<HTMLElement>('[data-launch-pulse]');
+
+        const submitSetup = () => {
+            router.post('/setup', form, {
+                preserveScroll: false,
+                onError: () => {
+                    submittingRef.current = false;
+                    launchStartedRef.current = false;
+                    setSubmitting(false);
+                    clearPageTransition();
+                    removePageTransitionLayer();
+                    setScene('wizard');
+                },
+            });
+        };
+
+        if (prefersReducedMotion()) {
+            submitSetup();
+            return;
+        }
+
+        gsap.killTweensOf([frame, mark, copy, loader, progress, pulse]);
+        gsap.set(progress, { width: '18%' });
+        gsap.set(pulse, { xPercent: -120, autoAlpha: 1 });
+
+        const pulseTween = pulse
+            ? gsap.to(pulse, {
+                xPercent: 120,
+                duration: 0.92,
+                ease: 'power2.inOut',
+                repeat: -1,
+                paused: true,
+            })
+            : null;
+
+        gsap.timeline({
+            defaults: { ease: 'power3.out' },
+            onComplete: () => {
+                storePageTransition({
+                    from: '/setup',
+                    to: '/',
+                    enterFrom: 0,
+                    exitTo: 0,
+                    kind: 'setup-complete',
+                });
+                createPageTransitionLayer(root);
+                pulseTween?.kill();
+                submitSetup();
+            },
+        })
+            .fromTo(frame, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2 }, 0)
+            .fromTo(mark, { scale: 0.92, rotation: -3 }, { scale: 1, rotation: 0, duration: 0.34, ease: 'back.out(1.7)' }, 0.08)
+            .to(progress, { width: '82%', duration: 0.92, ease: 'power2.out' }, 0.14)
+            .call(() => pulseTween?.play(), [], 0.18)
+            .to({}, { duration: 0.22 }, 1.08);
+    }, { scope: rootRef, dependencies: [scene] });
+
     function updateField<Key extends keyof SetupForm>(key: Key, value: SetupForm[Key]) {
         setForm((current) => ({ ...current, [key]: value }));
     }
@@ -227,7 +306,39 @@ export default function Setup() {
 
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        router.post('/setup', form);
+        if (submittingRef.current) return;
+
+        const root = rootRef.current;
+        const submitSetup = () => {
+            router.post('/setup', form, {
+                preserveScroll: false,
+                onError: () => {
+                    submittingRef.current = false;
+                    launchStartedRef.current = false;
+                    setSubmitting(false);
+                    clearPageTransition();
+                    removePageTransitionLayer();
+                    setScene('wizard');
+                },
+            });
+        };
+
+        submittingRef.current = true;
+        setSubmitting(true);
+
+        if (!root || prefersReducedMotion()) {
+            submitSetup();
+            return;
+        }
+
+        const shell = root.querySelector<HTMLElement>('[data-wizard-shell]');
+
+        gsap.timeline({
+            defaults: { ease: 'power3.inOut' },
+            onComplete: () => setScene('launch'),
+        })
+            .to(shell, { scale: 0.965, autoAlpha: 0.2, filter: 'blur(10px)', duration: 0.34 }, 0)
+            .to(shell, { autoAlpha: 0, duration: 0.2 }, 0.18);
     }
 
     async function testProvider(provider: Provider) {
@@ -399,9 +510,9 @@ export default function Setup() {
                                                 <div className="text-xs font-black uppercase text-black/52">Ready</div>
                                                 <h3 className="mt-2 text-4xl font-black leading-none">Open Stupid Log.</h3>
                                             </div>
-                                            <ControlButton type="submit" tone="dark">
+                                            <ControlButton type="submit" tone="dark" disabled={submitting}>
                                                 <Save size={17} strokeWidth={3} />
-                                                Enter app
+                                                {submitting ? 'Opening' : 'Enter app'}
                                             </ControlButton>
                                         </div>
                                     </div>
@@ -410,24 +521,46 @@ export default function Setup() {
                         </section>
 
                         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
-                            <ControlButton tone="ghost" disabled={step === 0} onClick={() => setStep((current) => Math.max(0, current - 1))}>
+                            <ControlButton tone="ghost" disabled={step === 0 || submitting} onClick={() => setStep((current) => Math.max(0, current - 1))}>
                                 <ArrowLeft size={17} strokeWidth={3} />
                                 Back
                             </ControlButton>
                             {step < steps.length - 1 ? (
-                                <ControlButton tone="lime" onClick={() => setStep((current) => Math.min(steps.length - 1, current + 1))}>
+                                <ControlButton tone="lime" disabled={submitting} onClick={() => setStep((current) => Math.min(steps.length - 1, current + 1))}>
                                     Continue
                                     <ArrowRight size={17} strokeWidth={3} />
                                 </ControlButton>
                             ) : (
-                                <ControlButton type="submit" tone="lime">
+                                <ControlButton type="submit" tone="lime" disabled={submitting}>
                                     <Save size={17} strokeWidth={3} />
-                                    Finish setup
+                                    {submitting ? 'Opening' : 'Finish setup'}
                                 </ControlButton>
                             )}
                         </footer>
                     </div>
                 </form>
+            )}
+
+            {scene === 'launch' && (
+                <section className="relative grid min-h-screen place-items-center overflow-hidden bg-[#090b08] px-5 py-8 text-center text-white" data-launch-frame>
+                    <Background />
+                    <div className="absolute inset-0 bg-[#b7ff63]/10" />
+                    <div className="relative grid place-items-center px-6">
+                        <div className="grid size-[168px] place-items-center rounded-[44px] bg-white p-8 shadow-[0_28px_90px_rgb(183_255_99/0.2)]" data-launch-mark>
+                            <img src="/images/stupid-log/stupid-log.png" alt="" className="size-full object-contain" />
+                        </div>
+                        <div className="mt-6 text-xs font-black uppercase tracking-[0.32em] text-[#b7ff63]" data-launch-copy>Stupid Log</div>
+                        <div className="mt-3 text-5xl font-black leading-none md:text-7xl" data-launch-copy>Opening Log</div>
+                        <div className="mt-8 grid w-[min(70vw,430px)] gap-3" data-launch-loader>
+                            <div className="h-3.5 overflow-hidden rounded-full bg-white/14 p-1">
+                                <div className="relative h-full w-[18%] overflow-hidden rounded-full bg-[#b7ff63]" data-launch-progress>
+                                    <div className="absolute inset-y-0 w-1/3 rounded-full bg-white/80 blur-[1px]" data-launch-pulse />
+                                </div>
+                            </div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.28em] text-white/38">Preparing home base</div>
+                        </div>
+                    </div>
+                </section>
             )}
         </main>
     );
