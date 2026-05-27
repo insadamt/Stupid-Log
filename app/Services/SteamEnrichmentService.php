@@ -102,18 +102,7 @@ class SteamEnrichmentService
         }
 
         foreach ($dlcIds->chunk(self::DLC_DETAILS_CHUNK_SIZE) as $chunk) {
-            try {
-                $details = $this->appDetails($chunk->all());
-            } catch (Throwable $exception) {
-                Log::warning('Steam DLC detail enrichment failed.', [
-                    'game_id' => $game->id,
-                    'steam_app_id' => $steamAppId,
-                    'dlc_app_ids' => $chunk->all(),
-                    'exception' => $exception,
-                ]);
-
-                continue;
-            }
+            $details = $this->dlcDetails($chunk->all(), $game, $steamAppId);
 
             foreach ($chunk as $dlcId) {
                 $dlcData = $details[$dlcId]['data'] ?? null;
@@ -135,6 +124,44 @@ class SteamEnrichmentService
                 );
             }
         }
+    }
+
+    private function dlcDetails(array $dlcIds, Game $game, string $steamAppId): array
+    {
+        try {
+            $details = $this->appDetails($dlcIds);
+        } catch (Throwable $exception) {
+            $details = [];
+            Log::warning('Steam DLC batch detail enrichment failed.', [
+                'game_id' => $game->id,
+                'steam_app_id' => $steamAppId,
+                'dlc_app_ids' => $dlcIds,
+                'exception' => $exception,
+            ]);
+        }
+
+        $missingDlcIds = collect($dlcIds)
+            ->filter(fn (string $dlcId) => ! is_array($details[$dlcId]['data'] ?? null))
+            ->values();
+
+        foreach ($missingDlcIds as $dlcId) {
+            try {
+                $individualDetails = $this->appDetails([$dlcId]);
+
+                if (isset($individualDetails[$dlcId])) {
+                    $details[$dlcId] = $individualDetails[$dlcId];
+                }
+            } catch (Throwable $exception) {
+                Log::warning('Steam DLC individual detail enrichment failed.', [
+                    'game_id' => $game->id,
+                    'steam_app_id' => $steamAppId,
+                    'dlc_app_id' => $dlcId,
+                    'exception' => $exception,
+                ]);
+            }
+        }
+
+        return $details;
     }
 
     private function enrichAchievements(Game $game, string $steamAppId, ?User $user): void
