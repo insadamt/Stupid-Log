@@ -10,6 +10,7 @@ use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class ProviderSearchService
@@ -17,6 +18,8 @@ class ProviderSearchService
     private const SOURCE_ORDER = ['igdb', 'steam', 'manual'];
     private const RESULT_LIMIT = 10;
     private const SEARCH_CACHE_SECONDS = 300;
+    private const STEAM_APP_CATALOG_CACHE_SECONDS = 86400;
+    private const STEAM_APP_CATALOG_LIMIT = 50000;
 
     public function search(User $user, string $query, string $provider = 'igdb', bool $enrich = false, ?string $steamAppId = null): array
     {
@@ -31,9 +34,16 @@ class ProviderSearchService
 
         try {
             $results = $provider === 'steam'
-                ? $this->steamResults($query, $steamAppId)
+                ? $this->steamResults($user, $query, $steamAppId)
                 : $this->searchIgdb($user, $query);
         } catch (Throwable $exception) {
+            Log::warning('Provider search failed.', [
+                'provider' => $provider,
+                'query' => $query,
+                'class' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
+
             $results = [];
             $warnings[] = $provider === 'steam'
                 ? 'Steam search unavailable.'
@@ -52,10 +62,12 @@ class ProviderSearchService
             'warnings' => array_values(array_unique($warnings)),
             'notice' => $provider === 'igdb'
                 ? 'IGDB search is metadata-first. If IGDB does not provide a Steam App ID, Steam enrichment is skipped.'
-                : 'Steam search is direct. Use it when you want Steam price and achievement data first.',
+                : 'Steam search uses your Steam Web API key first, then falls back to the public Steam Store search.',
         ];
 
-        Cache::put($cacheKey, $response, self::SEARCH_CACHE_SECONDS);
+        if ($response['warnings'] === []) {
+            Cache::put($cacheKey, $response, self::SEARCH_CACHE_SECONDS);
+        }
 
         return $response;
     }
@@ -127,7 +139,7 @@ class ProviderSearchService
         })->all();
     }
 
-    private function steamResults(string $query, ?string $steamAppId): array
+    private function steamResults(User $user, string $query, ?string $steamAppId): array
     {
         if ($steamAppId) {
             return [$this->result([
@@ -142,10 +154,102 @@ class ProviderSearchService
             ])];
         }
 
-        return collect($this->steamStoreSearch($query))
+        $items = [];
+
+        try {
+            $items = $this->steamKeyedSearch($user, $query);
+        } catch (Throwable $exception) {
+            Log::warning('Steam keyed search failed; falling back to public store search.', [
+                'query' => $query,
+                'class' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+
+        if ($items === []) {
+            $items = $this->steamStoreSearch($query);
+        }
+
+        return collect($items)
             ->take(self::RESULT_LIMIT)
             ->map(fn (array $item) => $this->steamSearchResult($item))
             ->all();
+    }
+
+    private function steamKeyedSearch(User $user, string $query): array
+    {
+        $apiKey = $this->steamApiKey($user);
+
+        if (! $apiKey) {
+            return [];
+        }
+
+        $needle = $this->normalizedSteamTerm($query);
+
+        if ($needle === '') {
+            return [];
+        }
+
+        return collect($this->steamAppCatalog($user, $apiKey))
+            ->filter(fn ($app) => is_array($app)
+                && isset($app['appid'], $app['name'])
+                && is_scalar($app['appid'])
+                && is_string($app['name']))
+            ->map(function (array $app) use ($needle) {
+                return [
+                    'id' => (string) $app['appid'],
+                    'name' => $app['name'],
+                    'tiny_image' => null,
+                    '_score' => $this->steamSearchScore($needle, $app['name']),
+                ];
+            })
+            ->filter(fn (array $app) => $app['_score'] > 0)
+            ->sort(function (array $a, array $b) {
+                $score = $b['_score'] <=> $a['_score'];
+
+                return $score !== 0 ? $score : strnatcasecmp($a['name'], $b['name']);
+            })
+            ->take(self::RESULT_LIMIT)
+            ->map(fn (array $app) => [
+                'id' => $app['id'],
+                'name' => $app['name'],
+                'tiny_image' => $app['tiny_image'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function steamAppCatalog(User $user, string $apiKey): array
+    {
+        $cacheKey = 'steam-app-catalog:'.$user->id.':'.$this->credentialCachePart($user, 'steam');
+
+        return Cache::remember($cacheKey, self::STEAM_APP_CATALOG_CACHE_SECONDS, function () use ($apiKey) {
+            $response = Http::retry(2, 300)
+                ->connectTimeout(3)
+                ->timeout(20)
+                ->acceptJson()
+                ->get('https://partner.steam-api.com/IStoreService/GetAppList/v1/', [
+                    'key' => $apiKey,
+                    'input_json' => json_encode([
+                        'include_games' => true,
+                        'include_dlc' => false,
+                        'include_software' => false,
+                        'include_videos' => false,
+                        'include_hardware' => false,
+                        'have_description_language' => 'english',
+                        'max_results' => self::STEAM_APP_CATALOG_LIMIT,
+                    ]),
+                ])
+                ->throw();
+
+            $apps = $response->json('response.apps');
+
+            if (! is_array($apps)) {
+                $apps = $response->json('apps', []);
+            }
+
+            return is_array($apps) ? $apps : [];
+        });
     }
 
     private function steamStoreSearch(string $query): array
@@ -156,8 +260,13 @@ class ProviderSearchService
             return [];
         }
 
-        return Http::connectTimeout(1)
-            ->timeout(4)
+        return Http::retry(2, 300)
+            ->connectTimeout(3)
+            ->timeout(10)
+            ->acceptJson()
+            ->withHeaders([
+                'User-Agent' => 'Stupid Log/1.0',
+            ])
             ->get('https://store.steampowered.com/api/storesearch', [
                 'term' => $query,
                 'l' => 'english',
@@ -169,15 +278,17 @@ class ProviderSearchService
 
     private function steamSearchResult(array $item): array
     {
+        $appId = $item['id'] ?? $item['appid'] ?? null;
+
         return $this->result([
             'source' => 'steam',
-            'external_id' => (string) ($item['id'] ?? ''),
+            'external_id' => is_scalar($appId) ? (string) $appId : '',
             'title' => $item['name'] ?? 'Untitled',
             'cover_url_original' => $item['tiny_image'] ?? null,
             'publisher' => null,
             'release_date' => null,
             'description' => null,
-            'steam_app_id' => isset($item['id']) ? (string) $item['id'] : null,
+            'steam_app_id' => is_scalar($appId) ? (string) $appId : null,
         ]);
     }
 
@@ -396,6 +507,57 @@ class ProviderSearchService
         return is_numeric($price)
             ? round(((float) $price) / 100, 2)
             : null;
+    }
+
+    private function steamSearchScore(string $needle, string $title): int
+    {
+        $haystack = $this->normalizedSteamTerm($title);
+
+        if ($haystack === '') {
+            return 0;
+        }
+
+        if ($haystack === $needle) {
+            return 10000;
+        }
+
+        if (str_starts_with($haystack, $needle)) {
+            return 9000 - min(strlen($haystack) - strlen($needle), 2000);
+        }
+
+        $position = strpos($haystack, $needle);
+
+        if ($position !== false) {
+            return 7000 - min($position, 2000);
+        }
+
+        $words = array_values(array_filter(explode(' ', $needle)));
+
+        if ($words === []) {
+            return 0;
+        }
+
+        $matchedWords = 0;
+
+        foreach ($words as $word) {
+            if (str_contains($haystack, $word)) {
+                $matchedWords++;
+            }
+        }
+
+        if ($matchedWords === count($words)) {
+            return 5000 + ($matchedWords * 100);
+        }
+
+        return $matchedWords > 0 ? $matchedWords * 100 : 0;
+    }
+
+    private function normalizedSteamTerm(string $value): string
+    {
+        $normalized = preg_replace('/[^a-z0-9]+/', ' ', strtolower($value));
+        $normalized = preg_replace('/\s+/', ' ', $normalized ?? '');
+
+        return trim($normalized ?? '');
     }
 
     private function steamApiKey(User $user): ?string
