@@ -92,6 +92,28 @@
     min-height: 0 !important;
 }
 
+.fixed.inset-0.z-50.grid.place-items-center > section > main > div > .min-w-0 {
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .sl-wizard-step-shell {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-right: 8px !important;
+    scrollbar-gutter: stable !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .sl-wizard-step-content {
+    height: auto !important;
+    min-height: 100% !important;
+    padding-bottom: 8px !important;
+}
+
 .fixed.inset-0.z-50.grid.place-items-center > section > main > div.grid.gap-7 {
     grid-template-columns: 286px minmax(0, 1fr) !important;
     gap: 24px !important;
@@ -262,7 +284,7 @@
 
 .fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] > div:last-child {
     min-height: 0 !important;
-    max-height: none !important;
+    max-height: min(460px, calc(100vh - 430px)) !important;
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     align-content: start !important;
@@ -347,9 +369,11 @@
 
 .fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > input + div.grid.gap-2.rounded-\[28px\],
 .fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > div.grid.max-h-\[500px\] {
-    max-height: 430px !important;
+    max-height: min(430px, calc(100vh - 390px)) !important;
     overflow-y: auto !important;
     align-content: start !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
 }
 
 .fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6 > input + div.grid.gap-2.rounded-\[28px\] button,
