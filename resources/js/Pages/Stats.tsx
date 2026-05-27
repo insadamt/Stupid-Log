@@ -199,7 +199,7 @@ function ProgressBar({ value, large = false, tone = 'light' }: { value: number; 
     const hasRevealed = useRef(false);
     const revealDelay = useStatsRevealDelay();
     const targetScale = clampPercent(value) / 100;
-    const renderScale = !hasRevealed.current && revealDelay > 0 ? 0 : targetScale;
+    const renderScale = !hasRevealed.current ? 0 : targetScale;
 
     useGSAP(() => {
         const fill = fillRef.current;
@@ -215,7 +215,7 @@ function ProgressBar({ value, large = false, tone = 'light' }: { value: number; 
         }
 
         const from = hasRevealed.current ? previousScale.current : 0;
-        if (!hasRevealed.current && revealDelay > 0) {
+        if (!hasRevealed.current) {
             gsap.set(fill, { scaleX: from });
         }
 
@@ -228,11 +228,14 @@ function ProgressBar({ value, large = false, tone = 'light' }: { value: number; 
                 delay: hasRevealed.current ? 0 : revealDelay,
                 ease: hasRevealed.current ? 'power3.inOut' : 'power3.out',
                 overwrite: 'auto',
+                onStart: () => {
+                    hasRevealed.current = true;
+                },
+                onComplete: () => {
+                    previousScale.current = targetScale;
+                },
             },
         );
-
-        previousScale.current = targetScale;
-        hasRevealed.current = true;
     }, { scope: fillRef, dependencies: [targetScale] });
 
     return (
@@ -252,7 +255,7 @@ function StackedProgressBar({ segments, total }: { segments: StackSegment[]; tot
         acc[segment.label] = clampPercent((segment.value / safeTotal) * 100);
         return acc;
     }, {});
-    const renderWidths = !hasRevealed.current && revealDelay > 0
+    const renderWidths = !hasRevealed.current
         ? segments.reduce<Record<string, number>>((acc, segment) => ({ ...acc, [segment.label]: 0 }), {})
         : widths;
     const stackKey = animationKey(segments.map((segment) => `${segment.label}:${segment.value}:${segment.color}`));
@@ -278,7 +281,7 @@ function StackedProgressBar({ segments, total }: { segments: StackSegment[]; tot
             const label = fill.dataset.label ?? '';
             const targetWidth = widths[label] ?? 0;
             const previousWidth = hasRevealed.current ? previousWidths.current[label] ?? 0 : 0;
-            if (!hasRevealed.current && revealDelay > 0) {
+            if (!hasRevealed.current) {
                 gsap.set(fill, { width: `${previousWidth}%` });
             }
 
@@ -291,12 +294,14 @@ function StackedProgressBar({ segments, total }: { segments: StackSegment[]; tot
                     delay: hasRevealed.current ? 0 : revealDelay + index * 0.035,
                     ease: hasRevealed.current ? 'power3.inOut' : 'power3.out',
                     overwrite: 'auto',
+                    onStart: () => {
+                        hasRevealed.current = true;
+                    },
                 },
             );
         });
 
         previousWidths.current = widths;
-        hasRevealed.current = true;
     }, { scope: stackRef, dependencies: [stackKey, safeTotal] });
 
     return (
@@ -473,6 +478,7 @@ function Donut({ data, total, center }: { data: Slice[]; total: string; center: 
 function GameUiChart({ config }: { config: ChartConfig }) {
     const chartRef = useRef<HTMLElement>(null);
     const hasRevealed = useRef(false);
+    const hasSurfaceRevealed = useRef(false);
     const revealDelay = useStatsRevealDelay();
     const incomingData = [...config.data].sort((a, b) => b.value - a.value);
     const [renderedData, setRenderedData] = useState(incomingData);
@@ -481,6 +487,44 @@ function GameUiChart({ config }: { config: ChartConfig }) {
     const incomingChartKey = animationKey([config.title, config.eyebrow, ...incomingData.map((slice) => `${slice.label}:${slice.value}`)]);
     const renderedChartKey = animationKey([config.title, config.eyebrow, ...data.map((slice) => `${slice.label}:${slice.value}`)]);
     const rowRevealDelay = hasRevealed.current ? 0 : revealDelay + chartRowsRevealGap;
+    const markRowsRevealed = (rows: HTMLElement[]) => {
+        hasRevealed.current = true;
+        rows.forEach((row) => {
+            row.dataset.revealed = 'true';
+        });
+    };
+
+    useGSAP(() => {
+        const chart = chartRef.current;
+        if (!chart || hasSurfaceRevealed.current) return;
+
+        const panes = Array.from(chart.querySelectorAll<HTMLElement>('[data-chart-pane]'));
+        const headerItems = Array.from(chart.querySelectorAll<HTMLElement>('[data-chart-heading]'));
+
+        if (prefersReducedMotion()) {
+            gsap.set([chart, panes, headerItems], { autoAlpha: 1, clearProps: 'transform,visibility,opacity,filter' });
+            hasSurfaceRevealed.current = true;
+            return;
+        }
+
+        gsap.set(chart, { y: 18, scale: 0.985, autoAlpha: 0 });
+        gsap.set(panes, { y: 18, autoAlpha: 0, filter: 'blur(8px)' });
+        gsap.set(headerItems, { y: 10, autoAlpha: 0 });
+
+        const timeline = gsap.timeline({
+            delay: revealDelay,
+            defaults: { ease: 'power3.out' },
+            onComplete: () => {
+                hasSurfaceRevealed.current = true;
+                gsap.set([chart, panes, headerItems], { clearProps: 'transform,visibility,opacity,filter' });
+            },
+        });
+
+        timeline
+            .to(chart, { y: 0, scale: 1, autoAlpha: 1, duration: 0.46 }, 0)
+            .to(panes, { y: 0, autoAlpha: 1, filter: 'blur(0px)', duration: 0.58, stagger: 0.08 }, 0.08)
+            .to(headerItems, { y: 0, autoAlpha: 1, duration: 0.38, stagger: 0.05 }, 0.22);
+    }, { scope: chartRef, dependencies: [] });
 
     useGSAP(() => {
         const chart = chartRef.current;
@@ -544,13 +588,12 @@ function GameUiChart({ config }: { config: ChartConfig }) {
                         stagger: 0.04,
                         overwrite: 'auto',
                         clearProps: 'transform,visibility,opacity',
+                        onComplete: () => markRowsRevealed(newRows),
                     },
                 );
             }
         } else {
-            if (revealDelay > 0) {
-                gsap.set(rows, { y: 14, autoAlpha: 0 });
-            }
+            gsap.set(rows, { y: 14, autoAlpha: 0 });
 
             gsap.fromTo(
                 rows,
@@ -564,34 +607,30 @@ function GameUiChart({ config }: { config: ChartConfig }) {
                     stagger: 0.1,
                     overwrite: 'auto',
                     clearProps: 'transform,visibility,opacity',
+                    onComplete: () => markRowsRevealed(rows),
                 },
             );
         }
-
-        hasRevealed.current = true;
-        rows.forEach((row) => {
-            row.dataset.revealed = 'true';
-        });
     }, { scope: chartRef, dependencies: [renderedChartKey] });
 
     return (
         <article ref={chartRef} className="grid h-full min-h-0 grid-cols-[1.15fr_1fr] gap-4 rounded-[30px] bg-black p-4 text-white shadow-[0_24px_75px_rgb(0_0_0/0.2)]">
-            <section className="grid min-h-0 grid-rows-[auto_1fr] rounded-[26px] bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-6 ring-1 ring-white/8">
+            <section data-chart-pane className="grid min-h-0 grid-rows-[auto_1fr] rounded-[26px] bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-6 ring-1 ring-white/8">
                 <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]/70">{config.eyebrow}</div>
+                    <div data-chart-heading className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]/70">{config.eyebrow}</div>
                     <div className="mt-2 flex items-start justify-between gap-3">
-                        <h2 className="text-4xl font-black leading-none text-[#9BE44D]">{config.title}</h2>
-                        <DeltaBadge value={config.delta} compact />
+                        <h2 data-chart-heading className="text-4xl font-black leading-none text-[#9BE44D]">{config.title}</h2>
+                        <div data-chart-heading><DeltaBadge value={config.delta} compact /></div>
                     </div>
                 </div>
                 <div className="grid min-h-0 place-items-center">
                     <Donut data={data} total={config.total} center={config.center} />
                 </div>
             </section>
-            <section className="min-h-0 rounded-[26px] bg-white/[0.06] p-4 ring-1 ring-white/8">
+            <section data-chart-pane className="min-h-0 rounded-[26px] bg-white/[0.06] p-4 ring-1 ring-white/8">
                 <div className="flex items-center justify-between gap-3">
-                    <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">Metric entries</div>
-                    <div className="grid size-11 place-items-center rounded-2xl bg-[#b7ff63] text-black"><BarChart3 size={22} strokeWidth={3} /></div>
+                    <div data-chart-heading className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">Metric entries</div>
+                    <div data-chart-heading className="grid size-11 place-items-center rounded-2xl bg-[#b7ff63] text-black"><BarChart3 size={22} strokeWidth={3} /></div>
                 </div>
                 <div className="mt-4 grid max-h-[calc(100%-60px)] gap-3 overflow-y-auto pr-1">
                     {data.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm font-bold text-white/35">No rows available.</div>}
@@ -604,7 +643,6 @@ function GameUiChart({ config }: { config: ChartConfig }) {
                                 data-chart-row
                                 data-flip-id={slice.label}
                                 className="rounded-[22px] bg-white/[0.07] p-4 ring-1 ring-white/8"
-                                style={!hasRevealed.current && revealDelay > 0 ? { opacity: 0, transform: 'translateY(14px)' } : undefined}
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <span className="flex min-w-0 items-center gap-3 text-sm font-black text-white/75">
