@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StupidLog\StoreLibraryGameRequest;
 use App\Http\Requests\StupidLog\UpdateSettingsRequest;
 use App\Models\StupidLog\AppSetting;
-use App\Models\StupidLog\Currency;
 use App\Models\StupidLog\Device;
 use App\Models\StupidLog\Dlc;
+use App\Models\StupidLog\Game;
 use App\Models\StupidLog\LibraryGame;
 use App\Models\StupidLog\OwnershipCopy;
 use App\Models\StupidLog\OwnershipType;
@@ -31,7 +31,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -43,8 +45,12 @@ class StupidLogController extends Controller
     private const PHYSICAL_LIKE = ['Physical', 'Pre-owned', 'Borrowed'];
     private const DLC_ACQUISITION_TYPES = ['Owned', 'Edition Included', 'Free'];
 
-    public function home(StatsService $stats): Response
+    public function home(StatsService $stats): Response|RedirectResponse
     {
+        if (! User::query()->exists() || ! AppSetting::query()->exists()) {
+            return redirect()->route('setup');
+        }
+
         $user = $this->localUser();
         $libraryGames = $this->libraryQuery($user)->latest()->take(6)->get();
 
@@ -385,23 +391,20 @@ class StupidLogController extends Controller
 
     public function setup(): Response
     {
-        return Inertia::render('Setup', [
-            'currencies' => Currency::orderBy('code')->pluck('code'),
-        ]);
+        return Inertia::render('Setup');
     }
 
     public function storeSetup(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:255'],
-            'currency_code' => ['required', 'exists:currencies,code'],
             'igdb_client_id' => ['nullable', 'string'],
             'igdb_client_secret' => ['nullable', 'string'],
             'steam_api_key' => ['nullable', 'string'],
         ]);
 
         $user = User::updateOrCreate(['id' => $this->localUser()->id], ['username' => $validated['username']]);
-        AppSetting::updateOrCreate(['user_id' => $user->id], ['currency_code' => $validated['currency_code']]);
+        AppSetting::updateOrCreate(['user_id' => $user->id], ['currency_code' => 'USD']);
         $this->storeCredential($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null);
         $this->storeCredential($user, 'steam', null, null, $validated['steam_api_key'] ?? null);
 
@@ -416,7 +419,6 @@ class StupidLogController extends Controller
 
         return Inertia::render('Settings', [
             'user' => $user->load('settings'),
-            'currencies' => Currency::orderBy('code')->pluck('code'),
             'providers' => Provider::orderBy('name')->get(),
             'igdbCredential' => [
                 'has_client_id' => (bool) $igdb?->encrypted_client_id,
@@ -441,7 +443,7 @@ class StupidLogController extends Controller
 
         AppSetting::updateOrCreate(
             ['user_id' => $user->id],
-            ['currency_code' => $validated['currency_code']]
+            ['currency_code' => $user->settings?->currency_code ?? 'USD']
         );
 
         $this->storeCredential(
@@ -463,6 +465,31 @@ class StupidLogController extends Controller
         );
 
         return back();
+    }
+
+    public function resetApp(): RedirectResponse
+    {
+        $coverPaths = [];
+
+        DB::transaction(function () use (&$coverPaths) {
+            $coverPaths = Game::query()
+                ->whereNotNull('cover_path')
+                ->pluck('cover_path')
+                ->merge(Dlc::query()->whereNotNull('cover_path')->pluck('cover_path'))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            User::query()->delete();
+            Game::query()->delete();
+        });
+
+        if ($coverPaths !== []) {
+            Storage::disk('public')->delete($coverPaths);
+        }
+
+        return redirect()->route('setup');
     }
 
     public function testIgdbCredentials(Request $request): JsonResponse

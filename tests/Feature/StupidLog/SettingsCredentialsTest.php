@@ -2,13 +2,22 @@
 
 namespace Tests\Feature\StupidLog;
 
+use App\Models\StupidLog\AppSetting;
+use App\Models\StupidLog\Dlc;
+use App\Models\StupidLog\ExternalGameId;
+use App\Models\StupidLog\Game;
+use App\Models\StupidLog\LibraryGame;
+use App\Models\StupidLog\Platform;
 use App\Models\StupidLog\Provider;
 use App\Models\StupidLog\ProviderCredential;
+use App\Models\StupidLog\SnapshotRun;
+use App\Models\StupidLog\Status;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class SettingsCredentialsTest extends TestCase
@@ -45,7 +54,6 @@ class SettingsCredentialsTest extends TestCase
 
         $this->from('/settings')->patch('/settings', [
             'username' => 'Player Two',
-            'currency_code' => 'USD',
             'igdb_client_id' => '',
             'igdb_client_secret' => '',
             'steam_api_key' => '',
@@ -76,7 +84,6 @@ class SettingsCredentialsTest extends TestCase
 
         $this->from('/settings')->patch('/settings', [
             'username' => 'Player One',
-            'currency_code' => 'USD',
             'igdb_client_id' => 'new-client-id',
             'igdb_client_secret' => 'new-client-secret',
         ])->assertRedirect('/settings');
@@ -138,5 +145,90 @@ class SettingsCredentialsTest extends TestCase
 
         $this->assertSame('ok', $credential->refresh()->last_test_status);
         $this->assertNotNull($credential->last_tested_at);
+    }
+
+    public function test_setup_completes_without_currency_payload(): void
+    {
+        $user = User::firstOrFail();
+
+        $this->post('/setup', [
+            'username' => 'No Currency Player',
+            'igdb_client_id' => '',
+            'igdb_client_secret' => '',
+            'steam_api_key' => '',
+        ])->assertRedirect('/');
+
+        $this->assertSame('No Currency Player', $user->refresh()->username);
+        $this->assertDatabaseHas('app_settings', [
+            'user_id' => $user->id,
+            'currency_code' => 'USD',
+        ]);
+    }
+
+    public function test_settings_reset_erases_app_data_and_returns_to_setup(): void
+    {
+        Storage::fake('public');
+
+        $user = User::firstOrFail();
+        $provider = Provider::where('key', 'igdb')->firstOrFail();
+        $platform = Platform::where('name', 'Steam')->firstOrFail();
+        $status = Status::firstOrFail();
+
+        Storage::disk('public')->put('covers/games/reset-test.jpg', 'cover');
+        Storage::disk('public')->put('covers/provider/reset-dlc.jpg', 'dlc');
+
+        $game = Game::create([
+            'title' => 'Reset Test',
+            'normalized_title' => 'reset test',
+            'cover_path' => 'covers/games/reset-test.jpg',
+        ]);
+
+        ExternalGameId::create([
+            'game_id' => $game->id,
+            'provider_id' => $provider->id,
+            'external_id' => 'reset-test',
+        ]);
+
+        Dlc::create([
+            'game_id' => $game->id,
+            'title' => 'Reset DLC',
+            'cover_path' => 'covers/provider/reset-dlc.jpg',
+        ]);
+
+        LibraryGame::create([
+            'user_id' => $user->id,
+            'game_id' => $game->id,
+            'platform_id' => $platform->id,
+            'status_id' => $status->id,
+        ]);
+
+        SnapshotRun::create([
+            'user_id' => $user->id,
+            'year' => 2026,
+            'status' => 'draft',
+        ]);
+
+        ProviderCredential::create([
+            'user_id' => $user->id,
+            'provider_id' => $provider->id,
+            'encrypted_client_id' => Crypt::encryptString('client-id'),
+            'is_enabled' => true,
+        ]);
+
+        $this->post('/settings/reset')->assertRedirect('/setup');
+
+        $this->assertSame(0, User::count());
+        $this->assertSame(0, AppSetting::count());
+        $this->assertSame(0, ProviderCredential::count());
+        $this->assertSame(0, LibraryGame::count());
+        $this->assertSame(0, SnapshotRun::count());
+        $this->assertSame(0, ExternalGameId::count());
+        $this->assertSame(0, Dlc::count());
+        $this->assertSame(0, Game::count());
+        $this->assertGreaterThan(0, Status::count());
+        Storage::disk('public')->assertMissing('covers/games/reset-test.jpg');
+        Storage::disk('public')->assertMissing('covers/provider/reset-dlc.jpg');
+
+        $this->get('/')->assertRedirect('/setup');
     }
 }

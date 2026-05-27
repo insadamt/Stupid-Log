@@ -541,7 +541,8 @@ export default function AddGameWizard({
     const filteredDlcs = draft.dlcs.filter((dlc) => dlc.title.toLowerCase().includes(dlcQuery.trim().toLowerCase()));
     const ownedDlcCount = draft.owned_dlcs.length;
     const coverPreview = localCoverPreview || draft.cover_url_original;
-    const showSidePanel = !["search", "basics"].includes(step.key);
+    const stepProgress = ((stepIndex + 1) / steps.length) * 100;
+    const visibleStepQueue = steps.slice(stepIndex, Math.min(stepIndex + 2, steps.length));
 
     useGSAP(() => {
         if (!open) return;
@@ -555,16 +556,26 @@ export default function AddGameWizard({
             return;
         }
 
-        const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+        const header = panel.querySelector(".sl-wizard-header");
+        const sidebar = panel.querySelector(".sl-wizard-sidebar");
+        const main = panel.querySelector(".sl-wizard-main");
+        const footer = panel.querySelector("footer");
+        const stepButtons = panel.querySelectorAll(".sl-wizard-step");
+        const timeline = gsap.timeline({ defaults: { ease: "expo.out" } });
 
         timeline
-            .fromTo(backdrop, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.22, clearProps: "visibility,opacity" }, 0)
+            .fromTo(backdrop, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.24, clearProps: "visibility,opacity" }, 0)
             .fromTo(
                 panel,
-                { autoAlpha: 0, y: 24, scale: 0.965 },
-                { autoAlpha: 1, y: 0, scale: 1, duration: 0.42, clearProps: "transform,visibility,opacity" },
+                { autoAlpha: 0, y: 34, scale: 0.94, rotationX: 4, transformPerspective: 1000 },
+                { autoAlpha: 1, y: 0, scale: 1, rotationX: 0, duration: 0.58, clearProps: "transform,visibility,opacity" },
                 0.04,
-            );
+            )
+            .fromTo(header, { y: -18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.42, clearProps: "transform,visibility,opacity" }, 0.14)
+            .fromTo(sidebar, { x: -24, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: 0.44, clearProps: "transform,visibility,opacity" }, 0.18)
+            .fromTo(main, { y: 18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.44, clearProps: "transform,visibility,opacity" }, 0.2)
+            .fromTo(footer, { y: 18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.36, clearProps: "transform,visibility,opacity" }, 0.26)
+            .fromTo(stepButtons, { autoAlpha: 0, x: -8 }, { autoAlpha: 1, x: 0, duration: 0.28, stagger: 0.025, clearProps: "transform,visibility,opacity" }, 0.28);
     }, { scope: backdropRef, dependencies: [open] });
 
     useGSAP(() => {
@@ -584,7 +595,7 @@ export default function AddGameWizard({
         const direction = stepDirection.current >= 0 ? 1 : -1;
         const exitClone = stepExitClone.current;
         const timeline = gsap.timeline({
-            defaults: { ease: "power3.inOut" },
+            defaults: { ease: "expo.inOut" },
             onComplete: () => {
                 exitClone?.remove();
                 if (stepExitClone.current === exitClone) stepExitClone.current = null;
@@ -597,33 +608,57 @@ export default function AddGameWizard({
                 exitClone,
                 {
                     autoAlpha: 0,
-                    xPercent: -12 * direction,
-                    scale: 0.985,
-                    duration: 0.42,
+                    xPercent: -18 * direction,
+                    rotationY: -9 * direction,
+                    scale: 0.965,
+                    filter: "blur(5px)",
+                    duration: 0.54,
                 },
                 0,
             );
         }
 
+        gsap.set(stepNode, {
+            transformPerspective: 900,
+            transformOrigin: direction > 0 ? "left center" : "right center",
+        });
+
         timeline.fromTo(
             stepNode,
-            { autoAlpha: exitClone ? 0.35 : 0, xPercent: 12 * direction, scale: exitClone ? 0.985 : 1 },
-            { autoAlpha: 1, xPercent: 0, scale: 1, duration: 0.42, clearProps: "transform,visibility,opacity" },
+            {
+                autoAlpha: exitClone ? 0.38 : 0,
+                xPercent: exitClone ? 16 * direction : 0,
+                y: exitClone ? 0 : 14,
+                rotationY: exitClone ? 8 * direction : 0,
+                scale: exitClone ? 0.975 : 0.985,
+                filter: exitClone ? "blur(4px)" : "blur(0px)",
+            },
+            {
+                autoAlpha: 1,
+                xPercent: 0,
+                y: 0,
+                rotationY: 0,
+                scale: 1,
+                filter: "blur(0px)",
+                duration: exitClone ? 0.54 : 0.38,
+                clearProps: "transform,visibility,opacity,filter",
+            },
             0,
         );
 
-        if (!exitClone && children.length) {
+        if (children.length) {
             timeline.fromTo(
                 children,
-                { autoAlpha: 0, y: 10 },
+                { autoAlpha: 0, y: exitClone ? 18 : 10, scale: 0.985 },
                 {
                     autoAlpha: 1,
                     y: 0,
-                    duration: 0.28,
-                    stagger: 0.035,
+                    scale: 1,
+                    duration: 0.3,
+                    stagger: 0.045,
                     clearProps: "transform,visibility,opacity",
                 },
-                0.08,
+                exitClone ? 0.2 : 0.08,
             );
         }
     }, { scope: stepContentRef, dependencies: [open, step.key] });
@@ -668,6 +703,8 @@ export default function AddGameWizard({
             clone.style.margin = "0";
             clone.style.pointerEvents = "none";
             clone.style.zIndex = "20";
+            clone.style.transformPerspective = "900px";
+            clone.style.transformOrigin = direction > 0 ? "right center" : "left center";
             clone.setAttribute("aria-hidden", "true");
 
             shell.style.minHeight = `${stepRect.height}px`;
@@ -1203,12 +1240,12 @@ export default function AddGameWizard({
             </button>
 
             {open && (
-                <div ref={backdropRef} className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 py-5 backdrop-blur-md">
-                    <section ref={panelRef} className="grid max-h-[94vh] w-full max-w-[1320px] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[42px] border border-white/15 bg-[#e9eee9] shadow-[0_44px_150px_rgb(0_0_0/0.6)]">
-                    <header className="relative overflow-hidden border-b border-black/10 bg-[#b7ff63] px-8 py-5">
-                            <div className="flex items-start justify-between gap-6">
+                <div ref={backdropRef} className="sl-wizard-modal fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 py-5 backdrop-blur-md">
+                    <section ref={panelRef} className="sl-wizard-panel grid max-h-[94vh] w-full max-w-[1380px] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[34px] border border-white/15 bg-[#e9eee9] shadow-[0_44px_150px_rgb(0_0_0/0.6)]">
+                        <header className="sl-wizard-header relative overflow-hidden border-b border-white/10 bg-black px-6 py-5 text-white md:px-8">
+                            <div className="relative z-10 flex items-start justify-between gap-6">
                                 <div className="flex min-w-0 items-center gap-4">
-                                    <div className="grid size-16 shrink-0 place-items-center rounded-[22px] bg-black p-1.5 shadow-[0_16px_30px_rgb(0_0_0/0.2)]">
+                                    <div className="grid size-16 shrink-0 place-items-center rounded-[20px] bg-[#b7ff63] p-1.5 shadow-[0_16px_30px_rgb(0_0_0/0.28)]">
                                         <img
                                             src="/images/stupid-log/stupid-log.png"
                                             alt=""
@@ -1216,37 +1253,70 @@ export default function AddGameWizard({
                                         />
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="text-xs font-black uppercase tracking-[0.35em] text-black/45">Stupid Log Archive Builder</div>
-                                        <h2 className="mt-1 text-[46px] font-black leading-none tracking-[-0.065em] text-black">Add Game</h2>
+                                        <div className="text-xs font-black uppercase tracking-[0.35em] text-[#b7ff63]/70">Stupid Log Archive Builder</div>
+                                        <h2 className="mt-1 text-[42px] font-black leading-none tracking-[-0.06em] text-white">Add Game</h2>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <Pill>{step.label}</Pill>
-                                    <button type="button" onClick={closeWizard} className="grid size-11 place-items-center rounded-full bg-black text-white transition hover:scale-105"><X size={20} /></button>
+                                <div className="flex shrink-0 items-center gap-3">
+                                    <span className="hidden rounded-full bg-white/8 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white/60 ring-1 ring-white/10 md:inline-flex">{stepIndex + 1} / {steps.length}</span>
+                                    <span className="rounded-full bg-[#b7ff63] px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-black shadow-[0_12px_30px_rgb(183_255_99/0.16)]">{step.label}</span>
+                                    <button type="button" onClick={closeWizard} className="grid size-11 place-items-center rounded-full bg-white/10 text-white ring-1 ring-white/10 transition hover:scale-105 hover:bg-white/16"><X size={20} /></button>
                                 </div>
                             </div>
-                            <div className="mt-5 grid grid-cols-9 gap-2">
-                                {steps.map((item, index) => <button key={item.key} type="button" disabled={!canOpenStep(index)} onClick={() => canOpenStep(index) && setWizardStep(index)} className={`h-1.5 rounded-full transition ${index <= stepIndex ? "bg-black" : "bg-white/65"} ${!canOpenStep(index) ? "cursor-not-allowed opacity-50" : ""}`} aria-label={item.label} />)}
+                            <div className="relative z-10 mt-5 h-2 overflow-hidden rounded-full bg-black/18">
+                                <div className="h-full rounded-full bg-black transition-[width] duration-300" style={{ width: `${stepProgress}%` }} />
                             </div>
                         </header>
 
-                        <main className="overflow-y-auto bg-[#e8eee8] p-7">
-                            <div className={showSidePanel ? "grid gap-7 lg:grid-cols-[280px_1fr]" : "grid gap-5"}>
-                                {showSidePanel && (
-                                    <aside className="space-y-4">
-                                        <div className="rounded-[28px] bg-black p-2.5 shadow-[0_18px_60px_rgb(0_0_0/0.18)]">
-                                            <CoverImage src={coverPreview} className="h-[360px] w-full rounded-[22px]" />
+                        <main className="sl-wizard-main overflow-y-auto bg-[#e8eee8] p-0">
+                            <div className="grid min-h-[640px] lg:grid-cols-[300px_minmax(0,1fr)]">
+                                <aside className="relative overflow-hidden p-5 text-black lg:p-6">
+                                    <div className="relative z-10 grid gap-5">
+                                        <div className="rounded-[28px] bg-black/[0.06] p-2 ring-1 ring-black/10">
+                                            <CoverImage src={coverPreview} className="h-[260px] w-full rounded-[22px]" />
                                         </div>
-                                        <div className="rounded-3xl border border-black/10 bg-white p-5">
-                                            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-black/35">Current Draft</div>
-                                            <h3 className="mt-2 text-2xl font-black tracking-[-0.05em]">{draft.title || "Untitled Game"}</h3>
-                                            <div className="mt-4 flex flex-wrap gap-2"><Pill>{sourceName(draft.source)}</Pill>{draft.steam_app_id && <Pill active>Steam {draft.steam_app_id}</Pill>}</div>
+                                        <div className="rounded-[26px] bg-black/[0.045] p-4 ring-1 ring-black/10">
+                                            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-black/42">Current Draft</div>
+                                            <div className="sl-wizard-draft-title mt-2 font-black text-black">{draft.title || "Untitled Game"}</div>
+                                            <div className="mt-4 flex flex-wrap gap-2">
+                                                <span className="rounded-full bg-black px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-white">{sourceName(draft.source)}</span>
+                                                {draft.steam_app_id && <span className="rounded-full bg-[#b7ff63] px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-black">Steam {draft.steam_app_id}</span>}
+                                            </div>
                                         </div>
-                                    </aside>
-                                )}
+                                        <div className="sl-wizard-rail relative grid gap-3">
+                                            {visibleStepQueue.map((item, queueIndex) => {
+                                                const index = stepIndex + queueIndex;
+                                                const active = queueIndex === 0;
 
-                                <div ref={stepShellRef} className="relative min-w-0 overflow-hidden">
-                                <section ref={stepContentRef} className="relative z-10 min-w-0">
+                                                return (
+                                                    <button
+                                                        key={item.key}
+                                                        type="button"
+                                                        disabled={!canOpenStep(index)}
+                                                        onClick={() => canOpenStep(index) && setWizardStep(index)}
+                                                        className={`sl-wizard-step grid grid-cols-[36px_1fr] items-center gap-3 rounded-[20px] px-3.5 py-3 text-left opacity-100 transition ${active ? "is-active bg-[#b7ff63] text-black" : "bg-black/[0.055] text-black/58"} ${!canOpenStep(index) ? "cursor-not-allowed opacity-45" : "hover:bg-black/10"}`}
+                                                    >
+                                                        <span className={`grid size-9 place-items-center rounded-xl text-xs font-black ${active ? "bg-black text-[#b7ff63]" : "bg-black/10 text-black"}`}>{index + 1}</span>
+                                                        <span className="min-w-0">
+                                                            <span className={`block text-[9px] font-black uppercase tracking-[0.16em] ${active ? "text-black/45" : "text-black/35"}`}>{active ? "Current" : "Next"}</span>
+                                                            <span className="mt-1 block truncate text-xs font-black uppercase tracking-[0.1em]">{item.label}</span>
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                            {stepIndex === steps.length - 1 && (
+                                                <div className="sl-wizard-step rounded-[20px] bg-black/[0.045] px-3.5 py-3 text-black/40 ring-1 ring-black/10">
+                                                    <div className="text-[9px] font-black uppercase tracking-[0.16em]">Next</div>
+                                                    <div className="mt-1 text-xs font-black uppercase tracking-[0.1em]">Ready to save</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </aside>
+
+                                <div className="min-w-0 p-5 md:p-7">
+                                    <div ref={stepShellRef} className="sl-wizard-step-shell relative min-w-0 overflow-hidden">
+                                    <section ref={stepContentRef} className="sl-wizard-step-content relative z-10 min-w-0">
                                 {step.key === "search" && (
     <div className="grid gap-5">
         <section className="relative overflow-hidden rounded-[38px] bg-black p-6 text-white shadow-[0_28px_80px_rgb(0_0_0/0.24)]">
@@ -1496,13 +1566,14 @@ export default function AddGameWizard({
                                     {Object.keys(serverErrors).length > 0 && <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-5 text-sm font-black text-red-700"><div className="mb-2 text-base">Backend rejected the save:</div><ul className="list-inside list-disc space-y-1">{Object.entries(serverErrors).map(([key, value]) => <li key={key}>{key}: {value}</li>)}</ul></div>}
                                 </section>
                                 </div>
+                                </div>
                             </div>
                         </main>
 
-                        <footer className="flex items-center justify-between gap-5 border-t border-black/10 bg-[#f6faf4] px-7 py-5">
-                            <button type="button" onClick={previous} disabled={stepIndex === 0} className="flex items-center gap-3 rounded-2xl bg-black/[0.06] px-7 py-3.5 text-base font-black disabled:opacity-35"><ChevronLeft size={18} /> Back</button>
+                        <footer className="sl-wizard-footer flex items-center justify-between gap-5 border-t border-black/10 bg-[#f6faf4] px-7 py-5">
+                            <button type="button" onClick={previous} disabled={stepIndex === 0} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white transition hover:-translate-y-0.5 disabled:bg-black/[0.06] disabled:text-black/35 disabled:opacity-100 disabled:hover:translate-y-0"><ChevronLeft size={18} /> Back</button>
                             <div className={`hidden min-w-0 flex-1 text-center text-xs font-black uppercase tracking-[0.18em] md:block ${currentError ? "rounded-full bg-red-500/10 px-4 py-2 text-red-700" : "text-black/35"}`}>{currentError ? currentError : `${stepIndex + 1} / ${steps.length}`}</div>
-                            {stepIndex < steps.length - 1 ? <button type="button" onClick={next} disabled={!!currentError} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">Next <ChevronRight size={18} /></button> : <button type="button" onClick={() => void submit()} disabled={!!currentError || saving || checkingDuplicates} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">{saving || checkingDuplicates ? <><Loader2 className="animate-spin" size={18} /> Saving</> : <><Check size={18} /> Save Game</>}</button>}
+                            {stepIndex < steps.length - 1 ? <button type="button" onClick={next} disabled={!!currentError} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">Next <ChevronRight size={18} /></button> : <button type="button" onClick={() => void submit()} disabled={!!currentError || saving || checkingDuplicates} className="flex items-center gap-3 rounded-2xl bg-[#b7ff63] px-7 py-3.5 text-base font-black text-black disabled:opacity-35">{saving || checkingDuplicates ? <><Loader2 className="animate-spin" size={18} /> Saving</> : <><Check size={18} /> Save Game</>}</button>}
                         </footer>
                     </section>
 

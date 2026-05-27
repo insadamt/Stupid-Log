@@ -37,5 +37,6 @@ Route::patch('/snapshots/{snapshotRun}/best-games', [StupidLogController::class,
 Route::delete('/snapshots/{snapshotRun}', [StupidLogController::class, 'destroySnapshot'])->name('snapshots.destroy');
 Route::get('/settings', [StupidLogController::class, 'settings'])->name('settings');
 Route::patch('/settings', [StupidLogController::class, 'updateSettings'])->name('settings.update');
+Route::post('/settings/reset', [StupidLogController::class, 'resetApp'])->name('settings.reset');
 Route::post('/settings/igdb/test', [StupidLogController::class, 'testIgdbCredentials'])->name('settings.igdb.test');
 Route::post('/settings/steam/test', [StupidLogController::class, 'testSteamCredentials'])->name('settings.steam.test');

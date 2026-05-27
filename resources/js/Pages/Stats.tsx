@@ -1,16 +1,23 @@
 import { BarChart3, ChevronLeft, ChevronRight, Clock3, DollarSign, Gamepad2, Medal, Trophy } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { Flip } from 'gsap/Flip';
 import { gsap, prefersReducedMotion, useGSAP } from '../animation';
 import AppLayout from '../Components/AppLayout';
 import PlatformIcon from '../Components/PlatformIcon';
 import { statusColor, statusDotStyle, statusPillStyle } from '../statusColors';
 import { ConfirmedYearStats, GrowthMetric, PlatformBreakdown, SnapshotBestGame, StatsArchiveGame, StatsData, StatusBreakdown } from '../types';
 
+gsap.registerPlugin(Flip);
+
 type TabKey = 'overview' | 'breakdowns' | 'progression' | 'best-games' | 'archive';
 type MetricKey = 'library_games' | 'completed' | 'hundred_percent' | 'playtime_hours' | 'earned_achievements' | 'total_achievements' | 'achievement_progress' | 'base_value' | 'purchased_value';
 type StatView = StatsData & { year?: number; growth?: Record<string, GrowthMetric>; best_games?: ConfirmedYearStats['best_games'] };
 type Slice = { label: string; value: number; color: string; growth?: GrowthMetric | null };
 type ChartConfig = { title: string; eyebrow: string; data: Slice[]; total: string; center: string; delta?: GrowthMetric | null; format: (value: number) => string; showPlatformIcons?: boolean };
+type DonutArcLayout = { label: string; value: number; color: string; start: number; end: number };
+type DonutTweenSlice = { label: string; from: number; to: number; color: string };
+type StackSegment = { label: string; value: number; color: string };
 
 const tabs: Array<{ key: TabKey; title: string; sub: string }> = [
     { key: 'overview', title: 'Overview', sub: 'core totals' },
@@ -21,6 +28,15 @@ const tabs: Array<{ key: TabKey; title: string; sub: string }> = [
 ];
 
 const palette = ['#9BE44D', '#61C7DF', '#E86D78', '#DFC96B', '#A382DB', '#5CC193', '#D88F45', '#CED8D2'];
+const statsTabTransitionDuration = 0.48;
+const statsRevealAfterTabDelay = statsTabTransitionDuration + 0.16;
+const donutRevealTotalDuration = 1.35;
+const chartRowsRevealGap = 0.18;
+const StatsRevealDelayContext = createContext(0);
+
+function useStatsRevealDelay() {
+    return useContext(StatsRevealDelayContext);
+}
 
 function n(value: unknown) {
     const parsed = Number(value ?? 0);
@@ -43,6 +59,10 @@ function hours(value: unknown) {
 function percentLabel(value: number) {
     if (value > 0 && value < 0.1) return '<0.1%';
     return `${num(value, value < 10 ? 2 : 1)}%`;
+}
+
+function clampPercent(value: number) {
+    return Math.max(0, Math.min(100, value));
 }
 
 function growth(current: number, previous: number): GrowthMetric {
@@ -103,10 +123,194 @@ function PercentDeltaBadge({ value, compact = false }: { value?: GrowthMetric | 
     );
 }
 
-function ProgressBar({ value, large = false }: { value: number; large?: boolean }) {
+function animationKey(parts: Array<string | number | null | undefined>) {
+    return parts.map((part) => String(part ?? '')).join('|');
+}
+
+function donutLayout(data: Slice[], order?: string[]): DonutArcLayout[] {
+    const orderRank = new Map(order?.map((label, index) => [label, index]) ?? []);
+    const orderedData = order
+        ? [...data].sort((a, b) => (orderRank.get(a.label) ?? Number.MAX_SAFE_INTEGER) - (orderRank.get(b.label) ?? Number.MAX_SAFE_INTEGER))
+        : data;
+    const total = orderedData.reduce((sum, slice) => sum + slice.value, 0);
+    let cursor = 0;
+
+    if (total <= 0) return [];
+
+    return orderedData.map((slice, index) => {
+        const span = index === orderedData.length - 1 ? 360 - cursor : (slice.value / total) * 360;
+        const layout = {
+            label: slice.label,
+            value: slice.value,
+            color: slice.color,
+            start: cursor,
+            end: cursor + span,
+        };
+
+        cursor += span;
+        return layout;
+    });
+}
+
+function interpolateArc(from: DonutArcLayout, to: DonutArcLayout, progress: number): DonutArcLayout {
+    return {
+        label: to.label,
+        value: to.value,
+        color: to.color,
+        start: from.start + (to.start - from.start) * progress,
+        end: from.end + (to.end - from.end) * progress,
+    };
+}
+
+function interpolatedDonutLayout(transitions: DonutTweenSlice[], progress: number, order?: string[]) {
+    return donutLayout(transitions
+        .map((slice) => ({
+            label: slice.label,
+            value: slice.from + (slice.to - slice.from) * progress,
+            color: slice.color,
+        }))
+        .filter((slice) => slice.value > 0.001), order);
+}
+
+function pointOnCircle(cx: number, cy: number, radius: number, angle: number) {
+    const radians = (angle - 90) * (Math.PI / 180);
+
+    return {
+        x: cx + radius * Math.cos(radians),
+        y: cy + radius * Math.sin(radians),
+    };
+}
+
+function donutArcPath(arc: DonutArcLayout, cx: number, cy: number, radius: number) {
+    const span = Math.max(0, arc.end - arc.start);
+    if (span <= 0.01) return '';
+
+    const endAngle = span >= 359.99 ? arc.start + 359.99 : arc.end;
+    const start = pointOnCircle(cx, cy, radius, arc.start);
+    const end = pointOnCircle(cx, cy, radius, endAngle);
+    const largeArcFlag = endAngle - arc.start > 180 ? 1 : 0;
+
+    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
+}
+
+function ProgressBar({ value, large = false, tone = 'light' }: { value: number; large?: boolean; tone?: 'light' | 'dark' }) {
+    const fillRef = useRef<HTMLDivElement>(null);
+    const previousScale = useRef(0);
+    const hasRevealed = useRef(false);
+    const revealDelay = useStatsRevealDelay();
+    const targetScale = clampPercent(value) / 100;
+    const renderScale = !hasRevealed.current && revealDelay > 0 ? 0 : targetScale;
+
+    useGSAP(() => {
+        const fill = fillRef.current;
+        if (!fill) return;
+
+        gsap.killTweensOf(fill);
+
+        if (prefersReducedMotion()) {
+            gsap.set(fill, { scaleX: targetScale });
+            previousScale.current = targetScale;
+            hasRevealed.current = true;
+            return;
+        }
+
+        const from = hasRevealed.current ? previousScale.current : 0;
+        if (!hasRevealed.current && revealDelay > 0) {
+            gsap.set(fill, { scaleX: from });
+        }
+
+        gsap.fromTo(
+            fill,
+            { scaleX: from },
+            {
+                scaleX: targetScale,
+                duration: hasRevealed.current ? 0.46 : 0.74,
+                delay: hasRevealed.current ? 0 : revealDelay,
+                ease: hasRevealed.current ? 'power3.inOut' : 'power3.out',
+                overwrite: 'auto',
+            },
+        );
+
+        previousScale.current = targetScale;
+        hasRevealed.current = true;
+    }, { scope: fillRef, dependencies: [targetScale] });
+
     return (
-        <div className={`${large ? 'h-4' : 'h-2.5'} overflow-hidden rounded-full bg-black/8`}>
-            <div className="h-full rounded-full bg-[#9BE44D]" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+        <div className={`${large ? 'h-4' : 'h-2.5'} overflow-hidden rounded-full ${tone === 'dark' ? 'bg-white/10' : 'bg-black/8'}`}>
+            <div ref={fillRef} className="h-full w-full origin-left rounded-full bg-[#9BE44D]" style={{ transform: `scaleX(${renderScale})` }} />
+        </div>
+    );
+}
+
+function StackedProgressBar({ segments, total }: { segments: StackSegment[]; total: number }) {
+    const stackRef = useRef<HTMLDivElement>(null);
+    const previousWidths = useRef<Record<string, number>>({});
+    const hasRevealed = useRef(false);
+    const revealDelay = useStatsRevealDelay();
+    const safeTotal = Math.max(1, total);
+    const widths = segments.reduce<Record<string, number>>((acc, segment) => {
+        acc[segment.label] = clampPercent((segment.value / safeTotal) * 100);
+        return acc;
+    }, {});
+    const renderWidths = !hasRevealed.current && revealDelay > 0
+        ? segments.reduce<Record<string, number>>((acc, segment) => ({ ...acc, [segment.label]: 0 }), {})
+        : widths;
+    const stackKey = animationKey(segments.map((segment) => `${segment.label}:${segment.value}:${segment.color}`));
+
+    useGSAP(() => {
+        const stack = stackRef.current;
+        if (!stack) return;
+
+        const fills = Array.from(stack.querySelectorAll<HTMLElement>('[data-stack-segment]'));
+        gsap.killTweensOf(fills);
+
+        if (prefersReducedMotion()) {
+            fills.forEach((fill) => {
+                const label = fill.dataset.label ?? '';
+                gsap.set(fill, { width: `${widths[label] ?? 0}%` });
+            });
+            previousWidths.current = widths;
+            hasRevealed.current = true;
+            return;
+        }
+
+        fills.forEach((fill, index) => {
+            const label = fill.dataset.label ?? '';
+            const targetWidth = widths[label] ?? 0;
+            const previousWidth = hasRevealed.current ? previousWidths.current[label] ?? 0 : 0;
+            if (!hasRevealed.current && revealDelay > 0) {
+                gsap.set(fill, { width: `${previousWidth}%` });
+            }
+
+            gsap.fromTo(
+                fill,
+                { width: `${previousWidth}%` },
+                {
+                    width: `${targetWidth}%`,
+                    duration: hasRevealed.current ? 0.46 : 0.68,
+                    delay: hasRevealed.current ? 0 : revealDelay + index * 0.035,
+                    ease: hasRevealed.current ? 'power3.inOut' : 'power3.out',
+                    overwrite: 'auto',
+                },
+            );
+        });
+
+        previousWidths.current = widths;
+        hasRevealed.current = true;
+    }, { scope: stackRef, dependencies: [stackKey, safeTotal] });
+
+    return (
+        <div ref={stackRef} className="flex h-5 overflow-hidden rounded-full bg-black/8">
+            {segments.length === 0 && <div className="h-full w-full bg-black/10" />}
+            {segments.map((segment) => (
+                <div
+                    key={segment.label}
+                    data-stack-segment
+                    data-label={segment.label}
+                    className="h-full"
+                    style={{ width: `${renderWidths[segment.label]}%`, backgroundColor: segment.color }}
+                />
+            ))}
         </div>
     );
 }
@@ -143,39 +347,121 @@ function StatCard({ label, value, detail, delta, icon: Icon }: { label: string; 
 }
 
 function Donut({ data, total, center }: { data: Slice[]; total: string; center: string }) {
+    const chartRef = useRef<HTMLDivElement>(null);
+    const hasRevealed = useRef(false);
+    const previousSlices = useRef<Slice[]>(data);
+    const sliceOrder = useRef<string[]>(data.map((slice) => slice.label));
+    const revealDelay = useStatsRevealDelay();
     const radius = 72;
-    const circumference = 2 * Math.PI * radius;
-    const sum = data.reduce((acc, slice) => acc + slice.value, 0);
-    let offset = 0;
+    const strokeWidth = 24;
     const centerTextSize = total.length > 8 ? 'text-4xl' : total.length > 5 ? 'text-5xl' : 'text-6xl';
+    const dataKey = animationKey(data.map((slice) => `${slice.label}:${slice.value}:${slice.color}`));
+    const orderedLabels = [
+        ...sliceOrder.current,
+        ...data.filter((slice) => !sliceOrder.current.includes(slice.label)).map((slice) => slice.label),
+    ];
+    const targetLayout = useMemo(() => donutLayout(data, orderedLabels), [dataKey]);
+    const [renderLayout, setRenderLayout] = useState<DonutArcLayout[]>(() => targetLayout.map((arc) => ({ ...arc, end: arc.start })));
+
+    useGSAP(() => {
+        if (!chartRef.current) return;
+
+        const centerText = chartRef.current.querySelector<HTMLElement>('[data-donut-center]');
+
+        if (prefersReducedMotion()) {
+            setRenderLayout(targetLayout);
+            previousSlices.current = data;
+            sliceOrder.current = orderedLabels;
+            hasRevealed.current = true;
+            return;
+        }
+
+        const tweenState = { progress: 0 };
+
+        gsap.killTweensOf(tweenState);
+
+        if (!hasRevealed.current) {
+            const revealTransitions: DonutTweenSlice[] = data.map((slice) => ({
+                label: slice.label,
+                from: 0,
+                to: slice.value,
+                color: slice.color,
+            }));
+
+            setRenderLayout([]);
+
+            gsap.to(tweenState, {
+                progress: 1,
+                duration: 0.68,
+                delay: revealDelay,
+                ease: 'power3.inOut',
+                onUpdate: () => {
+                    setRenderLayout(interpolatedDonutLayout(revealTransitions, tweenState.progress, orderedLabels));
+                },
+                onComplete: () => {
+                    previousSlices.current = data;
+                    sliceOrder.current = orderedLabels;
+                    hasRevealed.current = true;
+                    setRenderLayout(targetLayout);
+                },
+            });
+            return;
+        }
+
+        const previousByLabel = new Map(previousSlices.current.map((slice) => [slice.label, slice]));
+        const targetByLabel = new Map(data.map((slice) => [slice.label, slice]));
+        const transitionLabels = [
+            ...orderedLabels,
+            ...previousSlices.current.filter((slice) => !orderedLabels.includes(slice.label)).map((slice) => slice.label),
+        ];
+        const transitions: DonutTweenSlice[] = transitionLabels.map((label) => {
+            const target = targetByLabel.get(label);
+            const from = previousByLabel.get(label);
+
+            return {
+                label,
+                from: from?.value ?? 0,
+                to: target?.value ?? 0,
+                color: target?.color ?? from?.color ?? '#9BE44D',
+            };
+        });
+
+        gsap.to(tweenState, {
+            progress: 1,
+            duration: 0.68,
+            ease: 'power3.inOut',
+            onUpdate: () => {
+                setRenderLayout(interpolatedDonutLayout(transitions, tweenState.progress, transitionLabels));
+            },
+            onComplete: () => {
+                previousSlices.current = data;
+                sliceOrder.current = orderedLabels;
+                setRenderLayout(targetLayout);
+            },
+        });
+
+        if (centerText) {
+            gsap.fromTo(centerText, { scale: 0.97, autoAlpha: 0.72 }, { scale: 1, autoAlpha: 1, duration: 0.34, ease: 'power3.out', overwrite: 'auto', clearProps: 'transform,visibility,opacity' });
+        }
+    }, { scope: chartRef, dependencies: [dataKey] });
 
     return (
-        <div className="relative size-[min(42vh,380px)] min-h-[330px] min-w-[330px] shrink-0">
+        <div ref={chartRef} className="relative size-[min(42vh,380px)] min-h-[330px] min-w-[330px] shrink-0">
             <svg viewBox="0 0 220 220" className="size-full">
-                <circle cx="110" cy="110" r={radius} fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="24" />
-                {sum > 0 && data.map((slice) => {
-                    const length = (slice.value / sum) * circumference;
-                    const segment = (
-                        <circle
-                            key={slice.label}
-                            cx="110"
-                            cy="110"
-                            r={radius}
-                            fill="none"
-                            stroke={slice.color}
-                            strokeWidth="24"
-                            strokeDasharray={`${length} ${circumference - length}`}
-                            strokeDashoffset={-offset}
-                            strokeLinecap="butt"
-                            transform="rotate(-90 110 110)"
-                        />
-                    );
-                    offset += length;
-                    return segment;
-                })}
+                <circle cx="110" cy="110" r={radius} fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth={strokeWidth} />
+                {renderLayout.map((arc) => (
+                    <path
+                        key={arc.label}
+                        d={donutArcPath(arc, 110, 110, radius)}
+                        fill="none"
+                        stroke={arc.color}
+                        strokeWidth={strokeWidth}
+                        strokeLinecap="butt"
+                    />
+                ))}
             </svg>
             <div className="absolute inset-0 grid place-items-center text-center">
-                <div className="max-w-[58%]">
+                <div data-donut-center className="max-w-[58%]">
                     <div className={`${centerTextSize} truncate font-black leading-none text-white`} title={total}>{total}</div>
                     <div className="mt-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/32">{center}</div>
                 </div>
@@ -185,11 +471,111 @@ function Donut({ data, total, center }: { data: Slice[]; total: string; center: 
 }
 
 function GameUiChart({ config }: { config: ChartConfig }) {
-    const data = [...config.data].sort((a, b) => b.value - a.value);
+    const chartRef = useRef<HTMLElement>(null);
+    const hasRevealed = useRef(false);
+    const revealDelay = useStatsRevealDelay();
+    const incomingData = [...config.data].sort((a, b) => b.value - a.value);
+    const [renderedData, setRenderedData] = useState(incomingData);
+    const data = renderedData;
     const sum = data.reduce((acc, slice) => acc + slice.value, 0);
+    const incomingChartKey = animationKey([config.title, config.eyebrow, ...incomingData.map((slice) => `${slice.label}:${slice.value}`)]);
+    const renderedChartKey = animationKey([config.title, config.eyebrow, ...data.map((slice) => `${slice.label}:${slice.value}`)]);
+    const rowRevealDelay = hasRevealed.current ? 0 : revealDelay + chartRowsRevealGap;
+
+    useGSAP(() => {
+        const chart = chartRef.current;
+        if (!chart || incomingChartKey === renderedChartKey) return;
+
+        if (!hasRevealed.current || prefersReducedMotion()) {
+            setRenderedData(incomingData);
+            return;
+        }
+
+        const rows = Array.from(chart.querySelectorAll<HTMLElement>('[data-chart-row]'));
+        const state = rows.length ? Flip.getState(rows) : null;
+
+        flushSync(() => {
+            setRenderedData(incomingData);
+        });
+
+        if (!state) return;
+
+        Flip.from(state, {
+            duration: 0.64,
+            ease: 'power3.inOut',
+            stagger: 0.045,
+            absolute: true,
+            prune: true,
+            nested: true,
+            onEnter: (elements) => gsap.fromTo(elements, { y: 14, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.38, ease: 'power3.out', stagger: 0.04 }),
+            onLeave: (elements) => gsap.to(elements, { y: -10, autoAlpha: 0, duration: 0.24, ease: 'power2.in' }),
+        });
+    }, { scope: chartRef, dependencies: [incomingChartKey, renderedChartKey] });
+
+    useGSAP(() => {
+        const chart = chartRef.current;
+        if (!chart) return;
+
+        const rows = Array.from(chart.querySelectorAll<HTMLElement>('[data-chart-row]'));
+        if (!rows.length) {
+            hasRevealed.current = true;
+            return;
+        }
+
+        gsap.killTweensOf(rows);
+
+        if (prefersReducedMotion()) {
+            gsap.set(rows, { autoAlpha: 1, clearProps: 'transform,visibility,opacity' });
+            hasRevealed.current = true;
+            return;
+        }
+
+        if (hasRevealed.current) {
+            const newRows = rows.filter((row) => !row.dataset.revealed);
+            if (newRows.length) {
+                gsap.fromTo(
+                    newRows,
+                    { y: 10, autoAlpha: 0 },
+                    {
+                        y: 0,
+                        autoAlpha: 1,
+                        duration: 0.36,
+                        ease: 'power3.out',
+                        stagger: 0.04,
+                        overwrite: 'auto',
+                        clearProps: 'transform,visibility,opacity',
+                    },
+                );
+            }
+        } else {
+            if (revealDelay > 0) {
+                gsap.set(rows, { y: 14, autoAlpha: 0 });
+            }
+
+            gsap.fromTo(
+                rows,
+                { y: 14, autoAlpha: 0 },
+                {
+                    y: 0,
+                    autoAlpha: 1,
+                    duration: 0.44,
+                    delay: rowRevealDelay,
+                    ease: 'power3.out',
+                    stagger: 0.1,
+                    overwrite: 'auto',
+                    clearProps: 'transform,visibility,opacity',
+                },
+            );
+        }
+
+        hasRevealed.current = true;
+        rows.forEach((row) => {
+            row.dataset.revealed = 'true';
+        });
+    }, { scope: chartRef, dependencies: [renderedChartKey] });
 
     return (
-        <article className="grid h-full min-h-0 grid-cols-[1.15fr_1fr] gap-4 rounded-[30px] bg-black p-4 text-white shadow-[0_24px_75px_rgb(0_0_0/0.2)]">
+        <article ref={chartRef} className="grid h-full min-h-0 grid-cols-[1.15fr_1fr] gap-4 rounded-[30px] bg-black p-4 text-white shadow-[0_24px_75px_rgb(0_0_0/0.2)]">
             <section className="grid min-h-0 grid-rows-[auto_1fr] rounded-[26px] bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-6 ring-1 ring-white/8">
                 <div>
                     <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]/70">{config.eyebrow}</div>
@@ -211,8 +597,15 @@ function GameUiChart({ config }: { config: ChartConfig }) {
                     {data.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm font-bold text-white/35">No rows available.</div>}
                     {data.map((slice) => {
                         const percent = sum > 0 ? (slice.value / sum) * 100 : 0;
+                        const rowDelay = rowRevealDelay + data.findIndex((item) => item.label === slice.label) * 0.1;
                         return (
-                            <div key={slice.label} className="rounded-[22px] bg-white/[0.07] p-4 ring-1 ring-white/8">
+                            <div
+                                key={slice.label}
+                                data-chart-row
+                                data-flip-id={slice.label}
+                                className="rounded-[22px] bg-white/[0.07] p-4 ring-1 ring-white/8"
+                                style={!hasRevealed.current && revealDelay > 0 ? { opacity: 0, transform: 'translateY(14px)' } : undefined}
+                            >
                                 <div className="flex items-center justify-between gap-3">
                                     <span className="flex min-w-0 items-center gap-3 text-sm font-black text-white/75">
                                         {config.showPlatformIcons ? <PlatformIcon platform={slice.label} surface="dark" size="sm" /> : <span className="size-3 rounded-full" style={{ backgroundColor: slice.color }} />}
@@ -224,6 +617,11 @@ function GameUiChart({ config }: { config: ChartConfig }) {
                                     <span>{config.format(slice.value)}</span>
                                     <DeltaBadge value={slice.growth} compact />
                                 </div>
+                                <StatsRevealDelayContext.Provider value={rowDelay}>
+                                    <div className="mt-3">
+                                        <ProgressBar value={percent} tone="dark" />
+                                    </div>
+                                </StatsRevealDelayContext.Provider>
                             </div>
                         );
                     })}
@@ -255,7 +653,7 @@ function Overview({ stats, previous, selectedYear }: { stats: StatView; previous
                         </div>
                         <PercentDeltaBadge value={metricGrowth('achievement_progress', stats, previous)} />
                     </div>
-                    <div className="mt-5 h-5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#b7ff63]" style={{ width: `${Math.max(0, Math.min(100, stats.achievement_progress))}%` }} /></div>
+                    <div className="mt-5"><ProgressBar value={stats.achievement_progress} large tone="dark" /></div>
                     {selectedYear && <div className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-white/30">Best of {selectedYear.year} is available in this snapshot</div>}
                 </article>
                 <StatCard label="Base Value" value={money(stats.base_value)} detail="Digital/Physical + owned DLCs" delta={metricGrowth('base_value', stats, previous)} icon={DollarSign} />
@@ -335,7 +733,7 @@ function Progression({ stats, previous }: { stats: StatView; previous?: StatView
                             <PercentDeltaBadge value={metricGrowth('achievement_progress', stats, previous)} compact />
                         </div>
                     </div>
-                    <div className="mt-4 h-4 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#b7ff63]" style={{ width: `${Math.max(0, Math.min(100, stats.achievement_progress))}%` }} /></div>
+                    <div className="mt-4"><ProgressBar value={stats.achievement_progress} large tone="dark" /></div>
                 </div>
                 <div className="mt-5 min-h-0 overflow-y-auto pr-1">
                     <div className="grid gap-3">
@@ -395,9 +793,8 @@ function StatusStack({ platform, previous }: { platform: PlatformBreakdown; prev
                     </div>
                 </div>
             </div>
-            <div className="mt-3 flex h-5 overflow-hidden rounded-full bg-black/8">
-                {statuses.length === 0 && <div className="h-full w-full bg-black/10" />}
-                {statuses.map((status) => <div key={status.label} className="h-full" style={{ width: `${(status.library_games / total) * 100}%`, backgroundColor: statusColor(status) }} />)}
+            <div className="mt-3">
+                <StackedProgressBar total={total} segments={statuses.map((status) => ({ label: status.label, value: status.library_games, color: statusColor(status) }))} />
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {statuses.map((status) => {
@@ -473,7 +870,7 @@ function BestGameCard({ game }: { game: SnapshotBestGame }) {
                             <span>Achievements</span>
                             <span>{game.earned_achievements}/{game.total_achievements || 0}</span>
                         </div>
-                        <div className="h-2.5 overflow-hidden rounded-full bg-white/18"><div className="h-full rounded-full bg-[#b7ff63]" style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} /></div>
+                        <ProgressBar value={progress} tone="dark" />
                     </div>
                 </div>
             </div>
@@ -588,7 +985,7 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
         }
 
         const timeline = gsap.timeline({
-            defaults: { duration: 0.48, ease: 'power3.inOut' },
+            defaults: { duration: statsTabTransitionDuration, ease: 'power3.inOut' },
             onComplete: () => transition.clone?.remove(),
         });
 
@@ -672,6 +1069,7 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                 : active === 'best-games'
                     ? <BestGames year={selectedBestGamesYear} />
                     : <Archive stats={current} />;
+    const panelRevealDelay = pendingTabTransition.current ? statsRevealAfterTabDelay : 0;
 
     return (
         <AppLayout title="Stats" lockViewport>
@@ -706,7 +1104,9 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                     </header>
                     <main ref={panelShellRef} className="relative min-h-0 overflow-hidden rounded-[34px] border border-black/8 bg-white/35 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.58)]">
                         <div ref={panelContentRef} className="relative z-10 h-full min-h-0">
-                            {panel}
+                            <StatsRevealDelayContext.Provider value={panelRevealDelay}>
+                                {panel}
+                            </StatsRevealDelayContext.Provider>
                         </div>
                     </main>
                     <SlideNav active={active} setActive={setActiveTab} />

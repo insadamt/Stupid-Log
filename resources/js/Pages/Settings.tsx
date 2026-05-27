@@ -5,8 +5,10 @@ import {
     Database,
     KeyRound,
     Loader2,
+    RotateCcw,
     Save,
     ShieldCheck,
+    TriangleAlert,
     UserRound,
 } from 'lucide-react';
 import { FormEvent, MouseEvent, ReactNode, useState } from 'react';
@@ -125,13 +127,14 @@ function ActionButton({
     children: ReactNode;
     disabled?: boolean;
     onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
-    tone?: 'dark' | 'green' | 'ghost';
+    tone?: 'dark' | 'green' | 'ghost' | 'danger';
     type?: 'button' | 'submit';
 }) {
     const toneClass = {
         dark: 'bg-black text-white hover:bg-black/85',
         green: 'bg-[#b7ff63] text-black hover:brightness-95',
         ghost: 'bg-white/75 text-black ring-1 ring-black/10 hover:bg-white',
+        danger: 'bg-[#d92d20] text-white hover:bg-[#b42318]',
     }[tone];
 
     return (
@@ -151,12 +154,13 @@ export default function Settings({
     igdbCredential,
     steamCredential,
 }: {
-    user: { username: string; settings?: { currency_code: string } };
+    user: { username: string };
     igdbCredential: IgdbCredential;
     steamCredential: SteamCredential;
 }) {
     const [testingIgdb, setTestingIgdb] = useState(false);
     const [testingSteam, setTestingSteam] = useState(false);
+    const [resetting, setResetting] = useState(false);
     const [igdbTest, setIgdbTest] = useState<TestResult | null>(null);
     const [steamTest, setSteamTest] = useState<TestResult | null>(null);
 
@@ -166,6 +170,15 @@ export default function Settings({
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         router.patch('/settings', Object.fromEntries(new FormData(event.currentTarget)), { preserveScroll: true });
+    }
+
+    function resetApp() {
+        if (!confirm('Reset Stupid Log and erase your library, snapshots, credentials, and settings?')) return;
+
+        setResetting(true);
+        router.post('/settings/reset', {}, {
+            onFinish: () => setResetting(false),
+        });
     }
 
     async function testIgdb(event: MouseEvent<HTMLButtonElement>) {
@@ -228,8 +241,6 @@ export default function Settings({
         <AppLayout title="Settings" lockViewport>
             <section className="h-full overflow-hidden px-4 py-3 md:pl-[88px] md:pr-6">
                 <form onSubmit={submit} className="mx-auto grid h-full max-w-[1540px] grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden">
-                    <input type="hidden" name="currency_code" value="USD" />
-
                     <header className="rounded-[24px] bg-black px-5 py-4 text-white shadow-[0_20px_60px_rgb(0_0_0/0.18)]">
                         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                             <div className="min-w-0">
@@ -248,7 +259,7 @@ export default function Settings({
                     </header>
 
                     <div className="grid min-h-0 gap-4 overflow-hidden xl:grid-cols-[360px_minmax(0,1fr)]">
-                        <aside className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden">
+                        <aside className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-4 overflow-hidden">
                             <article className="rounded-[24px] border border-black/10 bg-white/80 p-5 shadow-[0_18px_45px_rgb(9_14_12/0.06)]">
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="min-w-0">
@@ -278,6 +289,23 @@ export default function Settings({
                                     icon={<KeyRound size={22} strokeWidth={3} />}
                                 />
                             </section>
+
+                            <article className="rounded-[24px] border border-[#d92d20]/25 bg-[#fff4f2] p-5 shadow-[0_18px_45px_rgb(9_14_12/0.06)]">
+                                <div className="flex items-start gap-3">
+                                    <div className="grid size-11 shrink-0 place-items-center rounded-[16px] bg-[#d92d20] text-white"><TriangleAlert size={22} strokeWidth={3} /></div>
+                                    <div className="min-w-0">
+                                        <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#b42318]/70">Danger zone</div>
+                                        <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-black">Reset app</h2>
+                                        <p className="mt-2 text-sm font-bold leading-relaxed text-black/55">Erase your library, snapshots, provider credentials, and profile settings, then return to first-use setup.</p>
+                                    </div>
+                                </div>
+                                <div className="mt-4">
+                                    <ActionButton onClick={resetApp} disabled={resetting} tone="danger">
+                                        {resetting ? <Loader2 className="animate-spin" size={16} strokeWidth={3} /> : <RotateCcw size={16} strokeWidth={3} />}
+                                        {resetting ? 'Resetting' : 'Reset app'}
+                                    </ActionButton>
+                                </div>
+                            </article>
                         </aside>
 
                         <section className="grid min-h-0 gap-4 overflow-hidden lg:grid-cols-2">

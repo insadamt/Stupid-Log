@@ -15,7 +15,6 @@ class UpdateSettingsRequest extends FormRequest
     {
         return [
             'username' => ['required', 'string', 'max:255'],
-            'currency_code' => ['required', 'exists:currencies,code'],
             'igdb_client_id' => ['nullable', 'string'],
             'igdb_client_secret' => ['nullable', 'string'],
             'steam_api_key' => ['nullable', 'string'],
