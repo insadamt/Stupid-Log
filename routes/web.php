@@ -13,6 +13,8 @@ Route::post('/library-games', [StupidLogController::class, 'storeLibraryGame'])-
 Route::post('/library-games/cover', [StupidLogController::class, 'uploadGameCover'])->name('library-games.cover.store');
 Route::get('/library-games/manual-duplicates', [StupidLogController::class, 'manualDuplicates'])->name('library-games.manual-duplicates');
 Route::get('/provider-search', [StupidLogController::class, 'providerSearch'])->name('provider-search');
+Route::post('/provider-import-drafts', [StupidLogController::class, 'storeProviderImportDraft'])->name('provider-import-drafts.store');
+Route::delete('/provider-import-drafts/{providerImportDraft}', [StupidLogController::class, 'cancelProviderImportDraft'])->name('provider-import-drafts.destroy');
 Route::get('/games/{libraryGame}', [StupidLogController::class, 'gameDetails'])->name('games.show');
 Route::patch('/games/{libraryGame}', [StupidLogController::class, 'updateLibraryGame'])->name('games.update');
 Route::delete('/games/{libraryGame}', [StupidLogController::class, 'destroyLibraryGame'])->name('games.destroy');

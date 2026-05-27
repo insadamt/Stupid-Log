@@ -458,7 +458,6 @@ class ProviderSearchService
                 $catalog[] = [
                     'steam_app_id' => $dlcId,
                     'title' => $data['name'] ?? 'Untitled DLC',
-                    'cover_url_original' => $data['header_image'] ?? null,
                     'base_price' => $this->price($data),
                 ];
             }

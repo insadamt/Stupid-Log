@@ -28,7 +28,6 @@ type Dlc = {
     id: number;
     owned_dlc_id: number | null;
     title: string;
-    cover_url?: string | null;
     base_price: string | number | null;
     state: string;
     purchased_price: string | number | null;
@@ -238,18 +237,6 @@ function formFromCopy(copy?: OwnershipCopyDetails, fallbackTypeId?: number): Own
         purchased_price: copy?.purchased_price === null || copy?.purchased_price === undefined ? '' : String(copy.purchased_price),
         purchased_at: copy?.purchased_at ?? '',
     };
-}
-
-function DlcCover({ dlc }: { dlc: Dlc }) {
-    if (dlc.cover_url) {
-        return <img src={dlc.cover_url} alt={dlc.title} className="h-16 w-24 rounded-[18px] object-cover shadow-[0_12px_22px_rgb(0_0_0/0.22)]" />;
-    }
-
-    return (
-        <div className="grid h-16 w-24 place-items-center rounded-[18px] bg-white/10 text-[9px] font-black uppercase tracking-[0.16em] text-white/35">
-            No Cover
-        </div>
-    );
 }
 
 export default function GameDetails({
@@ -859,8 +846,7 @@ export default function GameDetails({
                                 {dlcErrors.dlcs && <div className="mt-3 rounded-[18px] border border-[#ff6068]/40 bg-[#ff6068]/10 px-4 py-3 text-sm font-black text-[#ff858b]">{dlcErrors.dlcs}</div>}
 
                                 <div className="min-h-0 overflow-auto pr-1">
-                                    <div className="sticky top-0 z-10 grid grid-cols-[92px_minmax(0,1fr)_150px_112px_88px] gap-3 rounded-[18px] bg-[#b7ff63] px-3 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-black">
-                                        <span>Cover</span>
+                                    <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_150px_112px_88px] gap-3 rounded-[18px] bg-[#b7ff63] px-3 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-black">
                                         <span>Title</span>
                                         <span>Status</span>
                                         <span>Value</span>
@@ -869,8 +855,7 @@ export default function GameDetails({
                                     <div className="mt-3 grid gap-2">
                                     {filteredDlcs.map((dlc) => (
                                         <div key={dlc.id} className="rounded-[20px] border border-white/10 bg-white/[0.06] p-3 text-sm font-black">
-                                            <div className="grid grid-cols-[92px_minmax(0,1fr)_150px_112px_88px] items-center gap-3">
-                                                <DlcCover dlc={dlc} />
+                                            <div className="grid grid-cols-[minmax(0,1fr)_150px_112px_88px] items-center gap-3">
                                                 <span className="truncate text-base">{dlc.title}</span>
                                                 <span className={`rounded-full px-4 py-2 text-center text-xs uppercase tracking-[0.12em] ring-1 ${statusTone(dlc.state)}`}>{dlc.state}</span>
                                                 <span className="text-right text-white/72">{formatMoney(dlc.purchased_price ?? dlc.base_price)}</span>
@@ -994,13 +979,6 @@ export default function GameDetails({
                     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-5 backdrop-blur-sm">
                         <section className="grid w-full max-w-4xl overflow-hidden rounded-[36px] border border-white/10 bg-black text-white shadow-[0_36px_120px_rgb(0_0_0/0.45)] md:grid-cols-[270px_minmax(0,1fr)]">
                             <aside className="bg-[#b7ff63] p-5 text-black">
-                                <div className="rounded-[28px] bg-black p-3 shadow-[0_22px_48px_rgb(0_0_0/0.25)]">
-                                    {editingDlc.cover_url ? (
-                                        <img src={editingDlc.cover_url} alt={editingDlc.title} className="h-[170px] w-full rounded-[22px] object-cover" />
-                                    ) : (
-                                        <div className="grid h-[170px] place-items-center rounded-[22px] bg-white/10 text-sm font-black uppercase tracking-[0.18em] text-[#b7ff63]">No Cover</div>
-                                    )}
-                                </div>
                                 <div className="mt-5 rounded-[26px] bg-black p-4 text-white">
                                     <div className="mb-3 grid size-12 place-items-center rounded-[18px] bg-white p-1.5">
                                         <img src="/images/stupid-log/stupid-log.png" alt="" className="size-full object-contain" />

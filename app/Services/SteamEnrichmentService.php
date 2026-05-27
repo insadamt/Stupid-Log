@@ -7,6 +7,8 @@ use App\Models\StupidLog\Game;
 use App\Models\StupidLog\Provider;
 use App\Models\StupidLog\ProviderCredential;
 use App\Models\User;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -14,8 +16,6 @@ use Throwable;
 
 class SteamEnrichmentService
 {
-    public function __construct(private readonly CoverStorageService $covers) {}
-
     public function enrich(Game $game, ?string $steamAppId, ?User $user = null): array
     {
         if (! $steamAppId) {
@@ -99,40 +99,39 @@ class SteamEnrichmentService
             return;
         }
 
-        foreach ($dlcIds as $dlcId) {
+        foreach ($dlcIds->chunk(25) as $chunk) {
             try {
-                $details = $this->appDetails([$dlcId]);
+                $details = $this->appDetails($chunk->all());
             } catch (Throwable $exception) {
                 Log::warning('Steam DLC detail enrichment failed.', [
                     'game_id' => $game->id,
                     'steam_app_id' => $steamAppId,
-                    'dlc_app_id' => $dlcId,
+                    'dlc_app_ids' => $chunk->all(),
                     'exception' => $exception,
                 ]);
 
                 continue;
             }
 
-            $dlcData = $details[$dlcId]['data'] ?? null;
-            if (! is_array($dlcData)) {
-                continue;
+            foreach ($chunk as $dlcId) {
+                $dlcData = $details[$dlcId]['data'] ?? null;
+                if (! is_array($dlcData)) {
+                    continue;
+                }
+
+                Dlc::updateOrCreate(
+                    ['steam_app_id' => $dlcId],
+                    [
+                        'game_id' => $game->id,
+                        'title' => $dlcData['name'] ?? 'Untitled DLC',
+                        'cover_url_original' => null,
+                        'cover_path' => null,
+                        'base_price' => $this->price($dlcData),
+                        'source_provider_id' => $provider?->id,
+                        'synced_at' => now(),
+                    ],
+                );
             }
-
-            $coverUrl = $dlcData['header_image'] ?? null;
-            $existing = Dlc::where('steam_app_id', $dlcId)->first();
-
-            Dlc::updateOrCreate(
-                ['steam_app_id' => $dlcId],
-                [
-                    'game_id' => $game->id,
-                    'title' => $dlcData['name'] ?? 'Untitled DLC',
-                    'cover_url_original' => $coverUrl,
-                    'cover_path' => $existing?->cover_path ?: $this->covers->storeFromUrl($coverUrl),
-                    'base_price' => $this->price($dlcData),
-                    'source_provider_id' => $provider?->id,
-                    'synced_at' => now(),
-                ],
-            );
         }
     }
 
@@ -160,11 +159,40 @@ class SteamEnrichmentService
 
     private function appDetails(array $appIds): array
     {
-        return Http::get('https://store.steampowered.com/api/appdetails', [
-            'appids' => implode(',', $appIds),
-            'cc' => 'US',
-            'l' => 'english',
-        ])->throw()->json() ?? [];
+        $appIds = collect($appIds)
+            ->filter(fn ($appId) => is_scalar($appId) && (string) $appId !== '')
+            ->map(fn ($appId) => (string) $appId)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($appIds === []) {
+            return [];
+        }
+
+        $responses = Http::pool(function (Pool $pool) use ($appIds) {
+            return collect($appIds)->map(function (string $appId) use ($pool) {
+                return $pool->as($appId)->connectTimeout(1)->timeout(4)->get('https://store.steampowered.com/api/appdetails', [
+                    'appids' => $appId,
+                    'cc' => 'US',
+                    'l' => 'english',
+                ]);
+            })->all();
+        });
+
+        $details = [];
+
+        foreach ($appIds as $appId) {
+            $response = $responses[$appId] ?? null;
+            if ($response instanceof Response && $response->successful()) {
+                $json = $response->json();
+                if (is_array($json)) {
+                    $details += $json;
+                }
+            }
+        }
+
+        return $details;
     }
 
     private function price(array $data): ?float

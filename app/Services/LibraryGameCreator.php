@@ -23,8 +23,7 @@ class LibraryGameCreator
     public function __construct(
         private readonly TitleNormalizer $normalizer,
         private readonly DuplicateDetectionService $duplicates,
-        private readonly SteamEnrichmentService $steam,
-        private readonly CoverStorageService $covers,
+        private readonly ProviderImportDraftService $importDrafts,
     ) {}
 
     public function create(User $user, array $payload): LibraryGame
@@ -32,7 +31,12 @@ class LibraryGameCreator
         $this->validatePayload($payload);
 
         return DB::transaction(function () use ($user, $payload) {
+            $payload = $this->importDrafts->mergeIntoPayload($user, $payload);
+            $importDraft = $payload['__import_draft'] ?? null;
             $game = $this->resolveGame($payload['game'], $user);
+            if ($importDraft) {
+                $this->applyProviderPayloadToGame($game, $payload['game']);
+            }
             $platform = Platform::findOrFail($payload['platform_id']);
             $status = Status::findOrFail($payload['progress']['status_id']);
 
@@ -72,6 +76,10 @@ class LibraryGameCreator
                 ]);
             }
 
+            if ($importDraft) {
+                $this->importDrafts->promoteDlcs($game, $importDraft);
+            }
+
             foreach ($payload['owned_dlcs'] ?? [] as $ownedDlc) {
                 $acquisitionType = $ownedDlc['acquisition_type'];
                 $dlc = $this->resolveDlc($game, $ownedDlc);
@@ -84,6 +92,10 @@ class LibraryGameCreator
                         : ($ownedDlc['purchased_price'] ?? null),
                     'purchased_at' => $ownedDlc['purchased_at'] ?? null,
                 ]);
+            }
+
+            if ($importDraft) {
+                $this->importDrafts->consume($importDraft);
             }
 
             return $libraryGame->load(['game', 'platform', 'status', 'devices', 'ownershipCopies', 'ownedDlcs']);
@@ -114,23 +126,16 @@ class LibraryGameCreator
         foreach (['igdb', 'steam'] as $providerKey) {
             $externalId = Arr::get($gamePayload, "external_ids.$providerKey");
             if ($externalId && $existing = $this->duplicates->findByExternalId($providerKey, (string) $externalId)) {
-                $this->steam->enrich($existing, $steamAppId, $user);
-
                 return $existing;
             }
         }
 
         if ($steamAppId && $existing = $this->duplicates->findByExternalId('steam', $steamAppId)) {
-            $this->steam->enrich($existing, $steamAppId, $user);
-
             return $existing;
         }
 
         if ($existingGameId = $gamePayload['existing_game_id'] ?? null) {
-            $existing = Game::findOrFail($existingGameId);
-            $this->steam->enrich($existing, $steamAppId, $user);
-
-            return $existing;
+            return Game::findOrFail($existingGameId);
         }
 
         if (($gamePayload['source'] ?? 'manual') === 'manual') {
@@ -149,7 +154,7 @@ class LibraryGameCreator
             'title' => $gamePayload['title'],
             'normalized_title' => $this->normalizer->normalize($gamePayload['title']),
             'cover_url_original' => $coverUrl,
-            'cover_path' => $gamePayload['cover_path'] ?? $this->covers->storeFromUrl($coverUrl),
+            'cover_path' => $gamePayload['cover_path'] ?? null,
             'publisher' => $gamePayload['publisher'] ?? null,
             'release_date' => $gamePayload['release_date'] ?? null,
             'description' => $gamePayload['description'] ?? null,
@@ -160,6 +165,55 @@ class LibraryGameCreator
             'total_achievements_source' => $gamePayload['total_achievements_source'] ?? null,
             'provider_synced_at' => now(),
         ]);
+
+        $externalIds = $gamePayload['external_ids'] ?? [];
+        if ($steamAppId) {
+            $externalIds['steam'] = $steamAppId;
+        }
+
+        foreach ($externalIds as $providerKey => $externalId) {
+            $externalProvider = Provider::where('key', $providerKey)->first();
+            if ($externalProvider && $externalId) {
+                $game->externalIds()->firstOrCreate([
+                    'provider_id' => $externalProvider->id,
+                    'external_id' => (string) $externalId,
+                ], [
+                    'url' => null,
+                ]);
+            }
+        }
+
+        return $game;
+    }
+
+    private function steamAppId(array $gamePayload): ?string
+    {
+        $steamAppId = Arr::get($gamePayload, 'external_ids.steam')
+            ?? Arr::get($gamePayload, 'steam_app_id')
+            ?? (($gamePayload['source'] ?? null) === 'steam' ? Arr::get($gamePayload, 'external_id') : null);
+
+        return $steamAppId ? (string) $steamAppId : null;
+    }
+
+    private function applyProviderPayloadToGame(Game $game, array $gamePayload): void
+    {
+        $provider = Provider::where('key', $gamePayload['source'] ?? 'manual')->first();
+
+        $game->fill([
+            'title' => $gamePayload['title'],
+            'normalized_title' => $this->normalizer->normalize($gamePayload['title']),
+            'cover_url_original' => $gamePayload['cover_url_original'] ?? $game->cover_url_original,
+            'cover_path' => $gamePayload['cover_path'] ?? $game->cover_path,
+            'publisher' => $gamePayload['publisher'] ?? null,
+            'release_date' => $gamePayload['release_date'] ?? null,
+            'description' => $gamePayload['description'] ?? null,
+            'source_provider_id' => $provider?->id ?? $game->source_provider_id,
+            'base_price_default' => $gamePayload['base_price_default'] ?? null,
+            'base_price_source' => $gamePayload['base_price_source'] ?? null,
+            'total_achievements' => $gamePayload['total_achievements'] ?? null,
+            'total_achievements_source' => $gamePayload['total_achievements_source'] ?? null,
+            'provider_synced_at' => now(),
+        ])->save();
 
         foreach ($gamePayload['external_ids'] ?? [] as $providerKey => $externalId) {
             $externalProvider = Provider::where('key', $providerKey)->first();
@@ -172,19 +226,6 @@ class LibraryGameCreator
                 ]);
             }
         }
-
-        $this->steam->enrich($game, $steamAppId, $user);
-
-        return $game;
-    }
-
-    private function steamAppId(array $gamePayload): ?string
-    {
-        $steamAppId = Arr::get($gamePayload, 'external_ids.steam')
-            ?? Arr::get($gamePayload, 'steam_app_id')
-            ?? (($gamePayload['source'] ?? null) === 'steam' ? Arr::get($gamePayload, 'external_id') : null);
-
-        return $steamAppId ? (string) $steamAppId : null;
     }
 
     private function assertDevicesAreValid(Platform $platform, array $deviceIds): void

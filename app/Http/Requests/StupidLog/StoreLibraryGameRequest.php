@@ -34,6 +34,7 @@ class StoreLibraryGameRequest extends FormRequest
             'game.base_price_source' => ['nullable', 'string', 'max:255'],
             'game.total_achievements' => ['nullable', 'integer', 'min:0'],
             'game.total_achievements_source' => ['nullable', 'string', 'max:255'],
+            'import_draft_id' => ['nullable', 'integer', 'exists:provider_import_drafts,id'],
 
             'platform_id' => ['required', 'integer', 'exists:platforms,id'],
             'device_ids' => ['required', 'array', 'min:1'],

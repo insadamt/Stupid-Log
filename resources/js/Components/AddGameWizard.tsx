@@ -35,7 +35,6 @@ type WizardSearchResult = ProviderSearchResult & {
         id?: number | null;
         steam_app_id?: string | null;
         title: string;
-        cover_url_original?: string | null;
         base_price?: number | string | null;
     }>;
 };
@@ -64,7 +63,6 @@ type DlcCatalogItem = {
     id?: number | null;
     steam_app_id: string;
     title: string;
-    cover_url_original?: string | null;
     base_price?: number | string | null;
 };
 
@@ -76,6 +74,7 @@ type OwnedDlcDraft = {
 };
 
 type Draft = {
+    import_draft_id: number | null;
     title: string;
     source: GameSource;
     external_id: string;
@@ -197,7 +196,6 @@ function dlcCatalogFromResult(result: WizardSearchResult): DlcCatalogItem[] {
             id: dlc.id ?? null,
             steam_app_id: String(dlc.steam_app_id),
             title: dlc.title,
-            cover_url_original: dlc.cover_url_original ?? null,
             base_price: dlc.base_price ?? null,
         }));
 }
@@ -206,6 +204,13 @@ function uploadErrorMessage(payload: unknown) {
     if (!payload || typeof payload !== "object") return "The cover failed to upload.";
     const data = payload as { message?: string; errors?: Record<string, string[]> };
     return data.errors?.cover?.[0] ?? data.message ?? "The cover failed to upload.";
+}
+
+function requestErrorMessage(payload: unknown, fallback: string) {
+    if (!payload || typeof payload !== "object") return fallback;
+    const data = payload as { message?: string; errors?: Record<string, string[]> };
+    const firstError = data.errors ? Object.values(data.errors)[0]?.[0] : null;
+    return firstError ?? data.message ?? fallback;
 }
 
 function Pill({ children, active = false, muted = false }: { children: ReactNode; active?: boolean; muted?: boolean }) {
@@ -460,6 +465,7 @@ export default function AddGameWizard({
     const defaultStatus = firstByName(references.statuses, "Not Played");
 
     const makeDraft = (): Draft => ({
+        import_draft_id: null,
         title: "",
         source: "manual",
         external_id: "",
@@ -501,12 +507,14 @@ export default function AddGameWizard({
     const [steamOriginal, setSteamOriginal] = useState<SteamOriginal | null>(null);
     const [providerCoverUrl, setProviderCoverUrl] = useState("");
     const [localCoverPreview, setLocalCoverPreview] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
     const [results, setResults] = useState<WizardSearchResult[]>([]);
     const [selectedResultKey, setSelectedResultKey] = useState("");
     const [warnings, setWarnings] = useState<string[]>([]);
     const [notice, setNotice] = useState("");
     const [searching, setSearching] = useState(false);
     const [enriching, setEnriching] = useState(false);
+    const [creatingImportDraft, setCreatingImportDraft] = useState(false);
     const [uploadingCover, setUploadingCover] = useState(false);
     const [coverError, setCoverError] = useState("");
     const [platformQuery, setPlatformQuery] = useState("");
@@ -726,6 +734,7 @@ export default function AddGameWizard({
         setSteamOriginal(null);
         setProviderCoverUrl("");
         setLocalCoverPreview("");
+        setSearchQuery("");
         setResults([]);
         setSelectedResultKey("");
         setWarnings([]);
@@ -745,7 +754,70 @@ export default function AddGameWizard({
         return await response.json() as WizardSearchResponse;
     }
 
-    async function runSearch(queryInput = draft.title, provider = providerMode) {
+    async function createImportDraft(result: WizardSearchResult) {
+        const headers: Record<string, string> = {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+        };
+        const token = csrfToken();
+        if (token) headers["X-CSRF-TOKEN"] = token;
+
+        const response = await fetch("/provider-import-drafts", {
+            method: "POST",
+            headers,
+            credentials: "same-origin",
+            body: JSON.stringify({ result }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(requestErrorMessage(data, "Provider import draft failed."));
+
+        return data as { id: number; cover_path?: string | null };
+    }
+
+    function importDraftResultFromCurrentDraft(): WizardSearchResult {
+        return {
+            source: draft.source === "manual" ? "steam" : draft.source,
+            external_id: draft.external_id || draft.steam_app_id,
+            title: draft.title.trim(),
+            cover_url_original: draft.cover_url_original || null,
+            publisher: draft.publisher || null,
+            release_date: draft.release_date || null,
+            description: draft.description || null,
+            steam_app_id: draft.steam_app_id || null,
+            base_price_default: numberOrNull(draft.base_price_default),
+            base_price_source: draft.base_price_default.trim() === "" ? null : "steam",
+            total_achievements: integerOrNull(draft.total_achievements),
+            total_achievements_source: draft.total_achievements.trim() === "" ? null : "steam",
+            dlcs: draft.dlcs.map((dlc) => ({
+                steam_app_id: dlc.steam_app_id,
+                title: dlc.title,
+                base_price: dlc.base_price ?? null,
+            })),
+        };
+    }
+
+    async function ensureImportDraft(): Promise<number | null> {
+        if (draft.source === "manual") return null;
+        if (draft.import_draft_id) return draft.import_draft_id;
+
+        const result = importDraftResultFromCurrentDraft();
+        if (!result.external_id || !result.title) {
+            throw new Error("Provider import is missing the selected game identity.");
+        }
+
+        setCreatingImportDraft(true);
+        try {
+            const importDraft = await createImportDraft(result);
+            setDraft((current) => ({ ...current, import_draft_id: importDraft.id }));
+            return importDraft.id;
+        } finally {
+            setCreatingImportDraft(false);
+        }
+    }
+
+    async function runSearch(queryInput = searchQuery, provider = providerMode) {
         const query = queryInput.trim();
         if (query.length < 2) {
             setResults([]);
@@ -803,6 +875,7 @@ export default function AddGameWizard({
         setOriginalFromResult(result);
         setDraft((current) => ({
             ...current,
+            import_draft_id: null,
             title: result.title,
             source: result.source,
             external_id: result.external_id,
@@ -846,25 +919,63 @@ export default function AddGameWizard({
         setSelectedResultKey(resultKey(result));
         setStepIndex(1);
 
-        if (!result.steam_app_id) return;
+        if (!result.steam_app_id) {
+            setCreatingImportDraft(true);
+            try {
+                const importDraft = await createImportDraft(result);
+                setDraft((current) => ({ ...current, import_draft_id: importDraft.id }));
+            } catch {
+                setWarnings((current) => [...current, "Provider import draft failed. Select the result again before saving."]);
+            } finally {
+                setCreatingImportDraft(false);
+            }
+            return;
+        }
+
+        const resultAlreadyEnriched = result.source === "steam" && (result.dlcs?.length ?? 0) > 0;
+
+        if (resultAlreadyEnriched) {
+            setCreatingImportDraft(true);
+            try {
+                const importDraft = await createImportDraft(result);
+                setDraft((current) => ({ ...current, import_draft_id: importDraft.id }));
+            } catch {
+                setWarnings((current) => [...current, "Provider import draft failed. Select the result again before saving."]);
+            } finally {
+                setCreatingImportDraft(false);
+            }
+            return;
+        }
 
         setEnriching(true);
+        setCreatingImportDraft(true);
         try {
             const enriched = await providerSearch(result.title, "steam", true, result.steam_app_id);
             setWarnings(enriched.warnings);
-            if (enriched.results[0]) mergeSteamEnrichment(enriched.results[0]);
+            const enrichedResult = enriched.results[0] ?? result;
+            if (enriched.results[0]) mergeSteamEnrichment(enrichedResult);
+            const importDraft = await createImportDraft(enrichedResult);
+            setDraft((current) => ({ ...current, import_draft_id: importDraft.id }));
         } catch {
-            setWarnings((current) => [...current, "Steam enrichment failed. You can edit Steam fields manually."]);
+            try {
+                const importDraft = await createImportDraft(result);
+                setDraft((current) => ({ ...current, import_draft_id: importDraft.id }));
+                setWarnings((current) => [...current, "Steam enrichment failed. The game can be saved with the provider data already loaded."]);
+            } catch {
+                setWarnings((current) => [...current, "Steam enrichment or import draft creation failed. Select the result again before saving."]);
+            }
         } finally {
             setEnriching(false);
+            setCreatingImportDraft(false);
         }
     }
 
     function manualEntry() {
-        const title = draft.title.trim();
+        const title = (draft.title || searchQuery).trim();
     
         setDraft((current) => ({
             ...current,
+            import_draft_id: null,
             title,
             source: "manual",
             external_id: "",
@@ -1154,6 +1265,18 @@ export default function AddGameWizard({
         if (draft.source === "steam" && draft.external_id) externalIds.steam = draft.external_id;
         if (draft.steam_app_id) externalIds.steam = draft.steam_app_id;
 
+        let importDraftId = draft.import_draft_id;
+        if (draft.source !== "manual") {
+            try {
+                importDraftId = await ensureImportDraft();
+            } catch (error) {
+                setServerErrors({
+                    import_draft_id: error instanceof Error ? error.message : "Provider import could not be prepared.",
+                });
+                return;
+            }
+        }
+
         router.post("/library-games", {
             game: {
                 title: draft.title.trim(),
@@ -1172,6 +1295,7 @@ export default function AddGameWizard({
                 existing_game_id: draft.existing_game_id,
                 create_duplicate_anyway: draft.create_duplicate_anyway || forceCreateDuplicate,
             },
+            import_draft_id: importDraftId,
             platform_id: draft.platform_id,
             device_ids: draft.device_ids,
             ownership_copies: draft.ownership_copies.map((copy) => ({
@@ -1209,7 +1333,7 @@ export default function AddGameWizard({
         if (!open || step.key !== "search") return;
         setSelectedResultKey("");
 
-        const query = draft.title.trim();
+        const query = searchQuery.trim();
         if (query.length < 2) {
             setResults([]);
             setWarnings([]);
@@ -1219,7 +1343,7 @@ export default function AddGameWizard({
 
         const timeout = window.setTimeout(() => void runSearch(query, providerMode), 360);
         return () => window.clearTimeout(timeout);
-    }, [draft.title, providerMode, open, step.key]);
+    }, [searchQuery, providerMode, open, step.key]);
 
     const resetButtons = steamOriginal && (
         <div className="flex flex-wrap gap-2">
@@ -1337,12 +1461,15 @@ export default function AddGameWizard({
                     <Search className="size-7 shrink-0 text-black/35" strokeWidth={3} />
 
                     <input
-                        value={draft.title}
-                        onChange={(event) => update("title", event.target.value)}
+                        value={searchQuery}
+                        onChange={(event) => {
+                            setSearchQuery(event.target.value);
+                            if (!selectedResultKey) update("title", event.target.value);
+                        }}
                         onKeyDown={(event) => {
                             if (event.key === "Enter") {
                                 event.preventDefault();
-                                void runSearch();
+                                void runSearch(searchQuery, providerMode);
                             }
                         }}
                         placeholder={`Search ${providerMode === "igdb" ? "IGDB" : "Steam"}...`}
@@ -1353,8 +1480,8 @@ export default function AddGameWizard({
 
                 <button
                     type="button"
-                    onClick={() => void runSearch()}
-                    disabled={searching || draft.title.trim().length < 2}
+                    onClick={() => void runSearch(searchQuery, providerMode)}
+                    disabled={searching || searchQuery.trim().length < 2}
                     className="flex h-[76px] items-center justify-center gap-3 rounded-[24px] bg-[#b7ff63] px-8 text-lg font-black text-black transition hover:-translate-y-0.5 disabled:opacity-40"
                 >
                     {searching ? (
@@ -1529,8 +1656,7 @@ export default function AddGameWizard({
                                                             const included = ["Edition Included", "Free"].includes(acquisitionType);
 
                                                             return (
-                                                                <div key={dlc.steam_app_id} className={`grid gap-4 rounded-[22px] border p-3 transition ${selected ? "border-black bg-white" : "border-black/5 bg-white/55"} lg:grid-cols-[96px_1fr_auto] lg:items-center`}>
-                                                                    <CoverImage src={dlc.cover_url_original ?? ""} alt={dlc.title} className="h-[54px] w-full rounded-2xl lg:h-[54px] lg:w-24" />
+                                                                <div key={dlc.steam_app_id} className={`grid gap-4 rounded-[22px] border p-3 transition ${selected ? "border-black bg-white" : "border-black/5 bg-white/55"} lg:grid-cols-[1fr_auto] lg:items-center`}>
                                                                     <div className="min-w-0">
                                                                         <div className="truncate text-lg font-black tracking-[-0.035em]">{dlc.title}</div>
                                                                         <div className="mt-1 text-sm font-bold text-black/45">{money(dlc.base_price)}</div>
@@ -1573,7 +1699,7 @@ export default function AddGameWizard({
                         <footer className="sl-wizard-footer flex items-center justify-between gap-5 border-t border-black/10 bg-[#f6faf4] px-7 py-5">
                             <button type="button" onClick={previous} disabled={stepIndex === 0} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white transition hover:-translate-y-0.5 disabled:bg-black/[0.06] disabled:text-black/35 disabled:opacity-100 disabled:hover:translate-y-0"><ChevronLeft size={18} /> Back</button>
                             <div className={`hidden min-w-0 flex-1 text-center text-xs font-black uppercase tracking-[0.18em] md:block ${currentError ? "rounded-full bg-red-500/10 px-4 py-2 text-red-700" : "text-black/35"}`}>{currentError ? currentError : `${stepIndex + 1} / ${steps.length}`}</div>
-                            {stepIndex < steps.length - 1 ? <button type="button" onClick={next} disabled={!!currentError} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">Next <ChevronRight size={18} /></button> : <button type="button" onClick={() => void submit()} disabled={!!currentError || saving || checkingDuplicates} className="flex items-center gap-3 rounded-2xl bg-[#b7ff63] px-7 py-3.5 text-base font-black text-black disabled:opacity-35">{saving || checkingDuplicates ? <><Loader2 className="animate-spin" size={18} /> Saving</> : <><Check size={18} /> Save Game</>}</button>}
+                            {stepIndex < steps.length - 1 ? <button type="button" onClick={next} disabled={!!currentError} className="flex items-center gap-3 rounded-2xl bg-black px-7 py-3.5 text-base font-black text-white disabled:opacity-35">Next <ChevronRight size={18} /></button> : <button type="button" onClick={() => void submit()} disabled={!!currentError || saving || checkingDuplicates || creatingImportDraft} className="flex items-center gap-3 rounded-2xl bg-[#b7ff63] px-7 py-3.5 text-base font-black text-black disabled:opacity-35">{saving || checkingDuplicates || creatingImportDraft ? <><Loader2 className="animate-spin" size={18} /> {creatingImportDraft ? "Preparing" : "Saving"}</> : <><Check size={18} /> Save Game</>}</button>}
                         </footer>
                     </section>
 

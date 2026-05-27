@@ -7,6 +7,7 @@ use App\Models\StupidLog\Platform;
 use App\Models\StupidLog\SnapshotRun;
 use App\Models\StupidLog\Status;
 use App\Models\User;
+use App\Services\ProviderImportDraftService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,13 @@ use Illuminate\Support\Str;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('stupid-log:cleanup-provider-import-drafts', function (ProviderImportDraftService $drafts) {
+    $count = $drafts->cleanupExpired();
+    $this->info("Deleted {$count} expired provider import draft(s).");
+
+    return 0;
+})->purpose('Delete expired unconsumed provider import drafts and temporary covers');
 
 Artisan::command('stupid-log:stress-seed
     {--games=10000 : Number of library games to create}

@@ -9,6 +9,7 @@ use App\Models\StupidLog\Game;
 use App\Models\StupidLog\OwnershipType;
 use App\Models\StupidLog\Platform;
 use App\Models\StupidLog\Provider;
+use App\Models\StupidLog\ProviderImportDraft;
 use App\Models\StupidLog\Status;
 use App\Models\User;
 use App\Services\LibraryGameCreator;
@@ -57,7 +58,7 @@ class SteamEnrichmentTest extends TestCase
         $this->assertSame(1, ExternalGameId::where('external_id', '100')->where('provider_id', Provider::where('key', 'steam')->first()->id)->count());
     }
 
-    public function test_steam_enrichment_fetches_dlc_details_one_app_at_a_time(): void
+    public function test_steam_enrichment_fetches_dlc_details_in_chunks_without_cover_downloads(): void
     {
         $dlcIds = range(1000, 1104);
 
@@ -78,7 +79,7 @@ class SteamEnrichmentTest extends TestCase
                     ]);
                 }
 
-                $this->assertCount(1, $appIds);
+                $this->assertLessThanOrEqual(25, count($appIds));
 
                 return Http::response(collect($appIds)
                     ->mapWithKeys(fn (string $appId) => [
@@ -128,9 +129,11 @@ class SteamEnrichmentTest extends TestCase
         ]);
     }
 
-    public function test_library_game_creation_enriches_existing_fields_when_steam_app_id_is_available(): void
+    public function test_library_game_creation_does_not_enrich_during_final_save(): void
     {
-        Http::fake($this->steamResponses());
+        Http::fake(function ($request) {
+            $this->fail('Final save must not call Steam: '.$request->url());
+        });
 
         $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload([
             'game' => [
@@ -144,9 +147,9 @@ class SteamEnrichmentTest extends TestCase
 
         $game = $libraryGame->game->refresh();
 
-        $this->assertSame(3, $game->total_achievements);
-        $this->assertSame('59.99', (string) $game->base_price_default);
-        $this->assertSame(2, Dlc::where('game_id', $game->id)->count());
+        $this->assertSame(0, $game->total_achievements);
+        $this->assertNull($game->base_price_default);
+        $this->assertSame(0, Dlc::where('game_id', $game->id)->count());
         $this->assertDatabaseHas('external_game_ids', [
             'game_id' => $game->id,
             'provider_id' => Provider::where('key', 'steam')->first()->id,
@@ -156,9 +159,33 @@ class SteamEnrichmentTest extends TestCase
 
     public function test_library_game_creation_can_mark_imported_steam_dlcs_owned_by_app_id(): void
     {
-        Http::fake($this->steamResponses());
+        Http::fake();
+
+        $draft = ProviderImportDraft::create([
+            'user_id' => $this->user->id,
+            'provider_key' => 'steam',
+            'external_id' => '100',
+            'steam_app_id' => '100',
+            'game_payload' => [
+                'title' => 'Portal 2',
+                'source' => 'steam',
+                'external_id' => '100',
+                'external_ids' => ['steam' => '100'],
+                'steam_app_id' => '100',
+                'total_achievements' => 3,
+                'total_achievements_source' => 'steam',
+                'base_price_default' => 59.99,
+                'base_price_source' => 'steam',
+            ],
+            'dlcs' => [
+                ['steam_app_id' => '200', 'title' => 'Expansion One', 'base_price' => 19.99],
+                ['steam_app_id' => '201', 'title' => 'Expansion Two', 'base_price' => 0],
+            ],
+            'expires_at' => now()->addHour(),
+        ]);
 
         $this->post('/library-games', $this->payload([
+            'import_draft_id' => $draft->id,
             'game' => [
                 'title' => 'Portal 2',
                 'source' => 'steam',
