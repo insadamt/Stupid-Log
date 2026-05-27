@@ -14,6 +14,8 @@ use Throwable;
 
 class SteamEnrichmentService
 {
+    private const DLC_DETAILS_CHUNK_SIZE = 25;
+
     public function __construct(private readonly CoverStorageService $covers) {}
 
     public function enrich(Game $game, ?string $steamAppId, ?User $user = null): array
@@ -99,40 +101,39 @@ class SteamEnrichmentService
             return;
         }
 
-        foreach ($dlcIds as $dlcId) {
+        foreach ($dlcIds->chunk(self::DLC_DETAILS_CHUNK_SIZE) as $chunk) {
             try {
-                $details = $this->appDetails([$dlcId]);
+                $details = $this->appDetails($chunk->all());
             } catch (Throwable $exception) {
                 Log::warning('Steam DLC detail enrichment failed.', [
                     'game_id' => $game->id,
                     'steam_app_id' => $steamAppId,
-                    'dlc_app_id' => $dlcId,
+                    'dlc_app_ids' => $chunk->all(),
                     'exception' => $exception,
                 ]);
 
                 continue;
             }
 
-            $dlcData = $details[$dlcId]['data'] ?? null;
-            if (! is_array($dlcData)) {
-                continue;
+            foreach ($chunk as $dlcId) {
+                $dlcData = $details[$dlcId]['data'] ?? null;
+                if (! is_array($dlcData)) {
+                    continue;
+                }
+
+                Dlc::updateOrCreate(
+                    ['steam_app_id' => $dlcId],
+                    [
+                        'game_id' => $game->id,
+                        'title' => $dlcData['name'] ?? 'Untitled DLC',
+                        'cover_url_original' => null,
+                        'cover_path' => null,
+                        'base_price' => $this->price($dlcData),
+                        'source_provider_id' => $provider?->id,
+                        'synced_at' => now(),
+                    ],
+                );
             }
-
-            $coverUrl = $dlcData['header_image'] ?? null;
-            $existing = Dlc::where('steam_app_id', $dlcId)->first();
-
-            Dlc::updateOrCreate(
-                ['steam_app_id' => $dlcId],
-                [
-                    'game_id' => $game->id,
-                    'title' => $dlcData['name'] ?? 'Untitled DLC',
-                    'cover_url_original' => $coverUrl,
-                    'cover_path' => $existing?->cover_path ?: $this->covers->storeFromUrl($coverUrl),
-                    'base_price' => $this->price($dlcData),
-                    'source_provider_id' => $provider?->id,
-                    'synced_at' => now(),
-                ],
-            );
         }
     }
 
