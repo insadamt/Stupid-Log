@@ -54,15 +54,18 @@ class SteamEnrichmentTest extends TestCase
         $this->assertSame(2, Dlc::where('game_id', $game->id)->count());
         $this->assertSame(1, Dlc::where('steam_app_id', '200')->count());
         $this->assertSame(1, Dlc::where('steam_app_id', '201')->count());
+        $this->assertNull(Dlc::where('steam_app_id', '200')->value('cover_url_original'));
+        $this->assertNull(Dlc::where('steam_app_id', '200')->value('cover_path'));
         $this->assertSame(1, ExternalGameId::where('external_id', '100')->where('provider_id', Provider::where('key', 'steam')->first()->id)->count());
     }
 
-    public function test_steam_enrichment_fetches_dlc_details_one_app_at_a_time(): void
+    public function test_steam_enrichment_fetches_dlc_details_in_chunks_without_covers(): void
     {
         $dlcIds = range(1000, 1104);
+        $dlcBatchSizes = [];
 
         Http::fake([
-            'store.steampowered.com/api/appdetails*' => function ($request) use ($dlcIds) {
+            'store.steampowered.com/api/appdetails*' => function ($request) use ($dlcIds, &$dlcBatchSizes) {
                 parse_str(parse_url($request->url(), PHP_URL_QUERY) ?? '', $query);
                 $appIds = explode(',', $query['appids'] ?? '');
 
@@ -78,14 +81,16 @@ class SteamEnrichmentTest extends TestCase
                     ]);
                 }
 
-                $this->assertCount(1, $appIds);
+                $dlcBatchSizes[] = count($appIds);
+                $this->assertLessThanOrEqual(25, count($appIds));
 
                 return Http::response(collect($appIds)
                     ->mapWithKeys(fn (string $appId) => [
                         $appId => [
                             'success' => true,
                             'data' => [
-                                'name' => "Expansion {$appId}",
+                                'name' => 'Expansion '.$appId,
+                                'header_image' => 'https://cdn.example.test/'.$appId.'.jpg',
                                 'price_overview' => ['initial' => 999],
                             ],
                         ],
@@ -102,6 +107,67 @@ class SteamEnrichmentTest extends TestCase
 
         $this->assertSame([], app(SteamEnrichmentService::class)->enrich($game, '100', $this->user));
         $this->assertSame(count($dlcIds), Dlc::where('game_id', $game->id)->count());
+        $this->assertSame([25, 25, 25, 25, 5], $dlcBatchSizes);
+        $this->assertNull(Dlc::where('steam_app_id', '1000')->value('cover_url_original'));
+        $this->assertNull(Dlc::where('steam_app_id', '1000')->value('cover_path'));
+    }
+
+    public function test_steam_enrichment_falls_back_to_individual_dlc_details_when_batch_returns_no_data(): void
+    {
+        $requests = [];
+
+        Http::fake([
+            'store.steampowered.com/api/appdetails*' => function ($request) use (&$requests) {
+                parse_str(parse_url($request->url(), PHP_URL_QUERY) ?? '', $query);
+                $appIds = explode(',', $query['appids'] ?? '');
+                $requests[] = $appIds;
+
+                if ($appIds === ['100']) {
+                    return Http::response([
+                        '100' => [
+                            'success' => true,
+                            'data' => [
+                                'name' => 'Steam Game',
+                                'dlc' => [200, 201],
+                            ],
+                        ],
+                    ]);
+                }
+
+                if ($appIds === ['200', '201']) {
+                    return Http::response([
+                        '200' => ['success' => false],
+                        '201' => ['success' => false],
+                    ]);
+                }
+
+                return Http::response(collect($appIds)
+                    ->mapWithKeys(fn (string $appId) => [
+                        $appId => [
+                            'success' => true,
+                            'data' => [
+                                'name' => 'Expansion '.$appId,
+                                'price_overview' => ['initial' => 999],
+                            ],
+                        ],
+                    ])
+                    ->all());
+            },
+            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response(['game' => ['availableGameStats' => ['achievements' => []]]]),
+        ]);
+
+        $game = Game::create([
+            'title' => 'Steam Game',
+            'normalized_title' => 'steam game',
+        ]);
+
+        $this->assertSame([], app(SteamEnrichmentService::class)->enrich($game, '100', $this->user));
+        $this->assertSame(2, Dlc::where('game_id', $game->id)->count());
+        $this->assertDatabaseHas('dlcs', ['steam_app_id' => '200', 'title' => 'Expansion 200']);
+        $this->assertDatabaseHas('dlcs', ['steam_app_id' => '201', 'title' => 'Expansion 201']);
+        $this->assertTrue(collect($requests)->contains(fn (array $appIds) => $appIds === ['200', '201']));
+        $this->assertTrue(collect($requests)->contains(fn (array $appIds) => $appIds === ['200']));
+        $this->assertTrue(collect($requests)->contains(fn (array $appIds) => $appIds === ['201']));
     }
 
     public function test_steam_enrichment_failures_do_not_block_manual_game_creation(): void
@@ -209,24 +275,18 @@ class SteamEnrichmentTest extends TestCase
                     ]);
                 }
 
-                return Http::response([
-                    '200' => [
-                        'success' => true,
-                        'data' => [
-                            'name' => 'Expansion One',
-                            'header_image' => 'https://cdn.example.test/200.jpg',
-                            'price_overview' => ['initial' => 1999],
+                return Http::response(collect($appIds)
+                    ->mapWithKeys(fn (string $appId) => [
+                        $appId => [
+                            'success' => true,
+                            'data' => [
+                                'name' => 'Expansion '.$appId,
+                                'header_image' => 'https://cdn.example.test/'.$appId.'.jpg',
+                                'price_overview' => ['initial' => 1999],
+                            ],
                         ],
-                    ],
-                    '201' => [
-                        'success' => true,
-                        'data' => [
-                            'name' => 'Expansion Two',
-                            'header_image' => 'https://cdn.example.test/201.jpg',
-                            'is_free' => true,
-                        ],
-                    ],
-                ]);
+                    ])
+                    ->all());
             },
             'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response([
                 'game' => [
