@@ -480,7 +480,6 @@ function Donut({ data, total, center }: { data: Slice[]; total: string; center: 
 function GameUiChart({ config }: { config: ChartConfig }) {
     const chartRef = useRef<HTMLElement>(null);
     const hasRevealed = useRef(false);
-    const hasSurfaceRevealed = useRef(false);
     const revealDelay = useStatsRevealDelay();
     const incomingData = [...config.data].sort((a, b) => b.value - a.value);
     const [renderedData, setRenderedData] = useState(incomingData);
@@ -495,38 +494,6 @@ function GameUiChart({ config }: { config: ChartConfig }) {
             row.dataset.revealed = 'true';
         });
     };
-
-    useGSAP(() => {
-        const chart = chartRef.current;
-        if (!chart || hasSurfaceRevealed.current) return;
-
-        const panes = Array.from(chart.querySelectorAll<HTMLElement>('[data-chart-pane]'));
-        const headerItems = Array.from(chart.querySelectorAll<HTMLElement>('[data-chart-heading]'));
-
-        if (prefersReducedMotion()) {
-            gsap.set([chart, panes, headerItems], { autoAlpha: 1, clearProps: 'transform,visibility,opacity,filter' });
-            hasSurfaceRevealed.current = true;
-            return;
-        }
-
-        gsap.set(chart, { y: 18, scale: 0.985, autoAlpha: 0 });
-        gsap.set(panes, { y: 18, autoAlpha: 0, filter: 'blur(8px)' });
-        gsap.set(headerItems, { y: 10, autoAlpha: 0 });
-
-        const timeline = gsap.timeline({
-            delay: revealDelay,
-            defaults: { ease: 'power3.out' },
-            onComplete: () => {
-                hasSurfaceRevealed.current = true;
-                gsap.set([chart, panes, headerItems], { clearProps: 'transform,visibility,opacity,filter' });
-            },
-        });
-
-        timeline
-            .to(chart, { y: 0, scale: 1, autoAlpha: 1, duration: 0.46 }, 0)
-            .to(panes, { y: 0, autoAlpha: 1, filter: 'blur(0px)', duration: 0.58, stagger: 0.08 }, 0.08)
-            .to(headerItems, { y: 0, autoAlpha: 1, duration: 0.38, stagger: 0.05 }, 0.22);
-    }, { scope: chartRef, dependencies: [] });
 
     useGSAP(() => {
         const chart = chartRef.current;
@@ -568,8 +535,6 @@ function GameUiChart({ config }: { config: ChartConfig }) {
             return;
         }
 
-        gsap.killTweensOf(rows);
-
         if (prefersReducedMotion()) {
             gsap.set(rows, { autoAlpha: 1, clearProps: 'transform,visibility,opacity' });
             hasRevealed.current = true;
@@ -577,62 +542,30 @@ function GameUiChart({ config }: { config: ChartConfig }) {
         }
 
         if (hasRevealed.current) {
-            const newRows = rows.filter((row) => !row.dataset.revealed);
-            if (newRows.length) {
-                gsap.fromTo(
-                    newRows,
-                    { y: 10, autoAlpha: 0 },
-                    {
-                        y: 0,
-                        autoAlpha: 1,
-                        duration: 0.36,
-                        ease: 'power3.out',
-                        stagger: 0.04,
-                        overwrite: 'auto',
-                        clearProps: 'transform,visibility,opacity',
-                        onComplete: () => markRowsRevealed(newRows),
-                    },
-                );
-            }
+            markRowsRevealed(rows.filter((row) => !row.dataset.revealed));
         } else {
-            gsap.set(rows, { y: 14, autoAlpha: 0 });
-
-            gsap.fromTo(
-                rows,
-                { y: 14, autoAlpha: 0 },
-                {
-                    y: 0,
-                    autoAlpha: 1,
-                    duration: 0.44,
-                    delay: rowRevealDelay,
-                    ease: 'power3.out',
-                    stagger: 0.1,
-                    overwrite: 'auto',
-                    clearProps: 'transform,visibility,opacity',
-                    onComplete: () => markRowsRevealed(rows),
-                },
-            );
+            markRowsRevealed(rows);
         }
     }, { scope: chartRef, dependencies: [renderedChartKey] });
 
     return (
         <article ref={chartRef} className="grid h-full min-h-0 grid-cols-[1.15fr_1fr] gap-4 rounded-[30px] bg-black p-4 text-white shadow-[0_24px_75px_rgb(0_0_0/0.2)]">
-            <section data-chart-pane className="grid min-h-0 grid-rows-[auto_1fr] rounded-[26px] bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-6 ring-1 ring-white/8">
+            <section className="grid min-h-0 grid-rows-[auto_1fr] rounded-[26px] bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-6 ring-1 ring-white/8">
                 <div>
-                    <div data-chart-heading className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]/70">{config.eyebrow}</div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]/70">{config.eyebrow}</div>
                     <div className="mt-2 flex items-start justify-between gap-3">
-                        <h2 data-chart-heading className="text-4xl font-black leading-none text-[#9BE44D]">{config.title}</h2>
-                        <div data-chart-heading><DeltaBadge value={config.delta} compact /></div>
+                        <h2 className="text-4xl font-black leading-none text-[#9BE44D]">{config.title}</h2>
+                        <DeltaBadge value={config.delta} compact />
                     </div>
                 </div>
                 <div className="grid min-h-0 place-items-center">
                     <Donut data={data} total={config.total} center={config.center} />
                 </div>
             </section>
-            <section data-chart-pane className="min-h-0 rounded-[26px] bg-white/[0.06] p-4 ring-1 ring-white/8">
+            <section className="min-h-0 rounded-[26px] bg-white/[0.06] p-4 ring-1 ring-white/8">
                 <div className="flex items-center justify-between gap-3">
-                    <div data-chart-heading className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">Metric entries</div>
-                    <div data-chart-heading className="grid size-11 place-items-center rounded-2xl bg-[#b7ff63] text-black"><BarChart3 size={22} strokeWidth={3} /></div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">Metric entries</div>
+                    <div className="grid size-11 place-items-center rounded-2xl bg-[#b7ff63] text-black"><BarChart3 size={22} strokeWidth={3} /></div>
                 </div>
                 <div className="mt-4 grid max-h-[calc(100%-60px)] gap-3 overflow-y-auto pr-1">
                     {data.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm font-bold text-white/35">No rows available.</div>}

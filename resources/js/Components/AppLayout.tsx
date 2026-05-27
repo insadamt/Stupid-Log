@@ -93,14 +93,12 @@ export default function AppLayout({
 
         gsap.fromTo(
             page,
-            { autoAlpha: 0, y: 18, scale: 0.992 },
+            { autoAlpha: 0 },
             {
                 autoAlpha: 1,
-                y: 0,
-                scale: 1,
                 duration: pageTransition.firstLoadDuration,
                 ease: pageTransition.firstLoadEase,
-                clearProps: 'transform,visibility,opacity',
+                clearProps: 'visibility,opacity',
             },
         );
     }, { scope: pageRef, dependencies: [title] });
