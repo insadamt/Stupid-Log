@@ -26,7 +26,8 @@ class ProviderSearchService
         $query = trim($query);
         $warnings = [];
         $provider = in_array($provider, ['igdb', 'steam'], true) ? $provider : 'igdb';
-        $cacheKey = $this->searchCacheKey($user, $query, $provider, $enrich, $steamAppId);
+        $shouldEnrich = $enrich && ($provider !== 'steam' || $steamAppId !== null);
+        $cacheKey = $this->searchCacheKey($user, $query, $provider, $shouldEnrich, $steamAppId);
 
         if ($cached = Cache::get($cacheKey)) {
             return $cached;
@@ -50,7 +51,7 @@ class ProviderSearchService
                 : 'IGDB search unavailable.';
         }
 
-        if ($enrich) {
+        if ($shouldEnrich) {
             $results = $this->withSteamMetadata($results, $user, $warnings, $steamAppId !== null);
         }
 
@@ -62,7 +63,7 @@ class ProviderSearchService
             'warnings' => array_values(array_unique($warnings)),
             'notice' => $provider === 'igdb'
                 ? 'IGDB search is metadata-first. If IGDB does not provide a Steam App ID, Steam enrichment is skipped.'
-                : 'Steam search uses your Steam Web API key first, then falls back to the public Steam Store search.',
+                : 'Steam search uses the fast public Steam Store search first, then falls back to your Steam Web API key catalog.',
         ];
 
         if ($response['warnings'] === []) {
@@ -155,11 +156,13 @@ class ProviderSearchService
         }
 
         $items = [];
+        $lastException = null;
 
         try {
-            $items = $this->steamKeyedSearch($user, $query);
+            $items = $this->steamStoreSearch($query);
         } catch (Throwable $exception) {
-            Log::warning('Steam keyed search failed; falling back to public store search.', [
+            $lastException = $exception;
+            Log::warning('Steam public store search failed; falling back to keyed app catalog.', [
                 'query' => $query,
                 'class' => $exception::class,
                 'message' => $exception->getMessage(),
@@ -167,7 +170,20 @@ class ProviderSearchService
         }
 
         if ($items === []) {
-            $items = $this->steamStoreSearch($query);
+            try {
+                $items = $this->steamKeyedSearch($user, $query);
+            } catch (Throwable $exception) {
+                $lastException ??= $exception;
+                Log::warning('Steam keyed catalog fallback failed.', [
+                    'query' => $query,
+                    'class' => $exception::class,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        if ($items === [] && $lastException) {
+            throw $lastException;
         }
 
         return collect($items)
@@ -228,17 +244,14 @@ class ProviderSearchService
                 ->connectTimeout(3)
                 ->timeout(20)
                 ->acceptJson()
-                ->get('https://partner.steam-api.com/IStoreService/GetAppList/v1/', [
+                ->get('https://api.steampowered.com/IStoreService/GetAppList/v1/', [
                     'key' => $apiKey,
-                    'input_json' => json_encode([
-                        'include_games' => true,
-                        'include_dlc' => false,
-                        'include_software' => false,
-                        'include_videos' => false,
-                        'include_hardware' => false,
-                        'have_description_language' => 'english',
-                        'max_results' => self::STEAM_APP_CATALOG_LIMIT,
-                    ]),
+                    'include_games' => 'true',
+                    'include_dlc' => 'false',
+                    'include_software' => 'false',
+                    'include_videos' => 'false',
+                    'include_hardware' => 'false',
+                    'max_results' => self::STEAM_APP_CATALOG_LIMIT,
                 ])
                 ->throw();
 
