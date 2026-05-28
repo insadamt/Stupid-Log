@@ -158,7 +158,7 @@ class ProviderSearchContractTest extends TestCase
             ->assertJsonPath('results.0.total_achievements_source', 'steam');
     }
 
-    public function test_steam_provider_uses_keyed_app_catalog_before_public_store_search(): void
+    public function test_steam_list_search_stays_fast_and_skips_enrichment_even_when_requested(): void
     {
         $user = User::firstOrFail();
         ProviderCredential::create([
@@ -169,51 +169,6 @@ class ProviderSearchContractTest extends TestCase
         ]);
 
         Http::fake([
-            'partner.steam-api.com/IStoreService/GetAppList/v1/*' => Http::response($this->steamCatalogResponse()),
-            'store.steampowered.com/api/storesearch*' => Http::response([
-                'items' => [[
-                    'id' => 999999,
-                    'name' => 'Wrong Public Result',
-                    'tiny_image' => 'https://cdn.example.test/wrong.jpg',
-                ]],
-            ]),
-            'store.steampowered.com/api/appdetails*' => Http::response([
-                '620' => [
-                    'success' => true,
-                    'data' => [
-                        'price_overview' => ['initial' => 999],
-                    ],
-                ],
-            ]),
-            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response([
-                'game' => [
-                    'availableGameStats' => [
-                        'achievements' => [],
-                    ],
-                ],
-            ]),
-        ]);
-
-        $this->getJson('/provider-search?query=portal&provider=steam&enrich=1')
-            ->assertOk()
-            ->assertJsonPath('results.0.source', 'steam')
-            ->assertJsonPath('results.0.title', 'Portal 2')
-            ->assertJsonPath('results.0.steam_app_id', '620')
-            ->assertJsonPath('results.0.base_price_default', 9.99);
-    }
-
-    public function test_steam_price_auto_fill_survives_achievement_schema_failures(): void
-    {
-        $user = User::firstOrFail();
-        ProviderCredential::create([
-            'user_id' => $user->id,
-            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
-            'encrypted_api_key' => Crypt::encryptString('steam-key'),
-            'is_enabled' => true,
-        ]);
-
-        Http::fake([
-            'partner.steam-api.com/IStoreService/GetAppList/v1/*' => Http::response($this->steamCatalogResponse()),
             'store.steampowered.com/api/storesearch*' => Http::response([
                 'items' => [[
                     'id' => 620,
@@ -229,10 +184,75 @@ class ProviderSearchContractTest extends TestCase
                     ],
                 ],
             ]),
-            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response(['error' => 'unavailable'], 500),
+            'api.steampowered.com/IStoreService/GetAppList/v1/*' => Http::response($this->steamCatalogResponse()),
+            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response([
+                'game' => [
+                    'availableGameStats' => [
+                        'achievements' => [],
+                    ],
+                ],
+            ]),
         ]);
 
         $this->getJson('/provider-search?query=portal&provider=steam&enrich=1')
+            ->assertOk()
+            ->assertJsonPath('results.0.source', 'steam')
+            ->assertJsonPath('results.0.title', 'Portal 2')
+            ->assertJsonPath('results.0.steam_app_id', '620')
+            ->assertJsonPath('results.0.base_price_default', null)
+            ->assertJsonPath('results.0.total_achievements', null)
+            ->assertJsonCount(0, 'warnings');
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'IStoreService/GetAppList'));
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'GetSchemaForGame'));
+    }
+
+    public function test_steam_provider_falls_back_to_keyed_game_catalog_when_public_store_search_fails(): void
+    {
+        $user = User::firstOrFail();
+        ProviderCredential::create([
+            'user_id' => $user->id,
+            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
+            'encrypted_api_key' => Crypt::encryptString('steam-key'),
+            'is_enabled' => true,
+        ]);
+
+        Http::fake([
+            'store.steampowered.com/api/storesearch*' => Http::failedConnection('Steam Store timed out.'),
+            'api.steampowered.com/IStoreService/GetAppList/v1/*' => Http::response($this->steamCatalogResponse()),
+        ]);
+
+        $this->getJson('/provider-search?query=portal&provider=steam')
+            ->assertOk()
+            ->assertJsonPath('results.0.source', 'steam')
+            ->assertJsonPath('results.0.title', 'Portal 2')
+            ->assertJsonPath('results.0.steam_app_id', '620')
+            ->assertJsonCount(0, 'warnings');
+    }
+
+    public function test_steam_price_auto_fill_survives_achievement_schema_failures(): void
+    {
+        $user = User::firstOrFail();
+        ProviderCredential::create([
+            'user_id' => $user->id,
+            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
+            'encrypted_api_key' => Crypt::encryptString('steam-key'),
+            'is_enabled' => true,
+        ]);
+
+        Http::fake([
+            'store.steampowered.com/api/appdetails*' => Http::response([
+                '620' => [
+                    'success' => true,
+                    'data' => [
+                        'price_overview' => ['initial' => 999],
+                    ],
+                ],
+            ]),
+            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response(['error' => 'unavailable'], 500),
+        ]);
+
+        $this->getJson('/provider-search?query=portal&provider=steam&enrich=1&steam_app_id=620')
             ->assertOk()
             ->assertJsonPath('results.0.source', 'steam')
             ->assertJsonPath('results.0.steam_app_id', '620')
@@ -254,14 +274,6 @@ class ProviderSearchContractTest extends TestCase
         ]);
 
         Http::fake([
-            'partner.steam-api.com/IStoreService/GetAppList/v1/*' => Http::response($this->steamCatalogResponse()),
-            'store.steampowered.com/api/storesearch*' => Http::response([
-                'items' => [[
-                    'id' => 620,
-                    'name' => 'Portal 2',
-                    'tiny_image' => 'https://cdn.example.test/portal.jpg',
-                ]],
-            ]),
             'store.steampowered.com/api/appdetails*' => Http::response([
                 '620' => [
                     'success' => true,
@@ -273,7 +285,7 @@ class ProviderSearchContractTest extends TestCase
             'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::failedConnection('Steam achievements timed out.'),
         ]);
 
-        $this->getJson('/provider-search?query=portal&provider=steam&enrich=1')
+        $this->getJson('/provider-search?query=portal&provider=steam&enrich=1&steam_app_id=620')
             ->assertOk()
             ->assertJsonPath('results.0.source', 'steam')
             ->assertJsonPath('results.0.steam_app_id', '620')
@@ -287,17 +299,10 @@ class ProviderSearchContractTest extends TestCase
     public function test_provider_search_survives_steam_metadata_failures_after_results_are_found(): void
     {
         Http::fake([
-            'store.steampowered.com/api/storesearch*' => Http::response([
-                'items' => [[
-                    'id' => 620,
-                    'name' => 'Portal 2',
-                    'tiny_image' => 'https://cdn.example.test/portal.jpg',
-                ]],
-            ]),
             'store.steampowered.com/api/appdetails*' => Http::response(['error' => 'unavailable'], 500),
         ]);
 
-        $this->getJson('/provider-search?query=portal&provider=steam&enrich=1')
+        $this->getJson('/provider-search?query=portal&provider=steam&enrich=1&steam_app_id=620')
             ->assertOk()
             ->assertJsonPath('results.0.source', 'steam')
             ->assertJsonPath('results.0.steam_app_id', '620')
