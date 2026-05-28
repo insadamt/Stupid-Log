@@ -5,8 +5,9 @@ namespace App\Services;
 use App\Models\StupidLog\Provider;
 use App\Models\StupidLog\ProviderCredential;
 use App\Models\User;
-use Illuminate\Http\Client\Response;
 use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
@@ -26,7 +27,7 @@ class ProviderSearchService
         $query = trim($query);
         $warnings = [];
         $provider = in_array($provider, ['igdb', 'steam'], true) ? $provider : 'igdb';
-        $shouldEnrich = $enrich && ($provider !== 'steam' || $steamAppId !== null);
+        $shouldEnrich = $enrich;
         $cacheKey = $this->searchCacheKey($user, $query, $provider, $shouldEnrich, $steamAppId);
 
         if ($cached = Cache::get($cacheKey)) {
@@ -52,7 +53,13 @@ class ProviderSearchService
         }
 
         if ($shouldEnrich) {
-            $results = $this->withSteamMetadata($results, $user, $warnings, $steamAppId !== null);
+            $results = $this->withSteamMetadata(
+                results: $results,
+                user: $user,
+                warnings: $warnings,
+                includeDlcCatalog: $steamAppId !== null,
+                includeAchievementCounts: $provider !== 'steam' || $steamAppId !== null,
+            );
         }
 
         $response = [
@@ -104,7 +111,6 @@ class ProviderSearchService
         }
 
         $safeQuery = str_replace(['"', "\n", "\r"], ' ', $query);
-
         $body = 'search "'.$safeQuery.'"; fields name,cover.url,summary,first_release_date,involved_companies.company.name,external_games.uid,external_games.category; limit '.self::RESULT_LIMIT.';';
 
         $games = Http::withHeaders([
@@ -147,7 +153,7 @@ class ProviderSearchService
                 'source' => 'steam',
                 'external_id' => $steamAppId,
                 'title' => $query ?: 'Steam App '.$steamAppId,
-                'cover_url_original' => null,
+                'cover_url_original' => $this->steamPortraitCoverUrl($steamAppId),
                 'publisher' => null,
                 'release_date' => null,
                 'description' => null,
@@ -292,21 +298,27 @@ class ProviderSearchService
     private function steamSearchResult(array $item): array
     {
         $appId = $item['id'] ?? $item['appid'] ?? null;
+        $steamAppId = is_scalar($appId) ? (string) $appId : null;
 
         return $this->result([
             'source' => 'steam',
-            'external_id' => is_scalar($appId) ? (string) $appId : '',
+            'external_id' => $steamAppId ?? '',
             'title' => $item['name'] ?? 'Untitled',
-            'cover_url_original' => $item['tiny_image'] ?? null,
+            'cover_url_original' => $this->steamPortraitCoverUrl($steamAppId),
             'publisher' => null,
             'release_date' => null,
             'description' => null,
-            'steam_app_id' => is_scalar($appId) ? (string) $appId : null,
+            'steam_app_id' => $steamAppId,
         ]);
     }
 
-    private function withSteamMetadata(array $results, User $user, array &$warnings, bool $includeDlcCatalog = false): array
-    {
+    private function withSteamMetadata(
+        array $results,
+        User $user,
+        array &$warnings,
+        bool $includeDlcCatalog = false,
+        bool $includeAchievementCounts = true,
+    ): array {
         $steamAppIds = collect($results)
             ->pluck('steam_app_id')
             ->filter(fn ($appId) => is_scalar($appId) && (string) $appId !== '')
@@ -320,30 +332,35 @@ class ProviderSearchService
         }
 
         $details = $this->steamAppDetails($steamAppIds, $warnings);
-        $achievementCounts = $details === []
-            ? collect($steamAppIds)->mapWithKeys(fn (string $steamAppId) => [$steamAppId => null])->all()
-            : $this->steamAchievementCounts($steamAppIds, $user, $warnings);
+        $achievementCounts = $includeAchievementCounts
+            ? ($details === []
+                ? collect($steamAppIds)->mapWithKeys(fn (string $steamAppId) => [$steamAppId => null])->all()
+                : $this->steamAchievementCounts($steamAppIds, $user, $warnings))
+            : collect($steamAppIds)->mapWithKeys(fn (string $steamAppId) => [$steamAppId => null])->all();
         $dlcCatalogs = $includeDlcCatalog
             ? collect($steamAppIds)
                 ->mapWithKeys(fn (string $steamAppId) => [$steamAppId => $this->steamDlcCatalog($details[$steamAppId]['dlc'] ?? [], $warnings)])
                 ->all()
             : [];
 
-        return collect($results)->map(function (array $result) use ($details, $achievementCounts, $dlcCatalogs, $includeDlcCatalog) {
+        return collect($results)->map(function (array $result) use ($details, $achievementCounts, $dlcCatalogs, $includeDlcCatalog, $includeAchievementCounts) {
             $steamAppId = isset($result['steam_app_id'])
                 ? (string) $result['steam_app_id']
                 : null;
 
             $data = $steamAppId ? ($details[$steamAppId] ?? null) : null;
             $price = is_array($data) ? $this->price($data) : null;
-            $totalAchievements = $steamAppId
+            $totalAchievements = $includeAchievementCounts && $steamAppId
                 ? ($achievementCounts[$steamAppId] ?? null)
                 : null;
 
             return array_merge($result, [
                 'title' => $result['title'] ?: ($data['name'] ?? 'Untitled'),
-                'cover_url_original' => $result['cover_url_original'] ?? ($data['header_image'] ?? null),
+                'cover_url_original' => $this->steamPortraitCoverUrl($steamAppId)
+                    ?? $result['cover_url_original']
+                    ?? ($data['header_image'] ?? null),
                 'publisher' => $result['publisher'] ?? ($data['publishers'][0] ?? null),
+                'release_date' => $result['release_date'] ?? (is_array($data) ? $this->steamReleaseDate($data) : null),
                 'description' => $result['description'] ?? ($data['short_description'] ?? null),
                 'base_price_default' => $price,
                 'base_price_source' => $price === null ? null : 'steam',
@@ -385,7 +402,7 @@ class ProviderSearchService
         }
 
         if ($failed > 0) {
-            $warnings[] = 'Steam price auto-fill unavailable for '.$failed.' result(s).';
+            $warnings[] = 'Steam metadata auto-fill unavailable for '.$failed.' result(s).';
         }
 
         return $details;
@@ -519,6 +536,30 @@ class ProviderSearchService
         return is_numeric($price)
             ? round(((float) $price) / 100, 2)
             : null;
+    }
+
+    private function steamReleaseDate(array $data): ?string
+    {
+        $date = $data['release_date']['date'] ?? null;
+
+        if (! is_string($date) || trim($date) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($date)->toDateString();
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private function steamPortraitCoverUrl(?string $steamAppId): ?string
+    {
+        if (! $steamAppId) {
+            return null;
+        }
+
+        return 'https://cdn.cloudflare.steamstatic.com/steam/apps/'.$steamAppId.'/library_600x900.jpg';
     }
 
     private function steamSearchScore(string $needle, string $title): int
