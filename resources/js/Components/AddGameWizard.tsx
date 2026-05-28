@@ -898,12 +898,21 @@ export default function AddGameWizard({
     function mergeSteamEnrichment(result: WizardSearchResult) {
         const basePrice = result.base_price_default === null || result.base_price_default === undefined ? "" : String(result.base_price_default);
         const totalAchievements = result.total_achievements === null || result.total_achievements === undefined ? "" : String(result.total_achievements);
+        const cover = preferredResultCover(result);
         const dlcs = dlcCatalogFromResult(result);
-
+    
+        if (cover) {
+            setProviderCoverUrl(cover);
+        }
+    
         setOriginalFromResult(result);
         setDraft((current) => ({
             ...current,
             steam_app_id: current.steam_app_id || result.steam_app_id || "",
+            cover_url_original: cover || current.cover_url_original,
+            publisher: result.publisher ?? current.publisher,
+            release_date: toDateInput(result.release_date) || current.release_date,
+            description: result.description ?? current.description,
             base_price_default: basePrice || current.base_price_default,
             total_achievements: totalAchievements || current.total_achievements,
             ownership_copies: current.ownership_copies.map((copy) => ({ ...copy, base_price: copy.base_price || basePrice })),
