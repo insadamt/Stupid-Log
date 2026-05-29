@@ -24,7 +24,17 @@ export function CoverArt({
     titleSize?: string;
 }) {
     if (game.cover_url) {
-        return <img src={game.cover_url} alt={game.title} className="h-full w-full object-cover" />;
+        return (
+            <div className="relative h-full w-full overflow-hidden bg-[#d9dedb]">
+                <img
+                    src={game.cover_url}
+                    alt={game.title}
+                    className="h-full w-full object-cover object-top"
+                    draggable={false}
+                    decoding="async"
+                />
+            </div>
+        );
     }
 
     return (
@@ -64,17 +74,17 @@ export default function GameCard({
     const progress = Math.min(Math.max(Number(game.progress ?? 0), 0), 100);
     const hasAchievements = Number(game.total_achievements ?? 0) > 0;
 
-    const shellWidth = featured ? 'w-[342px]' : homeSide ? 'w-[286px]' : compact ? 'w-[200px]' : 'w-[250px]';
-    const cardHeight = featured ? 'h-[560px]' : homeSide ? 'h-[500px]' : compact ? 'h-[335px]' : 'h-[410px]';
-    const coverHeight = featured ? 'h-[424px]' : homeSide ? 'h-[386px]' : compact ? 'h-[235px]' : 'h-[300px]';
-    const padding = featured ? 'p-4' : 'p-3';
-    const radius = featured ? 'rounded-[28px]' : compact ? 'rounded-[26px]' : 'rounded-[24px]';
+    const shellWidth = featured ? 'w-[314px]' : homeSide ? 'w-[258px]' : compact ? 'w-[180px]' : 'w-[226px]';
+    const cardHeight = featured ? 'h-[514px]' : homeSide ? 'h-[444px]' : compact ? 'h-[306px]' : 'h-[378px]';
+    const coverHeight = featured ? 'h-[382px]' : homeSide ? 'h-[326px]' : compact ? 'h-[214px]' : 'h-[270px]';
+    const padding = featured ? 'p-4' : compact ? 'p-2.5' : 'p-3';
+    const radius = featured ? 'rounded-[28px]' : compact ? 'rounded-[24px]' : 'rounded-[24px]';
     const panelWidth = compact ? 'w-[310px]' : 'w-[380px]';
 
     const panelPosition =
         panelSide === 'left'
-            ? `${compact ? 'right-[200px]' : 'right-[250px]'} rounded-l-[28px]`
-            : `${compact ? 'left-[200px]' : 'left-[250px]'} rounded-r-[28px]`;
+            ? `${compact ? 'right-[180px]' : 'right-[226px]'} rounded-l-[28px]`
+            : `${compact ? 'left-[180px]' : 'left-[226px]'} rounded-r-[28px]`;
     return (
         <article
             className={[
@@ -100,8 +110,8 @@ export default function GameCard({
 
                 <span
                     className={[
-                        'relative z-20 mx-auto -mt-4 rounded-full px-6 py-2 font-black leading-none outline-4 outline-[#b7ff63]',
-                        featured ? 'text-lg' : compact ? 'text-base' : 'text-base',
+                        'relative z-20 mx-auto -mt-4 rounded-full px-5 py-2 font-black leading-none outline-4 outline-[#b7ff63]',
+                        featured ? 'text-lg' : compact ? 'text-sm' : 'text-base',
                     ].join(' ')}
                     style={statusPillStyle(game)}
                 >
@@ -109,7 +119,7 @@ export default function GameCard({
                 </span>
 
                 <div className="relative z-10 mt-auto flex items-center gap-3 pb-1">
-                    <PlatformIcon platform={game.platform} surface="lime" size={featured ? 'lg' : compact ? 'md' : 'md'} />
+                    <PlatformIcon platform={game.platform} surface="lime" size={featured ? 'lg' : compact ? 'sm' : 'md'} />
 
                     {hasAchievements ? (
                         <>
@@ -120,7 +130,9 @@ export default function GameCard({
                             <span className="sl-mini-stat text-base font-black">{progress}%</span>
                         </>
                     ) : (
-                        <span className="text-lg font-black leading-none">No Achievements</span>
+                        <span className={compact ? 'text-sm font-black leading-none' : 'text-base font-black leading-none'}>
+                            No Achievements
+                        </span>
                     )}
                 </div>
             </Link>
