@@ -12,7 +12,6 @@ use App\Models\StupidLog\Game;
 use App\Models\StupidLog\LibraryGame;
 use App\Models\StupidLog\OwnershipCopy;
 use App\Models\StupidLog\OwnershipType;
-use App\Models\StupidLog\OwnedDlc;
 use App\Models\StupidLog\PhysicalStatus;
 use App\Models\StupidLog\Platform;
 use App\Models\StupidLog\Provider;
@@ -47,8 +46,6 @@ use Throwable;
 class StupidLogController extends Controller
 {
     private const PHYSICAL_LIKE = ['Physical', 'Pre-owned', 'Borrowed'];
-    private const DLC_ACQUISITION_TYPES = ['Owned', 'Edition Included', 'Free'];
-
     public function home(StatsService $stats, LibraryGameListService $libraryGames, LibraryGamePresenter $presenter): Response|RedirectResponse
     {
         if (! User::query()->exists() || ! AppSetting::query()->exists()) {
@@ -64,43 +61,6 @@ class StupidLogController extends Controller
             'recentGames' => $presenter->cards($recentLibraryGames),
             'references' => $this->references(),
         ]);
-    }
-
-    public function storeOwnedDlc(Request $request, LibraryGame $libraryGame): RedirectResponse
-    {
-        $validated = $this->validateOwnedDlcRequest($request);
-        $dlc = Dlc::findOrFail($validated['dlc_id']);
-
-        if ((int) $dlc->game_id !== (int) $libraryGame->game_id) {
-            throw ValidationException::withMessages(['dlc_id' => 'DLC does not belong to this game.']);
-        }
-
-        if ($libraryGame->ownedDlcs()->where('dlc_id', $dlc->id)->exists()) {
-            throw ValidationException::withMessages(['dlc_id' => 'This DLC is already tracked for this library game.']);
-        }
-
-        $libraryGame->ownedDlcs()->create($this->ownedDlcAttributes($validated));
-
-        return back();
-    }
-
-    public function updateOwnedDlc(Request $request, OwnedDlc $ownedDlc): RedirectResponse
-    {
-        $validated = $this->validateOwnedDlcRequest($request, requireDlc: false);
-
-        $ownedDlc->update($this->ownedDlcAttributes([
-            ...$validated,
-            'dlc_id' => $ownedDlc->dlc_id,
-        ]));
-
-        return back();
-    }
-
-    public function destroyOwnedDlc(OwnedDlc $ownedDlc): RedirectResponse
-    {
-        $ownedDlc->delete();
-
-        return back();
     }
 
     public function refreshDlcs(LibraryGame $libraryGame, SteamEnrichmentService $steam): RedirectResponse
@@ -763,30 +723,6 @@ class StupidLogController extends Controller
             'edition_name' => $payload['edition_name'] ?? null,
             'base_price' => $payload['base_price'] ?? null,
             'purchased_price' => $payload['purchased_price'] ?? null,
-            'purchased_at' => $payload['purchased_at'] ?? null,
-        ];
-    }
-
-    private function validateOwnedDlcRequest(Request $request, bool $requireDlc = true): array
-    {
-        return $request->validate([
-            'dlc_id' => [$requireDlc ? 'required' : 'nullable', 'integer', 'exists:dlcs,id'],
-            'acquisition_type' => ['required', 'string', Rule::in(self::DLC_ACQUISITION_TYPES)],
-            'purchased_price' => ['nullable', 'numeric', 'min:0'],
-            'purchased_at' => ['nullable', 'date'],
-        ]);
-    }
-
-    private function ownedDlcAttributes(array $payload): array
-    {
-        $acquisitionType = $payload['acquisition_type'];
-
-        return [
-            'dlc_id' => Dlc::findOrFail($payload['dlc_id'])->id,
-            'acquisition_type' => $acquisitionType,
-            'purchased_price' => in_array($acquisitionType, ['Edition Included', 'Free'], true)
-                ? 0
-                : ($payload['purchased_price'] ?? null),
             'purchased_at' => $payload['purchased_at'] ?? null,
         ];
     }
