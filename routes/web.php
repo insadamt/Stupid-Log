@@ -6,6 +6,7 @@ use App\Http\Controllers\StupidLog\OwnedDlcController;
 use App\Http\Controllers\StupidLog\OwnershipCopyController;
 use App\Http\Controllers\StupidLog\SnapshotController;
 use App\Http\Controllers\StupidLog\SetupController;
+use App\Http\Controllers\StupidLog\SettingsController;
 use App\Http\Controllers\StupidLog\StupidLogController;
 use Illuminate\Support\Facades\Route;
 
@@ -43,8 +44,8 @@ Route::patch('/snapshots/{snapshotRun}/resnap', [SnapshotController::class, 'res
 Route::patch('/snapshots/{snapshotRun}/confirm', [SnapshotController::class, 'confirmSnapshot'])->name('snapshots.confirm');
 Route::patch('/snapshots/{snapshotRun}/best-games', [SnapshotController::class, 'updateSnapshotBestGames'])->name('snapshots.best-games.update');
 Route::delete('/snapshots/{snapshotRun}', [SnapshotController::class, 'destroySnapshot'])->name('snapshots.destroy');
-Route::get('/settings', [StupidLogController::class, 'settings'])->name('settings');
-Route::patch('/settings', [StupidLogController::class, 'updateSettings'])->name('settings.update');
-Route::post('/settings/reset', [StupidLogController::class, 'resetApp'])->name('settings.reset');
-Route::post('/settings/igdb/test', [StupidLogController::class, 'testIgdbCredentials'])->name('settings.igdb.test');
-Route::post('/settings/steam/test', [StupidLogController::class, 'testSteamCredentials'])->name('settings.steam.test');
+Route::get('/settings', [SettingsController::class, 'settings'])->name('settings');
+Route::patch('/settings', [SettingsController::class, 'updateSettings'])->name('settings.update');
+Route::post('/settings/reset', [SettingsController::class, 'resetApp'])->name('settings.reset');
+Route::post('/settings/igdb/test', [SettingsController::class, 'testIgdbCredentials'])->name('settings.igdb.test');
+Route::post('/settings/steam/test', [SettingsController::class, 'testSteamCredentials'])->name('settings.steam.test');
