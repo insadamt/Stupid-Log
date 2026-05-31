@@ -5,11 +5,12 @@ use App\Http\Controllers\StupidLog\GameDetailsController;
 use App\Http\Controllers\StupidLog\OwnedDlcController;
 use App\Http\Controllers\StupidLog\OwnershipCopyController;
 use App\Http\Controllers\StupidLog\SnapshotController;
+use App\Http\Controllers\StupidLog\SetupController;
 use App\Http\Controllers\StupidLog\StupidLogController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/setup', [StupidLogController::class, 'setup'])->name('setup');
-Route::post('/setup', [StupidLogController::class, 'storeSetup'])->name('setup.store');
+Route::get('/setup', [SetupController::class, 'setup'])->name('setup');
+Route::post('/setup', [SetupController::class, 'storeSetup'])->name('setup.store');
 
 Route::get('/', [StupidLogController::class, 'home'])->name('home');
 Route::get('/library', [LibraryController::class, 'library'])->name('library');

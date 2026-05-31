@@ -196,28 +196,6 @@ class StupidLogController extends Controller
         ]);
     }
 
-    public function setup(): Response
-    {
-        return Inertia::render('Setup');
-    }
-
-    public function storeSetup(Request $request): RedirectResponse
-    {
-        $validated = $request->validate([
-            'username' => ['required', 'string', 'max:255'],
-            'igdb_client_id' => ['nullable', 'string'],
-            'igdb_client_secret' => ['nullable', 'string'],
-            'steam_api_key' => ['nullable', 'string'],
-        ]);
-
-        $user = User::updateOrCreate(['id' => $this->localUser()->id], ['username' => $validated['username']]);
-        AppSetting::updateOrCreate(['user_id' => $user->id], ['currency_code' => 'USD']);
-        $this->storeCredential($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null);
-        $this->storeCredential($user, 'steam', null, null, $validated['steam_api_key'] ?? null);
-
-        return redirect()->route('home');
-    }
-
     public function settings(): Response
     {
         $user = $this->localUser();
