@@ -66,18 +66,6 @@ class StupidLogController extends Controller
         ]);
     }
 
-    public function gameDetails(LibraryGame $libraryGame, LibraryGamePresenter $presenter): Response
-    {
-        $libraryGame->load(['game.dlcs', 'platform.ownershipTypes', 'status', 'devices', 'ownershipCopies.ownershipType', 'ownershipCopies.physicalStatus', 'ownedDlcs.dlc']);
-
-        return Inertia::render('GameDetails', [
-            'libraryGame' => $presenter->card($libraryGame),
-            'details' => $presenter->details($libraryGame),
-            'references' => $this->references(),
-            'dlcs' => $presenter->dlcs($libraryGame),
-        ]);
-    }
-
     public function storeOwnedDlc(Request $request, LibraryGame $libraryGame): RedirectResponse
     {
         $validated = $this->validateOwnedDlcRequest($request);

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\StupidLog\LibraryController;
+use App\Http\Controllers\StupidLog\GameDetailsController;
 use App\Http\Controllers\StupidLog\StupidLogController;
 use Illuminate\Support\Facades\Route;
 
@@ -16,7 +17,7 @@ Route::get('/library-games/manual-duplicates', [StupidLogController::class, 'man
 Route::get('/provider-search', [StupidLogController::class, 'providerSearch'])->name('provider-search');
 Route::post('/provider-import-drafts', [StupidLogController::class, 'storeProviderImportDraft'])->name('provider-import-drafts.store');
 Route::delete('/provider-import-drafts/{providerImportDraft}', [StupidLogController::class, 'cancelProviderImportDraft'])->name('provider-import-drafts.destroy');
-Route::get('/games/{libraryGame}', [StupidLogController::class, 'gameDetails'])->name('games.show');
+Route::get('/games/{libraryGame}', [GameDetailsController::class, 'gameDetails'])->name('games.show');
 Route::patch('/games/{libraryGame}', [StupidLogController::class, 'updateLibraryGame'])->name('games.update');
 Route::delete('/games/{libraryGame}', [StupidLogController::class, 'destroyLibraryGame'])->name('games.destroy');
 Route::patch('/games/{libraryGame}/platform-devices', [StupidLogController::class, 'updatePlatformDevices'])->name('games.platform-devices.update');
