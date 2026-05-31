@@ -333,6 +333,13 @@ function SnapshotInspector({
     const [eligibleBestGames, setEligibleBestGames] = useState<SnapshotBestGame[]>(selectedSnapshot?.eligible_best_games ?? []);
     const [eligibleBestGamesCursor, setEligibleBestGamesCursor] = useState<string | null>(selectedSnapshot?.eligible_best_games_next_cursor ?? null);
     const [eligibleBestGamesLoading, setEligibleBestGamesLoading] = useState(false);
+    const selectedSnapshotContentKey = JSON.stringify({
+        snapshot_id: selectedSnapshot?.snapshot_id ?? null,
+        games: selectedSnapshot?.games ?? [],
+        games_next_cursor: selectedSnapshot?.games_next_cursor ?? null,
+        eligible_best_games: selectedSnapshot?.eligible_best_games ?? [],
+        eligible_best_games_next_cursor: selectedSnapshot?.eligible_best_games_next_cursor ?? null,
+    });
 
     useEffect(() => {
         setCapturedGames(selectedSnapshot?.games ?? []);
@@ -340,7 +347,7 @@ function SnapshotInspector({
         setBestGameQuery('');
         setEligibleBestGames(selectedSnapshot?.eligible_best_games ?? []);
         setEligibleBestGamesCursor(selectedSnapshot?.eligible_best_games_next_cursor ?? null);
-    }, [selectedSnapshot?.snapshot_id]);
+    }, [selectedSnapshotContentKey]);
 
     useEffect(() => {
         if (!selectedSnapshot || selectedSnapshot.status === 'confirmed') return;
@@ -574,11 +581,12 @@ export default function Snapshots({
     const selectedYearExisting = snapshotItems.find((snapshot) => snapshot.year === selectedYear) ?? null;
     const selectedYearConfirmed = selectedYearExisting?.status === 'confirmed' || confirmedCurrentYear?.year === selectedYear;
     const selectedSnapshotId = selectedSnapshot?.snapshot_id ?? null;
+    const selectedSnapshotBestGamesKey = selectedSnapshot?.best_games.map((game) => game.library_game_id).join(',') ?? '';
 
     useEffect(() => {
         setBestGameIds(selectedSnapshot?.best_games.map((game) => game.library_game_id) ?? []);
         setDetailTab('best-games');
-    }, [selectedSnapshot?.snapshot_id]);
+    }, [selectedSnapshot?.snapshot_id, selectedSnapshotBestGamesKey]);
 
     function createDraft() {
         if (!selectedYearIsValid || selectedYearExisting) return;
@@ -639,6 +647,13 @@ export default function Snapshots({
         setResnappingId(snapshot.snapshot_id);
         router.patch(`/snapshots/${snapshot.snapshot_id}/resnap`, {}, {
             preserveScroll: true,
+            onSuccess: () => {
+                router.visit(`/snapshots/${snapshot.snapshot_id}`, {
+                    preserveScroll: true,
+                    preserveState: false,
+                    replace: true,
+                });
+            },
             onFinish: () => setResnappingId(null),
         });
     }
