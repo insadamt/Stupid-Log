@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\StupidLog\LibraryController;
 use App\Http\Controllers\StupidLog\StupidLogController;
 use Illuminate\Support\Facades\Route;
 
@@ -7,8 +8,8 @@ Route::get('/setup', [StupidLogController::class, 'setup'])->name('setup');
 Route::post('/setup', [StupidLogController::class, 'storeSetup'])->name('setup.store');
 
 Route::get('/', [StupidLogController::class, 'home'])->name('home');
-Route::get('/library', [StupidLogController::class, 'library'])->name('library');
-Route::get('/library-games', [StupidLogController::class, 'libraryGames'])->name('library-games.index');
+Route::get('/library', [LibraryController::class, 'library'])->name('library');
+Route::get('/library-games', [LibraryController::class, 'libraryGames'])->name('library-games.index');
 Route::post('/library-games', [StupidLogController::class, 'storeLibraryGame'])->name('library-games.store');
 Route::post('/library-games/cover', [StupidLogController::class, 'uploadGameCover'])->name('library-games.cover.store');
 Route::get('/library-games/manual-duplicates', [StupidLogController::class, 'manualDuplicates'])->name('library-games.manual-duplicates');

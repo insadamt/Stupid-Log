@@ -66,22 +66,6 @@ class StupidLogController extends Controller
         ]);
     }
 
-    public function library(LibraryGameListService $libraryGames): Response
-    {
-        $user = $this->localUser();
-
-        return Inertia::render('Library', [
-            'libraryGames' => $libraryGames->payload($user, request())->get('items'),
-            'libraryMeta' => $libraryGames->meta($user),
-            'references' => $this->references(),
-        ]);
-    }
-
-    public function libraryGames(Request $request, LibraryGameListService $libraryGames): JsonResponse
-    {
-        return response()->json($libraryGames->payload($this->localUser(), $request));
-    }
-
     public function gameDetails(LibraryGame $libraryGame, LibraryGamePresenter $presenter): Response
     {
         $libraryGame->load(['game.dlcs', 'platform.ownershipTypes', 'status', 'devices', 'ownershipCopies.ownershipType', 'ownershipCopies.physicalStatus', 'ownedDlcs.dlc']);
