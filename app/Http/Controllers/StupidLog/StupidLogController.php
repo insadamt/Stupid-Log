@@ -23,6 +23,8 @@ use App\Models\StupidLog\Status;
 use App\Models\User;
 use App\Services\LibraryGameCreator;
 use App\Services\DuplicateDetectionService;
+use App\Services\LibraryGameListService;
+use App\Services\LibraryGamePresenter;
 use App\Services\ProviderImportDraftService;
 use App\Services\ProviderSearchService;
 use App\Services\SnapshotService;
@@ -47,48 +49,48 @@ class StupidLogController extends Controller
     private const PHYSICAL_LIKE = ['Physical', 'Pre-owned', 'Borrowed'];
     private const DLC_ACQUISITION_TYPES = ['Owned', 'Edition Included', 'Free'];
 
-    public function home(StatsService $stats): Response|RedirectResponse
+    public function home(StatsService $stats, LibraryGameListService $libraryGames, LibraryGamePresenter $presenter): Response|RedirectResponse
     {
         if (! User::query()->exists() || ! AppSetting::query()->exists()) {
             return redirect()->route('setup');
         }
 
         $user = $this->localUser();
-        $libraryGames = $this->libraryQuery($user)->latest()->take(6)->get();
+        $recentLibraryGames = $libraryGames->query($user)->latest()->take(6)->get();
 
         return Inertia::render('Home', [
             'user' => $user,
             'stats' => $stats->live($user),
-            'recentGames' => $this->cards($libraryGames),
+            'recentGames' => $presenter->cards($recentLibraryGames),
             'references' => $this->references(),
         ]);
     }
 
-    public function library(): Response
+    public function library(LibraryGameListService $libraryGames): Response
     {
         $user = $this->localUser();
 
         return Inertia::render('Library', [
-            'libraryGames' => $this->libraryGamesPayload($user, request())->get('items'),
-            'libraryMeta' => $this->libraryMeta($user),
+            'libraryGames' => $libraryGames->payload($user, request())->get('items'),
+            'libraryMeta' => $libraryGames->meta($user),
             'references' => $this->references(),
         ]);
     }
 
-    public function libraryGames(Request $request): JsonResponse
+    public function libraryGames(Request $request, LibraryGameListService $libraryGames): JsonResponse
     {
-        return response()->json($this->libraryGamesPayload($this->localUser(), $request));
+        return response()->json($libraryGames->payload($this->localUser(), $request));
     }
 
-    public function gameDetails(LibraryGame $libraryGame): Response
+    public function gameDetails(LibraryGame $libraryGame, LibraryGamePresenter $presenter): Response
     {
         $libraryGame->load(['game.dlcs', 'platform.ownershipTypes', 'status', 'devices', 'ownershipCopies.ownershipType', 'ownershipCopies.physicalStatus', 'ownedDlcs.dlc']);
 
         return Inertia::render('GameDetails', [
-            'libraryGame' => $this->card($libraryGame),
-            'details' => $this->details($libraryGame),
+            'libraryGame' => $presenter->card($libraryGame),
+            'details' => $presenter->details($libraryGame),
             'references' => $this->references(),
-            'dlcs' => $this->dlcs($libraryGame),
+            'dlcs' => $presenter->dlcs($libraryGame),
         ]);
     }
 
@@ -683,95 +685,6 @@ class StupidLogController extends Controller
         ));
     }
 
-    private function libraryGamesPayload(User $user, Request $request)
-    {
-        $limit = $this->boundedLimit($request, 40, 120);
-        $offset = $this->decodeOffsetCursor($request->string('cursor')->toString());
-        $sort = $request->string('sort')->toString() ?: 'title';
-        $query = trim($request->string('query')->toString());
-        $status = $request->string('status')->toString();
-        $platform = $request->string('platform')->toString();
-
-        $builder = $this->libraryQuery($user);
-
-        if ($query !== '') {
-            $builder->where(function ($scope) use ($query) {
-                $scope->whereHas('game', function ($gameQuery) use ($query) {
-                    $gameQuery->where('title', 'like', "%{$query}%")
-                        ->orWhere('publisher', 'like', "%{$query}%");
-                })->orWhereHas('platform', fn ($platformQuery) => $platformQuery->where('name', 'like', "%{$query}%"))
-                    ->orWhereHas('devices', fn ($deviceQuery) => $deviceQuery->where('name', 'like', "%{$query}%"))
-                    ->orWhereHas('ownershipCopies.ownershipType', fn ($ownershipQuery) => $ownershipQuery->where('name', 'like', "%{$query}%"));
-            });
-        }
-
-        if ($status !== '' && strcasecmp($status, 'All') !== 0) {
-            $builder->whereHas('status', fn ($statusQuery) => $statusQuery->where('name', $status));
-        }
-
-        if ($platform !== '' && strcasecmp($platform, 'All') !== 0) {
-            $builder->whereHas('platform', fn ($platformQuery) => $platformQuery->where('name', $platform));
-        }
-
-        match ($sort) {
-            'playtime' => $builder->orderByDesc('playtime_hours')->orderBy('id'),
-            'progress' => $builder
-                ->leftJoin('games as sort_games', 'sort_games.id', '=', 'library_games.game_id')
-                ->select('library_games.*')
-                ->orderByRaw('case when sort_games.total_achievements > 0 then coalesce(library_games.earned_achievements, 0) * 1.0 / sort_games.total_achievements else 0 end desc')
-                ->orderBy('library_games.id'),
-            default => $builder
-                ->join('games as sort_games', 'sort_games.id', '=', 'library_games.game_id')
-                ->select('library_games.*')
-                ->orderBy('sort_games.title')
-                ->orderBy('library_games.id'),
-        };
-
-        $rows = $builder->skip($offset)->take($limit + 1)->get();
-        $items = $rows->take($limit)->values();
-
-        return collect([
-            'items' => $this->cards($items),
-            'next_cursor' => $rows->count() > $limit ? $this->encodeOffsetCursor($offset + $limit) : null,
-            'has_more' => $rows->count() > $limit,
-        ]);
-    }
-
-    private function libraryMeta(User $user): array
-    {
-        $totals = LibraryGame::query()
-            ->join('statuses', 'statuses.id', '=', 'library_games.status_id')
-            ->where('library_games.user_id', $user->id)
-            ->selectRaw('count(*) as library_games')
-            ->selectRaw("sum(case when statuses.name in ('Completed', '100%') then 1 else 0 end) as completed")
-            ->selectRaw('sum(library_games.playtime_hours) as playtime_hours')
-            ->first();
-
-        return [
-            'total' => (int) ($totals?->library_games ?? 0),
-            'completed' => (int) ($totals?->completed ?? 0),
-            'playtime_hours' => (float) ($totals?->playtime_hours ?? 0),
-            'statuses' => LibraryGame::query()
-                ->join('statuses', 'statuses.id', '=', 'library_games.status_id')
-                ->where('library_games.user_id', $user->id)
-                ->groupBy('statuses.name')
-                ->orderBy('statuses.name')
-                ->selectRaw('statuses.name, count(*) as count')
-                ->get()
-                ->mapWithKeys(fn ($row) => [$row->name => (int) $row->count])
-                ->all(),
-            'platforms' => LibraryGame::query()
-                ->join('platforms', 'platforms.id', '=', 'library_games.platform_id')
-                ->where('library_games.user_id', $user->id)
-                ->groupBy('platforms.name')
-                ->orderBy('platforms.name')
-                ->selectRaw('platforms.name, count(*) as count')
-                ->get()
-                ->mapWithKeys(fn ($row) => [$row->name => (int) $row->count])
-                ->all(),
-        ];
-    }
-
     private function snapshotFeedPayload(User $user, Request $request, StatsService $stats): array
     {
         $limit = $this->boundedLimit($request, 30, 100);
@@ -826,82 +739,6 @@ class StupidLogController extends Controller
     private function localUser(): User
     {
         return User::first() ?? User::create(['username' => 'Player One', 'avatar_path' => null]);
-    }
-
-    private function libraryQuery(User $user)
-    {
-        return LibraryGame::where('user_id', $user->id)
-            ->with(['game', 'platform', 'status', 'devices', 'ownershipCopies.ownershipType']);
-    }
-
-    private function cards($libraryGames)
-    {
-        return $libraryGames->map(fn (LibraryGame $libraryGame) => $this->card($libraryGame))->values();
-    }
-
-    private function card(LibraryGame $libraryGame): array
-    {
-        $game = $libraryGame->game;
-
-        return [
-            'id' => $libraryGame->id,
-            'title' => $game->title,
-            'publisher' => $game->publisher,
-            'description' => $game->description,
-            'cover_url' => $game->cover_path ? asset('storage/'.$game->cover_path) : $game->cover_url_original,
-            'platform' => $libraryGame->platform->name,
-            'status' => $libraryGame->status->name,
-            'status_color_key' => $libraryGame->status->color_key,
-            'status_color_hex' => $libraryGame->status->color_hex,
-            'playtime_hours' => (float) $libraryGame->playtime_hours,
-            'earned_achievements' => $libraryGame->earned_achievements ?? 0,
-            'total_achievements' => $game->total_achievements ?? 0,
-            'completed_at' => $libraryGame->completed_at?->format('Y-m-d'),
-            'progress' => $game->total_achievements ? round((($libraryGame->earned_achievements ?? 0) / $game->total_achievements) * 100) : 0,
-            'ownership' => $libraryGame->ownershipCopies->map(fn ($copy) => $copy->ownershipType?->name ?? OwnershipType::find($copy->ownership_type_id)?->name)->filter()->values(),
-            'devices' => $libraryGame->devices->pluck('name')->values(),
-            'base_price_default' => $game->base_price_default,
-        ];
-    }
-
-    private function details(LibraryGame $libraryGame): array
-    {
-        return [
-            'platform_id' => $libraryGame->platform_id,
-            'device_ids' => $libraryGame->devices->pluck('id')->values(),
-            'ownership_copies' => $libraryGame->ownershipCopies->map(fn (OwnershipCopy $copy) => [
-                'id' => $copy->id,
-                'ownership_type_id' => $copy->ownership_type_id,
-                'ownership_type' => $copy->ownershipType?->name,
-                'physical_status_id' => $copy->physical_status_id,
-                'physical_status' => $copy->physicalStatus?->name,
-                'edition_name' => $copy->edition_name,
-                'base_price' => $copy->base_price,
-                'purchased_price' => $copy->purchased_price,
-                'purchased_at' => $copy->purchased_at?->format('Y-m-d'),
-            ])->values(),
-            'platform_ownership_types' => $libraryGame->platform->ownershipTypes->map(fn (OwnershipType $type) => [
-                'id' => $type->id,
-                'name' => $type->name,
-            ])->values(),
-        ];
-    }
-
-    private function dlcs(LibraryGame $libraryGame)
-    {
-        return $libraryGame->game->dlcs->map(function (Dlc $dlc) use ($libraryGame) {
-            $ownedDlc = $libraryGame->ownedDlcs->firstWhere('dlc_id', $dlc->id);
-
-            return [
-                'id' => $dlc->id,
-                'owned_dlc_id' => $ownedDlc?->id,
-                'title' => $dlc->title,
-                'base_price' => $dlc->base_price,
-                'state' => $ownedDlc?->acquisition_type ?? 'Not Owned',
-                'purchased_price' => $ownedDlc?->purchased_price,
-                'purchased_at' => $ownedDlc?->purchased_at?->format('Y-m-d'),
-            ];
-        })->values();
     }
 
     private function validateOwnershipCopyRequest(Request $request): array
