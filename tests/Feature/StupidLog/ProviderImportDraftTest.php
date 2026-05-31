@@ -88,6 +88,36 @@ class ProviderImportDraftTest extends TestCase
         $this->assertNotNull(ProviderImportDraft::find($draftId)->consumed_at);
     }
 
+    public function test_submitted_cover_path_wins_over_provider_import_draft_cover(): void
+    {
+        Http::fake(['cdn.example.test/*' => Http::response('provider cover', 200, ['Content-Type' => 'image/jpeg'])]);
+        $draftId = $this->postJson('/provider-import-drafts', ['result' => $this->providerResult()])->json('id');
+        $providerCoverPath = ProviderImportDraft::findOrFail($draftId)->cover_path;
+        $submittedCoverPath = 'covers/games/custom-upload.jpg';
+        Storage::disk('public')->put($submittedCoverPath, 'custom cover');
+
+        $this->post('/library-games', $this->payload([
+            'import_draft_id' => $draftId,
+            'game' => [
+                'title' => 'Custom Covered Steam Game',
+                'source' => 'steam',
+                'external_id' => '100',
+                'steam_app_id' => '100',
+                'cover_url_original' => null,
+                'cover_path' => $submittedCoverPath,
+                'create_duplicate_anyway' => true,
+            ],
+        ]))->assertRedirect();
+
+        $game = $this->user->libraryGames()->latest()->firstOrFail()->game;
+
+        $this->assertSame('Custom Covered Steam Game', $game->title);
+        $this->assertSame($submittedCoverPath, $game->cover_path);
+        $this->assertNull($game->cover_url_original);
+        Storage::disk('public')->assertMissing($providerCoverPath);
+        Storage::disk('public')->assertExists($submittedCoverPath);
+    }
+
     public function test_cancel_removes_unconsumed_draft_and_temporary_cover(): void
     {
         Http::fake(['cdn.example.test/*' => Http::response('cover', 200, ['Content-Type' => 'image/jpeg'])]);

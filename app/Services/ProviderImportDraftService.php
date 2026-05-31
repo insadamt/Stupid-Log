@@ -40,8 +40,17 @@ class ProviderImportDraftService
 
         $draft = $this->findConsumable($user, (int) $draftId);
 
-        $payload['game'] = array_merge($payload['game'], $draft->game_payload ?? []);
-        $payload['game']['cover_path'] = $this->covers->promoteTemporaryProviderCover($draft->cover_path);
+        $submittedGame = $payload['game'];
+        $providerGame = Arr::except($draft->game_payload ?? [], ['cover_path']);
+
+        $payload['game'] = array_merge($providerGame, $submittedGame);
+
+        if (empty($payload['game']['cover_path'])) {
+            $payload['game']['cover_path'] = $this->covers->promoteTemporaryProviderCover($draft->cover_path);
+        } else {
+            $this->covers->deleteTemporaryProviderCover($draft->cover_path);
+        }
+
         $payload['__import_draft'] = $draft;
 
         return $payload;
