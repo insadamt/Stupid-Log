@@ -3,6 +3,7 @@
 use App\Http\Controllers\StupidLog\LibraryController;
 use App\Http\Controllers\StupidLog\GameDetailsController;
 use App\Http\Controllers\StupidLog\OwnedDlcController;
+use App\Http\Controllers\StupidLog\OwnershipCopyController;
 use App\Http\Controllers\StupidLog\StupidLogController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,9 +23,9 @@ Route::get('/games/{libraryGame}', [GameDetailsController::class, 'gameDetails']
 Route::patch('/games/{libraryGame}', [StupidLogController::class, 'updateLibraryGame'])->name('games.update');
 Route::delete('/games/{libraryGame}', [StupidLogController::class, 'destroyLibraryGame'])->name('games.destroy');
 Route::patch('/games/{libraryGame}/platform-devices', [StupidLogController::class, 'updatePlatformDevices'])->name('games.platform-devices.update');
-Route::post('/games/{libraryGame}/ownership-copies', [StupidLogController::class, 'storeOwnershipCopy'])->name('games.ownership-copies.store');
-Route::patch('/ownership-copies/{ownershipCopy}', [StupidLogController::class, 'updateOwnershipCopy'])->name('ownership-copies.update');
-Route::delete('/ownership-copies/{ownershipCopy}', [StupidLogController::class, 'destroyOwnershipCopy'])->name('ownership-copies.destroy');
+Route::post('/games/{libraryGame}/ownership-copies', [OwnershipCopyController::class, 'storeOwnershipCopy'])->name('games.ownership-copies.store');
+Route::patch('/ownership-copies/{ownershipCopy}', [OwnershipCopyController::class, 'updateOwnershipCopy'])->name('ownership-copies.update');
+Route::delete('/ownership-copies/{ownershipCopy}', [OwnershipCopyController::class, 'destroyOwnershipCopy'])->name('ownership-copies.destroy');
 Route::post('/games/{libraryGame}/dlcs/refresh', [StupidLogController::class, 'refreshDlcs'])->name('games.dlcs.refresh');
 Route::post('/games/{libraryGame}/owned-dlcs', [OwnedDlcController::class, 'storeOwnedDlc'])->name('games.owned-dlcs.store');
 Route::patch('/owned-dlcs/{ownedDlc}', [OwnedDlcController::class, 'updateOwnedDlc'])->name('owned-dlcs.update');
