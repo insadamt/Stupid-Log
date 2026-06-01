@@ -9,6 +9,7 @@ import {
 import SetupIntro from './components/SetupIntro';
 import SetupLaunch from './components/SetupLaunch';
 import SetupWizard from './components/SetupWizard';
+import { steps } from './constants';
 import { Provider, Scene, SetupForm, TestResult } from './types';
 import { useSetupAnimations } from './useSetupAnimations';
 
@@ -62,6 +63,11 @@ export default function Setup() {
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (submittingRef.current) return;
+
+        if (step < steps.length - 1) {
+            setStep((current) => Math.min(steps.length - 1, current + 1));
+            return;
+        }
 
         const root = rootRef.current;
         const submitSetup = () => {

@@ -49,7 +49,7 @@ export default function LibraryFilters({
                     <SlidersHorizontal size={24} strokeWidth={3} className="text-[#b7ff63]" />
                 </div>
 
-                <div className="sl-scrollbar min-h-0 overflow-y-auto p-5">
+                <div className="sl-scrollbar min-h-0 overflow-y-auto overflow-x-hidden p-5">
                     <div className="mb-3 text-[10px] font-black uppercase tracking-[0.24em] text-white/35">Status</div>
 
                     <div className="grid gap-2">
@@ -62,18 +62,18 @@ export default function LibraryFilters({
                                     type="button"
                                     onClick={() => onStatusChange(item.label)}
                                     className={[
-                                        'flex min-h-12 items-center justify-between gap-3 rounded-[18px] px-4 py-3 text-left text-sm font-black transition',
+                                        'flex min-h-12 w-full min-w-0 max-w-full items-center justify-between gap-3 overflow-hidden rounded-[18px] px-4 py-3 text-left text-sm font-black transition',
                                         selected
                                             ? item.status ? 'text-black' : 'bg-[#b7ff63] text-black'
                                             : 'bg-white/10 text-white/58 hover:bg-white/15 hover:text-white',
                                     ].join(' ')}
                                     style={selected && item.status ? statusPillStyle({ status: item.status.name, status_color_hex: item.status.color_hex }) : undefined}
                                 >
-                                    <span className="flex min-w-0 items-center gap-2">
+                                    <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
                                         {item.status && <span className="size-2.5 shrink-0 rounded-full" style={statusDotStyle({ status: item.status.name, status_color_hex: item.status.color_hex })} />}
                                         <span className="truncate">{item.label}</span>
                                     </span>
-                                    <span>{item.count}</span>
+                                    <span className="shrink-0">{item.count}</span>
                                 </button>
                             );
                         })}
@@ -91,17 +91,17 @@ export default function LibraryFilters({
                                     type="button"
                                     onClick={() => onPlatformChange(item.label)}
                                     className={[
-                                        'flex min-h-12 items-center justify-between gap-3 rounded-[18px] px-4 py-3 text-left text-sm font-black transition',
+                                        'flex min-h-12 w-full min-w-0 max-w-full items-center justify-between gap-3 overflow-hidden rounded-[18px] px-4 py-3 text-left text-sm font-black transition',
                                         selected
                                             ? 'bg-[#b7ff63] text-black'
                                             : 'bg-white/10 text-white/58 hover:bg-white/15 hover:text-white',
                                     ].join(' ')}
                                 >
-                                    <span className="flex min-w-0 items-center gap-2">
+                                    <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
                                         <PlatformIcon platform={item.label} surface={selected ? 'lime' : 'dark'} size="sm" />
                                         <span className="truncate">{item.label}</span>
                                     </span>
-                                    <span>{item.count}</span>
+                                    <span className="shrink-0">{item.count}</span>
                                 </button>
                             );
                         })}
@@ -111,7 +111,7 @@ export default function LibraryFilters({
                 <div className="border-t border-white/10 p-5">
                     <div className="rounded-[24px] bg-[#b7ff63] p-4 text-black">
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-black/45">Active View</p>
-                        <p className="mt-1 truncate text-xl font-black">{status} / {platform} / {sort}</p>
+                        <p className="mt-1 break-words text-xl font-black leading-tight">{status} / {platform} / {sort}</p>
                     </div>
                 </div>
             </div>
