@@ -176,16 +176,6 @@ class StupidLogController extends Controller
         return back();
     }
 
-    public function stats(StatsService $stats): Response
-    {
-        $user = $this->localUser();
-
-        return Inertia::render('Stats', [
-            'stats' => $stats->live($user),
-            'confirmedYears' => $stats->confirmedYears($user),
-        ]);
-    }
-
     public function manualDuplicates(Request $request, DuplicateDetectionService $duplicates): JsonResponse
     {
         $validated = $request->validate([

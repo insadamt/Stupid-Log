@@ -7,6 +7,7 @@ use App\Http\Controllers\StupidLog\OwnershipCopyController;
 use App\Http\Controllers\StupidLog\SnapshotController;
 use App\Http\Controllers\StupidLog\SetupController;
 use App\Http\Controllers\StupidLog\SettingsController;
+use App\Http\Controllers\StupidLog\StatsController;
 use App\Http\Controllers\StupidLog\StupidLogController;
 use Illuminate\Support\Facades\Route;
 
@@ -33,7 +34,7 @@ Route::post('/games/{libraryGame}/dlcs/refresh', [StupidLogController::class, 'r
 Route::post('/games/{libraryGame}/owned-dlcs', [OwnedDlcController::class, 'storeOwnedDlc'])->name('games.owned-dlcs.store');
 Route::patch('/owned-dlcs/{ownedDlc}', [OwnedDlcController::class, 'updateOwnedDlc'])->name('owned-dlcs.update');
 Route::delete('/owned-dlcs/{ownedDlc}', [OwnedDlcController::class, 'destroyOwnedDlc'])->name('owned-dlcs.destroy');
-Route::get('/stats', [StupidLogController::class, 'stats'])->name('stats');
+Route::get('/stats', [StatsController::class, 'stats'])->name('stats');
 Route::get('/snapshots', [SnapshotController::class, 'snapshots'])->name('snapshots');
 Route::get('/snapshots-feed', [SnapshotController::class, 'snapshotFeed'])->name('snapshots.feed');
 Route::post('/snapshots', [SnapshotController::class, 'createSnapshot'])->name('snapshots.store');
