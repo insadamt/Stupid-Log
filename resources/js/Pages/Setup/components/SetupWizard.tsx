@@ -1,17 +1,19 @@
 import { ArrowLeft, ArrowRight, Database, Gamepad2, KeyRound, Loader2, Save, ShieldCheck } from 'lucide-react';
 import { Dispatch, KeyboardEvent, SetStateAction } from 'react';
 import { steps } from '../constants';
-import { Provider, SetupForm, TestResult } from '../types';
-import { ControlButton, SummaryRow, TestMessage, TextField } from './SetupControls';
+import { Provider, ProviderTestResults, SetupForm, TestResult } from '../types';
+import { ControlButton, ProviderResultRow, SummaryRow, TestMessage, TextField } from './SetupControls';
 
 export default function SetupWizard({
     step,
     form,
     updateField,
     finishSetup,
+    continueStep,
     testProvider,
     testing,
     testResult,
+    providerResults,
     setStep,
     submitting,
 }: {
@@ -19,23 +21,35 @@ export default function SetupWizard({
     form: SetupForm;
     updateField: <Key extends keyof SetupForm>(key: Key, value: SetupForm[Key]) => void;
     finishSetup: () => void;
+    continueStep: () => Promise<void>;
     testProvider: (provider: Provider) => Promise<void>;
     testing: Provider | null;
     testResult: TestResult | null;
+    providerResults: ProviderTestResults;
     setStep: Dispatch<SetStateAction<number>>;
     submitting: boolean;
 }) {
     const StepIcon = steps[step].icon;
-    const advanceStep = () => setStep((current) => Math.min(steps.length - 1, current + 1));
+    const igdbConfigured = Boolean(form.igdb_client_id.trim() || form.igdb_client_secret.trim());
+    const steamConfigured = Boolean(form.steam_api_key.trim());
+    const providerStatus = (provider: Provider, configured: boolean) => {
+        if (!configured) return 'Later';
+
+        const result = providerResults[provider];
+        if (!result) return 'Untested';
+
+        return result.ok ? 'Ready' : 'Failed';
+    };
     const handleKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
         if (event.key !== 'Enter') return;
         const target = event.target as HTMLElement;
 
         if (target.tagName === 'TEXTAREA') return;
+        if (target.closest('button')) return;
 
         event.preventDefault();
         if (step < steps.length - 1) {
-            advanceStep();
+            void continueStep();
         }
     };
 
@@ -140,8 +154,12 @@ export default function SetupWizard({
                         <div className="grid gap-4">
                             <div className="grid gap-3 md:grid-cols-3">
                                 <SummaryRow label="Player" value={form.username || 'Missing'} />
-                                <SummaryRow label="IGDB" value={form.igdb_client_id && form.igdb_client_secret ? 'Ready' : 'Later'} />
-                                <SummaryRow label="Steam" value={form.steam_api_key ? 'Ready' : 'Later'} />
+                                <SummaryRow label="IGDB" value={providerStatus('igdb', igdbConfigured)} />
+                                <SummaryRow label="Steam" value={providerStatus('steam', steamConfigured)} />
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <ProviderResultRow label="IGDB" configured={igdbConfigured} result={providerResults.igdb} />
+                                <ProviderResultRow label="Steam" configured={steamConfigured} result={providerResults.steam} />
                             </div>
                             <div className="overflow-hidden rounded-[26px] border border-[#b7ff63]/30 bg-[#b7ff63] p-6 text-black" data-wizard-item>
                                 <div>
@@ -156,14 +174,23 @@ export default function SetupWizard({
                 </section>
 
                 <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
-                    <ControlButton tone="ghost" disabled={step === 0 || submitting} onClick={() => setStep((current) => Math.max(0, current - 1))}>
+                    <ControlButton tone="ghost" disabled={step === 0 || submitting || testing !== null} onClick={() => setStep((current) => Math.max(0, current - 1))}>
                         <ArrowLeft size={17} strokeWidth={3} />
                         Back
                     </ControlButton>
                     {step < steps.length - 1 ? (
-                        <ControlButton tone="lime" disabled={submitting} onClick={advanceStep}>
-                            Continue
-                            <ArrowRight size={17} strokeWidth={3} />
+                        <ControlButton tone="lime" disabled={submitting || testing !== null} onClick={() => void continueStep()}>
+                            {testing ? (
+                                <>
+                                    <Loader2 className="animate-spin" size={17} strokeWidth={3} />
+                                    {testing === 'igdb' ? 'Testing IGDB' : 'Testing Steam'}
+                                </>
+                            ) : (
+                                <>
+                                    Continue
+                                    <ArrowRight size={17} strokeWidth={3} />
+                                </>
+                            )}
                         </ControlButton>
                     ) : (
                         <ControlButton tone="lime" disabled={submitting} onClick={finishSetup}>

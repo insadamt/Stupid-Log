@@ -12,3 +12,5 @@ export type TestResult = {
     ok: boolean;
     message: string;
 };
+
+export type ProviderTestResults = Partial<Record<Provider, TestResult>>;

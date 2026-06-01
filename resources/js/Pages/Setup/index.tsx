@@ -10,7 +10,7 @@ import SetupIntro from './components/SetupIntro';
 import SetupLaunch from './components/SetupLaunch';
 import SetupWizard from './components/SetupWizard';
 import { steps } from './constants';
-import { Provider, Scene, SetupForm, TestResult } from './types';
+import { Provider, ProviderTestResults, Scene, SetupForm, TestResult } from './types';
 import { useSetupAnimations } from './useSetupAnimations';
 
 export default function Setup() {
@@ -19,6 +19,7 @@ export default function Setup() {
     const [step, setStep] = useState(0);
     const [testing, setTesting] = useState<Provider | null>(null);
     const [testResult, setTestResult] = useState<TestResult | null>(null);
+    const [providerResults, setProviderResults] = useState<ProviderTestResults>({});
     const [submitting, setSubmitting] = useState(false);
     const submittingRef = useRef(false);
     const launchStartedRef = useRef(false);
@@ -42,6 +43,12 @@ export default function Setup() {
 
     function updateField<Key extends keyof SetupForm>(key: Key, value: SetupForm[Key]) {
         setForm((current) => ({ ...current, [key]: value }));
+        if (key === 'igdb_client_id' || key === 'igdb_client_secret') {
+            setProviderResults((current) => ({ ...current, igdb: undefined }));
+        }
+        if (key === 'steam_api_key') {
+            setProviderResults((current) => ({ ...current, steam: undefined }));
+        }
     }
 
     function startWizard() {
@@ -101,10 +108,7 @@ export default function Setup() {
             .to(shell, { autoAlpha: 0, duration: 0.2 }, 0.18);
     }
 
-    async function testProvider(provider: Provider) {
-        setTesting(provider);
-        setTestResult(null);
-
+    async function runProviderTest(provider: Provider): Promise<TestResult> {
         const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
         const formData = new FormData();
         Object.entries(form).forEach(([key, value]) => formData.append(key, value));
@@ -119,12 +123,64 @@ export default function Setup() {
                 body: formData,
             });
             const data = await response.json() as TestResult;
-            setTestResult({ ok: response.ok && data.ok, message: data.message });
+            return { ok: response.ok && data.ok, message: data.message };
         } catch (error) {
-            setTestResult({ ok: false, message: error instanceof Error ? error.message : 'Credential test failed.' });
+            return { ok: false, message: error instanceof Error ? error.message : 'Credential test failed.' };
+        }
+    }
+
+    async function testProvider(provider: Provider) {
+        if (testing) return;
+
+        setTesting(provider);
+        setTestResult(null);
+
+        try {
+            const result = await runProviderTest(provider);
+            setProviderResults((current) => ({ ...current, [provider]: result }));
+            setTestResult(result);
         } finally {
             setTesting(null);
         }
+    }
+
+    function configuredProviders() {
+        const providers: Provider[] = [];
+        if (form.igdb_client_id.trim() || form.igdb_client_secret.trim()) {
+            providers.push('igdb');
+        }
+        if (form.steam_api_key.trim()) {
+            providers.push('steam');
+        }
+
+        return providers;
+    }
+
+    async function continueStep() {
+        if (testing || submittingRef.current) return;
+
+        if (step !== 1) {
+            setStep((current) => Math.min(steps.length - 1, current + 1));
+            return;
+        }
+
+        const providers = configuredProviders();
+        if (providers.length === 0) {
+            setStep((current) => Math.min(steps.length - 1, current + 1));
+            return;
+        }
+
+        setTestResult(null);
+
+        for (const provider of providers) {
+            setTesting(provider);
+            const result = await runProviderTest(provider);
+            setProviderResults((current) => ({ ...current, [provider]: result }));
+            setTestResult(result);
+        }
+
+        setTesting(null);
+        setStep((current) => Math.min(steps.length - 1, current + 1));
     }
 
     return (
@@ -136,9 +192,11 @@ export default function Setup() {
                     form={form}
                     updateField={updateField}
                     finishSetup={finishSetup}
+                    continueStep={continueStep}
                     testProvider={testProvider}
                     testing={testing}
                     testResult={testResult}
+                    providerResults={providerResults}
                     setStep={setStep}
                     submitting={submitting}
                 />

@@ -80,3 +80,31 @@ export function TestMessage({ result }: { result: TestResult | null }) {
         </div>
     );
 }
+
+export function ProviderResultRow({
+    label,
+    configured,
+    result,
+}: {
+    label: string;
+    configured: boolean;
+    result?: TestResult;
+}) {
+    const status = !configured ? 'Later' : result ? (result.ok ? 'Passed' : 'Failed') : 'Untested';
+    const message = !configured ? `${label} was skipped.` : result?.message ?? `${label} was not tested.`;
+    const tone = !configured
+        ? 'bg-white/[0.08] text-white ring-white/10'
+        : result?.ok
+            ? 'bg-[#b7ff63] text-black ring-[#b7ff63]/40'
+            : 'bg-[#ffe0dd] text-[#ad2c21] ring-[#ffe0dd]/50';
+
+    return (
+        <div className={`rounded-[18px] px-4 py-3 ring-1 ${tone}`} data-wizard-item>
+            <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-black uppercase">{label}</span>
+                <span className="shrink-0 text-[10px] font-black uppercase">{status}</span>
+            </div>
+            <p className="mt-1 text-sm font-black leading-snug opacity-70">{message}</p>
+        </div>
+    );
+}
