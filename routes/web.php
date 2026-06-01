@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\StupidLog\LibraryController;
+use App\Http\Controllers\StupidLog\LibraryGameMutationController;
 use App\Http\Controllers\StupidLog\GameDetailsController;
 use App\Http\Controllers\StupidLog\OwnedDlcController;
 use App\Http\Controllers\StupidLog\OwnershipCopyController;
@@ -18,20 +19,20 @@ Route::post('/setup', [SetupController::class, 'storeSetup'])->name('setup.store
 Route::get('/', [StupidLogController::class, 'home'])->name('home');
 Route::get('/library', [LibraryController::class, 'library'])->name('library');
 Route::get('/library-games', [LibraryController::class, 'libraryGames'])->name('library-games.index');
-Route::post('/library-games', [StupidLogController::class, 'storeLibraryGame'])->name('library-games.store');
-Route::post('/library-games/cover', [StupidLogController::class, 'uploadGameCover'])->name('library-games.cover.store');
-Route::get('/library-games/manual-duplicates', [StupidLogController::class, 'manualDuplicates'])->name('library-games.manual-duplicates');
+Route::post('/library-games', [LibraryGameMutationController::class, 'storeLibraryGame'])->name('library-games.store');
+Route::post('/library-games/cover', [LibraryGameMutationController::class, 'uploadGameCover'])->name('library-games.cover.store');
+Route::get('/library-games/manual-duplicates', [LibraryGameMutationController::class, 'manualDuplicates'])->name('library-games.manual-duplicates');
 Route::get('/provider-search', [ProviderController::class, 'providerSearch'])->name('provider-search');
 Route::post('/provider-import-drafts', [ProviderController::class, 'storeProviderImportDraft'])->name('provider-import-drafts.store');
 Route::delete('/provider-import-drafts/{providerImportDraft}', [ProviderController::class, 'cancelProviderImportDraft'])->name('provider-import-drafts.destroy');
 Route::get('/games/{libraryGame}', [GameDetailsController::class, 'gameDetails'])->name('games.show');
-Route::patch('/games/{libraryGame}', [StupidLogController::class, 'updateLibraryGame'])->name('games.update');
-Route::delete('/games/{libraryGame}', [StupidLogController::class, 'destroyLibraryGame'])->name('games.destroy');
-Route::patch('/games/{libraryGame}/platform-devices', [StupidLogController::class, 'updatePlatformDevices'])->name('games.platform-devices.update');
+Route::patch('/games/{libraryGame}', [LibraryGameMutationController::class, 'updateLibraryGame'])->name('games.update');
+Route::delete('/games/{libraryGame}', [LibraryGameMutationController::class, 'destroyLibraryGame'])->name('games.destroy');
+Route::patch('/games/{libraryGame}/platform-devices', [LibraryGameMutationController::class, 'updatePlatformDevices'])->name('games.platform-devices.update');
 Route::post('/games/{libraryGame}/ownership-copies', [OwnershipCopyController::class, 'storeOwnershipCopy'])->name('games.ownership-copies.store');
 Route::patch('/ownership-copies/{ownershipCopy}', [OwnershipCopyController::class, 'updateOwnershipCopy'])->name('ownership-copies.update');
 Route::delete('/ownership-copies/{ownershipCopy}', [OwnershipCopyController::class, 'destroyOwnershipCopy'])->name('ownership-copies.destroy');
-Route::post('/games/{libraryGame}/dlcs/refresh', [StupidLogController::class, 'refreshDlcs'])->name('games.dlcs.refresh');
+Route::post('/games/{libraryGame}/dlcs/refresh', [LibraryGameMutationController::class, 'refreshDlcs'])->name('games.dlcs.refresh');
 Route::post('/games/{libraryGame}/owned-dlcs', [OwnedDlcController::class, 'storeOwnedDlc'])->name('games.owned-dlcs.store');
 Route::patch('/owned-dlcs/{ownedDlc}', [OwnedDlcController::class, 'updateOwnedDlc'])->name('owned-dlcs.update');
 Route::delete('/owned-dlcs/{ownedDlc}', [OwnedDlcController::class, 'destroyOwnedDlc'])->name('owned-dlcs.destroy');
