@@ -144,15 +144,11 @@ export default function SetupWizard({
                                 <SummaryRow label="Steam" value={form.steam_api_key ? 'Ready' : 'Later'} />
                             </div>
                             <div className="overflow-hidden rounded-[26px] border border-[#b7ff63]/30 bg-[#b7ff63] p-6 text-black" data-wizard-item>
-                                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                <div>
                                     <div>
                                         <div className="text-xs font-black uppercase text-black/52">Ready</div>
                                         <h3 className="mt-2 text-4xl font-black leading-none">Open Stupid Log.</h3>
                                     </div>
-                                    <ControlButton tone="dark" disabled={submitting} onClick={finishSetup}>
-                                        <Save size={17} strokeWidth={3} />
-                                        {submitting ? 'Opening' : 'Enter app'}
-                                    </ControlButton>
                                 </div>
                             </div>
                         </div>
