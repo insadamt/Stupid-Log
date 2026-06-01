@@ -7,9 +7,9 @@ use App\Http\Requests\StupidLog\StoreLibraryGameRequest;
 use App\Models\StupidLog\LibraryGame;
 use App\Models\StupidLog\Platform;
 use App\Models\StupidLog\Status;
-use App\Models\User;
 use App\Services\DuplicateDetectionService;
 use App\Services\LibraryGameCreator;
+use App\Services\LocalUserService;
 use App\Services\SteamEnrichmentService;
 use App\Services\TitleNormalizer;
 use Illuminate\Http\JsonResponse;
@@ -168,9 +168,9 @@ class LibraryGameMutationController extends Controller
         ]);
     }
 
-    public function storeLibraryGame(StoreLibraryGameRequest $request, LibraryGameCreator $creator): RedirectResponse
+    public function storeLibraryGame(StoreLibraryGameRequest $request, LibraryGameCreator $creator, LocalUserService $users): RedirectResponse
     {
-        $libraryGame = $creator->create($this->localUser(), $request->validated());
+        $libraryGame = $creator->create($users->get(), $request->validated());
 
         return redirect()->route('games.show', $libraryGame);
     }
@@ -189,8 +189,4 @@ class LibraryGameMutationController extends Controller
         ], 201);
     }
 
-    private function localUser(): User
-    {
-        return User::first() ?? User::create(['username' => 'Player One', 'avatar_path' => null]);
-    }
 }

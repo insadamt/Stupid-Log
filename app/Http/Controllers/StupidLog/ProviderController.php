@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\StupidLog;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Services\LocalUserService;
 use App\Services\ProviderImportDraftService;
 use App\Services\ProviderSearchService;
 use Illuminate\Http\JsonResponse;
@@ -12,7 +12,7 @@ use Illuminate\Validation\Rule;
 
 class ProviderController extends Controller
 {
-    public function providerSearch(Request $request, ProviderSearchService $providers): JsonResponse
+    public function providerSearch(Request $request, ProviderSearchService $providers, LocalUserService $users): JsonResponse
     {
         $validated = $request->validate([
             'query' => ['required', 'string', 'min:2'],
@@ -22,7 +22,7 @@ class ProviderController extends Controller
         ]);
 
         return response()->json($providers->search(
-            $this->localUser(),
+            $users->get(),
             $validated['query'],
             $validated['provider'] ?? 'igdb',
             (bool) ($validated['enrich'] ?? false),
@@ -30,7 +30,7 @@ class ProviderController extends Controller
         ));
     }
 
-    public function storeProviderImportDraft(Request $request, ProviderImportDraftService $drafts): JsonResponse
+    public function storeProviderImportDraft(Request $request, ProviderImportDraftService $drafts, LocalUserService $users): JsonResponse
     {
         $validated = $request->validate([
             'result' => ['required', 'array'],
@@ -52,7 +52,7 @@ class ProviderController extends Controller
             'result.dlcs.*.base_price' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $draft = $drafts->create($this->localUser(), $validated['result']);
+        $draft = $drafts->create($users->get(), $validated['result']);
 
         return response()->json([
             'id' => $draft->id,
@@ -61,15 +61,10 @@ class ProviderController extends Controller
         ], 201);
     }
 
-    public function cancelProviderImportDraft(int $providerImportDraft, ProviderImportDraftService $drafts): JsonResponse
+    public function cancelProviderImportDraft(int $providerImportDraft, ProviderImportDraftService $drafts, LocalUserService $users): JsonResponse
     {
-        $drafts->cancel($this->localUser(), $providerImportDraft);
+        $drafts->cancel($users->get(), $providerImportDraft);
 
         return response()->json(['ok' => true]);
-    }
-
-    private function localUser(): User
-    {
-        return User::first() ?? User::create(['username' => 'Player One', 'avatar_path' => null]);
     }
 }

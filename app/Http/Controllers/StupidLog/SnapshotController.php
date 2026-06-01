@@ -5,6 +5,7 @@ namespace App\Http\Controllers\StupidLog;
 use App\Http\Controllers\Controller;
 use App\Models\StupidLog\SnapshotRun;
 use App\Models\User;
+use App\Services\LocalUserService;
 use App\Services\SnapshotService;
 use App\Services\StatsService;
 use Illuminate\Http\JsonResponse;
@@ -15,9 +16,9 @@ use Inertia\Response;
 
 class SnapshotController extends Controller
 {
-    public function snapshots(StatsService $stats): Response
+    public function snapshots(StatsService $stats, LocalUserService $users): Response
     {
-        $user = $this->localUser();
+        $user = $users->get();
         $snapshotPage = $this->snapshotFeedPayload($user, request(), $stats);
 
         return Inertia::render('Snapshots', [
@@ -29,14 +30,14 @@ class SnapshotController extends Controller
         ]);
     }
 
-    public function snapshotFeed(Request $request, StatsService $stats): JsonResponse
+    public function snapshotFeed(Request $request, StatsService $stats, LocalUserService $users): JsonResponse
     {
-        return response()->json($this->snapshotFeedPayload($this->localUser(), $request, $stats));
+        return response()->json($this->snapshotFeedPayload($users->get(), $request, $stats));
     }
 
-    public function snapshotDetails(SnapshotRun $snapshotRun, StatsService $stats, SnapshotService $snapshotService): Response
+    public function snapshotDetails(SnapshotRun $snapshotRun, StatsService $stats, SnapshotService $snapshotService, LocalUserService $users): Response
     {
-        $user = $this->localUser();
+        $user = $users->get();
         $snapshotPage = $this->snapshotFeedPayload($user, request(), $stats);
         $gameRows = $stats->snapshotRows($snapshotRun, request());
         $eligibleRows = $snapshotService->eligibleBestGames($snapshotRun, request());
@@ -67,10 +68,10 @@ class SnapshotController extends Controller
         return response()->json($snapshots->eligibleBestGames($snapshotRun, $request));
     }
 
-    public function createSnapshot(Request $request, SnapshotService $snapshots): RedirectResponse
+    public function createSnapshot(Request $request, SnapshotService $snapshots, LocalUserService $users): RedirectResponse
     {
         $validated = $request->validate(['year' => ['required', 'integer', 'min:1970', 'max:2100']]);
-        $snapshots->createDraft($this->localUser(), (int) $validated['year']);
+        $snapshots->createDraft($users->get(), (int) $validated['year']);
 
         return back();
     }
@@ -148,8 +149,4 @@ class SnapshotController extends Controller
         return is_numeric($decoded) ? max(0, (int) $decoded) : 0;
     }
 
-    private function localUser(): User
-    {
-        return User::first() ?? User::create(['username' => 'Player One', 'avatar_path' => null]);
-    }
 }

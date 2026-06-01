@@ -7,6 +7,7 @@ use App\Models\StupidLog\AppSetting;
 use App\Models\StupidLog\Provider;
 use App\Models\StupidLog\ProviderCredential;
 use App\Models\User;
+use App\Services\LocalUserService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -20,7 +21,7 @@ class SetupController extends Controller
         return Inertia::render('Setup');
     }
 
-    public function storeSetup(Request $request): RedirectResponse
+    public function storeSetup(Request $request, LocalUserService $users): RedirectResponse
     {
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:255'],
@@ -29,17 +30,12 @@ class SetupController extends Controller
             'steam_api_key' => ['nullable', 'string'],
         ]);
 
-        $user = User::updateOrCreate(['id' => $this->localUser()->id], ['username' => $validated['username']]);
+        $user = User::updateOrCreate(['id' => $users->get()->id], ['username' => $validated['username']]);
         AppSetting::updateOrCreate(['user_id' => $user->id], ['currency_code' => 'USD']);
         $this->storeCredential($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null);
         $this->storeCredential($user, 'steam', null, null, $validated['steam_api_key'] ?? null);
 
         return redirect()->route('home');
-    }
-
-    private function localUser(): User
-    {
-        return User::first() ?? User::create(['username' => 'Player One', 'avatar_path' => null]);
     }
 
     private function storeCredential(User $user, string $providerKey, ?string $clientId, ?string $clientSecret, ?string $apiKey, bool $preserveBlankFields = false): void

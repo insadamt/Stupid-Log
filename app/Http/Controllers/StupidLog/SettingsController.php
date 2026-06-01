@@ -11,6 +11,7 @@ use App\Models\StupidLog\Provider;
 use App\Models\StupidLog\ProviderCredential;
 use App\Models\StupidLog\ProviderImportDraft;
 use App\Models\User;
+use App\Services\LocalUserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,9 +25,9 @@ use Throwable;
 
 class SettingsController extends Controller
 {
-    public function settings(): Response
+    public function settings(LocalUserService $users): Response
     {
-        $user = $this->localUser();
+        $user = $users->get();
         $igdb = $this->credential($user, 'igdb');
         $steam = $this->credential($user, 'steam');
 
@@ -47,10 +48,10 @@ class SettingsController extends Controller
         ]);
     }
 
-    public function updateSettings(UpdateSettingsRequest $request): RedirectResponse
+    public function updateSettings(UpdateSettingsRequest $request, LocalUserService $users): RedirectResponse
     {
         $validated = $request->validated();
-        $user = $this->localUser();
+        $user = $users->get();
 
         $user->update(['username' => $validated['username']]);
 
@@ -106,14 +107,14 @@ class SettingsController extends Controller
         return redirect()->route('setup');
     }
 
-    public function testIgdbCredentials(Request $request): JsonResponse
+    public function testIgdbCredentials(Request $request, LocalUserService $users): JsonResponse
     {
         $validated = $request->validate([
             'igdb_client_id' => ['nullable', 'string'],
             'igdb_client_secret' => ['nullable', 'string'],
         ]);
 
-        $user = $this->localUser();
+        $user = $users->get();
         $credential = $this->credential($user, 'igdb');
         $clientId = ($validated['igdb_client_id'] ?? null) ?: ($credential?->encrypted_client_id ? Crypt::decryptString($credential->encrypted_client_id) : null);
         $clientSecret = ($validated['igdb_client_secret'] ?? null) ?: ($credential?->encrypted_client_secret ? Crypt::decryptString($credential->encrypted_client_secret) : null);
@@ -158,13 +159,13 @@ class SettingsController extends Controller
         }
     }
 
-    public function testSteamCredentials(Request $request): JsonResponse
+    public function testSteamCredentials(Request $request, LocalUserService $users): JsonResponse
     {
         $validated = $request->validate([
             'steam_api_key' => ['nullable', 'string'],
         ]);
 
-        $user = $this->localUser();
+        $user = $users->get();
         $credential = $this->credential($user, 'steam');
         $apiKey = ($validated['steam_api_key'] ?? null) ?: ($credential?->encrypted_api_key ? Crypt::decryptString($credential->encrypted_api_key) : null);
 
@@ -194,11 +195,6 @@ class SettingsController extends Controller
                 'message' => 'Steam test failed: '.$exception->getMessage(),
             ], 422);
         }
-    }
-
-    private function localUser(): User
-    {
-        return User::first() ?? User::create(['username' => 'Player One', 'avatar_path' => null]);
     }
 
     private function storeCredential(User $user, string $providerKey, ?string $clientId, ?string $clientSecret, ?string $apiKey, bool $preserveBlankFields = false): void
