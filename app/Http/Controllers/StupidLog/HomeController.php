@@ -14,7 +14,7 @@ use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class StupidLogController extends Controller
+class HomeController extends Controller
 {
     public function home(StatsService $stats, LibraryGameListService $libraryGames, LibraryGamePresenter $presenter, LocalUserService $users, ReferenceDataService $references): Response|RedirectResponse
     {

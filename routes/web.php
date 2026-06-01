@@ -3,6 +3,7 @@
 use App\Http\Controllers\StupidLog\LibraryController;
 use App\Http\Controllers\StupidLog\LibraryGameMutationController;
 use App\Http\Controllers\StupidLog\GameDetailsController;
+use App\Http\Controllers\StupidLog\HomeController;
 use App\Http\Controllers\StupidLog\OwnedDlcController;
 use App\Http\Controllers\StupidLog\OwnershipCopyController;
 use App\Http\Controllers\StupidLog\ProviderController;
@@ -10,13 +11,12 @@ use App\Http\Controllers\StupidLog\SnapshotController;
 use App\Http\Controllers\StupidLog\SetupController;
 use App\Http\Controllers\StupidLog\SettingsController;
 use App\Http\Controllers\StupidLog\StatsController;
-use App\Http\Controllers\StupidLog\StupidLogController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/setup', [SetupController::class, 'setup'])->name('setup');
 Route::post('/setup', [SetupController::class, 'storeSetup'])->name('setup.store');
 
-Route::get('/', [StupidLogController::class, 'home'])->name('home');
+Route::get('/', [HomeController::class, 'home'])->name('home');
 Route::get('/library', [LibraryController::class, 'library'])->name('library');
 Route::get('/library-games', [LibraryController::class, 'libraryGames'])->name('library-games.index');
 Route::post('/library-games', [LibraryGameMutationController::class, 'storeLibraryGame'])->name('library-games.store');
