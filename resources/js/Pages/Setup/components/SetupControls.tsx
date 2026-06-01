@@ -71,6 +71,24 @@ export function SummaryRow({ label, value }: { label: string; value: string }) {
     );
 }
 
+export function OverviewCard({
+    label,
+    value,
+    detail,
+}: {
+    label: string;
+    value: string;
+    detail: string;
+}) {
+    return (
+        <div className="rounded-[22px] bg-white/[0.08] px-5 py-4 ring-1 ring-white/10" data-wizard-item>
+            <div className="text-[11px] font-black uppercase text-white/42">{label}</div>
+            <div className="mt-2 truncate text-xl font-black text-white">{value}</div>
+            <p className="mt-1 text-sm font-bold leading-snug text-white/44">{detail}</p>
+        </div>
+    );
+}
+
 export function TestMessage({ result }: { result: TestResult | null }) {
     if (!result) return null;
 
@@ -90,8 +108,8 @@ export function ProviderResultRow({
     configured: boolean;
     result?: TestResult;
 }) {
-    const status = !configured ? 'Later' : result ? (result.ok ? 'Passed' : 'Failed') : 'Untested';
-    const message = !configured ? `${label} was skipped.` : result?.message ?? `${label} was not tested.`;
+    const status = !configured ? 'Later' : result ? (result.ok ? 'Connected' : 'Needs review') : 'Untested';
+    const message = providerMessage(label, configured, result);
     const tone = !configured
         ? 'bg-white/[0.08] text-white ring-white/10'
         : result?.ok
@@ -99,12 +117,23 @@ export function ProviderResultRow({
             : 'bg-[#ffe0dd] text-[#ad2c21] ring-[#ffe0dd]/50';
 
     return (
-        <div className={`rounded-[18px] px-4 py-3 ring-1 ${tone}`} data-wizard-item>
+        <div className={`min-h-[128px] rounded-[22px] px-5 py-4 ring-1 ${tone}`} data-wizard-item>
             <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-black uppercase">{label}</span>
                 <span className="shrink-0 text-[10px] font-black uppercase">{status}</span>
             </div>
-            <p className="mt-1 text-sm font-black leading-snug opacity-70">{message}</p>
+            <p className="mt-3 text-sm font-black leading-snug opacity-70">{message}</p>
         </div>
     );
+}
+
+function providerMessage(label: string, configured: boolean, result?: TestResult) {
+    if (!configured) return `${label} will stay disconnected for now.`;
+    if (!result) return `${label} was not tested yet.`;
+    if (result.ok) return result.message;
+    if (result.message.toLowerCase().includes('timed out')) {
+        return `${label} test timed out. You can finish setup and update it later in Settings.`;
+    }
+
+    return result.message.replace(/\s*\(see https:\/\/curl\.haxx\.se\/libcurl\/c\/libcurl-errors\.html\)/, '');
 }

@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight, Database, Gamepad2, KeyRound, Loader2, Save, Shi
 import { Dispatch, KeyboardEvent, SetStateAction } from 'react';
 import { steps } from '../constants';
 import { Provider, ProviderTestResults, SetupForm, TestResult } from '../types';
-import { ControlButton, ProviderResultRow, SummaryRow, TestMessage, TextField } from './SetupControls';
+import { ControlButton, OverviewCard, ProviderResultRow, TestMessage, TextField } from './SetupControls';
 
 export default function SetupWizard({
     step,
@@ -151,23 +151,20 @@ export default function SetupWizard({
                     )}
 
                     {step === 2 && (
-                        <div className="grid gap-4">
-                            <div className="grid gap-3 md:grid-cols-3">
-                                <SummaryRow label="Player" value={form.username || 'Missing'} />
-                                <SummaryRow label="IGDB" value={providerStatus('igdb', igdbConfigured)} />
-                                <SummaryRow label="Steam" value={providerStatus('steam', steamConfigured)} />
-                            </div>
-                            <div className="grid gap-3 md:grid-cols-2">
+                        <div className="grid gap-5">
+                            <div className="grid gap-3 md:grid-cols-[0.8fr_1fr_1fr]">
+                                <OverviewCard label="Player" value={form.username || 'Missing'} detail="Local library profile" />
                                 <ProviderResultRow label="IGDB" configured={igdbConfigured} result={providerResults.igdb} />
                                 <ProviderResultRow label="Steam" configured={steamConfigured} result={providerResults.steam} />
                             </div>
-                            <div className="overflow-hidden rounded-[26px] border border-[#b7ff63]/30 bg-[#b7ff63] p-6 text-black" data-wizard-item>
-                                <div>
-                                    <div>
-                                        <div className="text-xs font-black uppercase text-black/52">Ready</div>
-                                        <h3 className="mt-2 text-4xl font-black leading-none">Open Stupid Log.</h3>
-                                    </div>
-                                </div>
+                            <div className="overflow-hidden rounded-[26px] border border-[#b7ff63]/30 bg-[#b7ff63] p-6 text-black shadow-[0_22px_70px_rgb(183_255_99/0.16)]" data-wizard-item>
+                                <div className="text-xs font-black uppercase text-black/52">Ready</div>
+                                <h3 className="mt-2 text-4xl font-black leading-none">Open Stupid Log.</h3>
+                                <p className="mt-3 max-w-[560px] text-sm font-black leading-relaxed text-black/58">
+                                    {providerStatus('igdb', igdbConfigured) === 'Failed' || providerStatus('steam', steamConfigured) === 'Failed'
+                                        ? 'Some provider checks need review, but setup can continue and credentials can be updated later.'
+                                        : 'Setup is ready. Finish to enter your library.'}
+                                </p>
                             </div>
                         </div>
                     )}
