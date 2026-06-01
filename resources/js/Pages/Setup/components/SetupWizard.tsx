@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, Database, Gamepad2, KeyRound, Loader2, Save, ShieldCheck } from 'lucide-react';
-import { Dispatch, FormEvent, KeyboardEvent, SetStateAction } from 'react';
+import { Dispatch, KeyboardEvent, SetStateAction } from 'react';
 import { steps } from '../constants';
 import { Provider, SetupForm, TestResult } from '../types';
 import { ControlButton, SummaryRow, TestMessage, TextField } from './SetupControls';
@@ -8,7 +8,7 @@ export default function SetupWizard({
     step,
     form,
     updateField,
-    submit,
+    finishSetup,
     testProvider,
     testing,
     testResult,
@@ -18,7 +18,7 @@ export default function SetupWizard({
     step: number;
     form: SetupForm;
     updateField: <Key extends keyof SetupForm>(key: Key, value: SetupForm[Key]) => void;
-    submit: (event: FormEvent<HTMLFormElement>) => void;
+    finishSetup: () => void;
     testProvider: (provider: Provider) => Promise<void>;
     testing: Provider | null;
     testResult: TestResult | null;
@@ -40,7 +40,7 @@ export default function SetupWizard({
     };
 
     return (
-        <form onSubmit={submit} onKeyDown={handleKeyDown} className="relative grid min-h-screen place-items-center px-5 py-8">
+        <form onSubmit={(event) => event.preventDefault()} onKeyDown={handleKeyDown} className="relative grid min-h-screen place-items-center px-5 py-8">
             <div className="grid w-full max-w-[840px] gap-5 rounded-[36px] border border-white/10 bg-black/42 p-5 shadow-[0_34px_120px_rgb(0_0_0/0.45)] backdrop-blur-md md:p-7" data-wizard-shell>
                 <header className="grid gap-5 border-b border-white/10 pb-5">
                     <div className="flex items-center justify-between gap-4">
@@ -149,7 +149,7 @@ export default function SetupWizard({
                                         <div className="text-xs font-black uppercase text-black/52">Ready</div>
                                         <h3 className="mt-2 text-4xl font-black leading-none">Open Stupid Log.</h3>
                                     </div>
-                                    <ControlButton type="submit" tone="dark" disabled={submitting} finalSubmit>
+                                    <ControlButton tone="dark" disabled={submitting} onClick={finishSetup}>
                                         <Save size={17} strokeWidth={3} />
                                         {submitting ? 'Opening' : 'Enter app'}
                                     </ControlButton>
@@ -170,7 +170,7 @@ export default function SetupWizard({
                             <ArrowRight size={17} strokeWidth={3} />
                         </ControlButton>
                     ) : (
-                        <ControlButton type="submit" tone="lime" disabled={submitting} finalSubmit>
+                        <ControlButton tone="lime" disabled={submitting} onClick={finishSetup}>
                             <Save size={17} strokeWidth={3} />
                             {submitting ? 'Opening' : 'Finish setup'}
                         </ControlButton>

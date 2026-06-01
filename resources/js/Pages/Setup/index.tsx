@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { FormEvent, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
     clearPageTransition,
     gsap,
@@ -60,17 +60,8 @@ export default function Setup() {
             .to(root.querySelector('[data-intro-frame]'), { scale: 1.025, autoAlpha: 0, duration: 0.4 }, 0.08);
     }
 
-    function submit(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
+    function finishSetup() {
         if (submittingRef.current) return;
-
-        const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
-        if (submitter?.dataset.finalSubmit !== 'true') {
-            if (step < steps.length - 1) {
-                setStep((current) => Math.min(steps.length - 1, current + 1));
-            }
-            return;
-        }
 
         if (step < steps.length - 1) {
             setStep((current) => Math.min(steps.length - 1, current + 1));
@@ -144,7 +135,7 @@ export default function Setup() {
                     step={step}
                     form={form}
                     updateField={updateField}
-                    submit={submit}
+                    finishSetup={finishSetup}
                     testProvider={testProvider}
                     testing={testing}
                     testResult={testResult}
