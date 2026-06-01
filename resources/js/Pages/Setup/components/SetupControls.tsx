@@ -6,12 +6,14 @@ export function ControlButton({
     type = 'button',
     tone = 'dark',
     disabled,
+    finalSubmit = false,
     onClick,
 }: {
     children: ReactNode;
     type?: 'button' | 'submit';
     tone?: 'dark' | 'lime' | 'ghost';
     disabled?: boolean;
+    finalSubmit?: boolean;
     onClick?: () => void;
 }) {
     const toneClass = {
@@ -23,6 +25,7 @@ export function ControlButton({
     return (
         <button
             type={type}
+            data-final-submit={finalSubmit ? 'true' : undefined}
             disabled={disabled}
             onClick={onClick}
             className={`${toneClass} inline-flex h-12 items-center justify-center gap-2 rounded-[14px] px-5 text-sm font-black uppercase transition disabled:cursor-not-allowed disabled:opacity-40`}

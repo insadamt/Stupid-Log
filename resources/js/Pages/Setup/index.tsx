@@ -64,6 +64,14 @@ export default function Setup() {
         event.preventDefault();
         if (submittingRef.current) return;
 
+        const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
+        if (submitter?.dataset.finalSubmit !== 'true') {
+            if (step < steps.length - 1) {
+                setStep((current) => Math.min(steps.length - 1, current + 1));
+            }
+            return;
+        }
+
         if (step < steps.length - 1) {
             setStep((current) => Math.min(steps.length - 1, current + 1));
             return;
