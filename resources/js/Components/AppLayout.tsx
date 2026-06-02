@@ -4,6 +4,7 @@ import {
     BarChart3,
     BookOpen,
     Home as HomeIcon,
+    ReceiptText,
     Settings,
 } from 'lucide-react';
 import {
@@ -35,6 +36,7 @@ const nav: NavItem[] = [
     { label: 'Home', href: '/', icon: HomeIcon },
     { label: 'Library', href: '/library', icon: BookOpen },
     { label: 'Stats', href: '/stats', icon: BarChart3 },
+    { label: 'Subscriptions', href: '/subscriptions', icon: ReceiptText },
     { label: 'Snapshots', href: '/snapshots', icon: Archive },
     { label: 'Settings', href: '/settings', icon: Settings },
 ];
