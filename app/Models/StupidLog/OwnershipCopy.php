@@ -5,6 +5,7 @@ namespace App\Models\StupidLog;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 #[Fillable(['library_game_id', 'ownership_type_id', 'physical_status_id', 'edition_name', 'base_price', 'purchased_price', 'purchased_at'])]
 class OwnershipCopy extends Model
@@ -31,5 +32,11 @@ class OwnershipCopy extends Model
     public function physicalStatus(): BelongsTo
     {
         return $this->belongsTo(PhysicalStatus::class);
+    }
+
+    public function subscriptionEntries(): BelongsToMany
+    {
+        return $this->belongsToMany(SubscriptionEntry::class, 'subscription_entry_ownership_copies')
+            ->withTimestamps();
     }
 }

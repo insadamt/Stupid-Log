@@ -15,6 +15,7 @@ use App\Models\StupidLog\Status;
 use App\Models\User;
 use App\Services\DuplicateDetectionService;
 use App\Services\LibraryGameCreator;
+use App\Services\ReferenceDataService;
 use App\Services\SnapshotService;
 use App\Services\StatsService;
 use Database\Seeders\DatabaseSeeder;
@@ -48,11 +49,26 @@ class LibraryGameRulesTest extends TestCase
         $this->assertSame(1, Platform::where('name', 'Steam')->count());
         $this->assertSame(1, Device::where('name', 'Xbox Series X|S')->count());
         $this->assertDatabaseHas('ownership_types', ['name' => 'Family Sharing']);
+        $this->assertDatabaseHas('ownership_types', ['name' => 'Game Pass', 'is_subscription' => true]);
+        $this->assertDatabaseHas('ownership_types', ['name' => 'Digital', 'is_subscription' => false]);
         $this->assertDatabaseHas('devices', ['name' => 'Pokemon Mini']);
         $this->assertDatabaseHas('platform_device', [
             'platform_id' => Platform::where('name', 'Steam')->first()->id,
             'device_id' => Device::where('name', 'PC')->first()->id,
         ]);
+    }
+
+    public function test_reference_data_marks_subscription_ownership_types(): void
+    {
+        $references = app(ReferenceDataService::class)->all();
+        $ownershipTypes = $references['ownershipTypes']->keyBy('name');
+
+        foreach (['Game Pass', 'EA Play', 'U+', 'PS Plus', 'Play Pass', 'Apple Arcade', 'Nintendo Switch Online'] as $name) {
+            $this->assertTrue($ownershipTypes->get($name)->is_subscription, "{$name} should be marked as a subscription ownership type.");
+        }
+
+        $this->assertFalse($ownershipTypes->get('Digital')->is_subscription);
+        $this->assertTrue($references['platforms']->firstWhere('name', 'Xbox')->ownershipTypes->firstWhere('name', 'Game Pass')->is_subscription);
     }
 
     public function test_duplicate_detection_reuses_external_ids_and_flags_manual_matches(): void

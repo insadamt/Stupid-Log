@@ -122,6 +122,7 @@ return new class extends Migration
         Schema::create('ownership_types', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
+            $table->boolean('is_subscription')->default(false);
             $table->timestamps();
         });
 
@@ -174,6 +175,44 @@ return new class extends Migration
             $table->date('purchased_at')->nullable();
             $table->timestamps();
             $table->unique(['library_game_id', 'dlc_id']);
+        });
+
+        Schema::create('subscription_entries', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('ownership_type_id')->constrained('ownership_types')->restrictOnDelete();
+            $table->decimal('amount_paid', 10, 2);
+            $table->date('started_at');
+            $table->date('finished_at');
+            $table->timestamps();
+
+            $table->index('user_id');
+            $table->index('ownership_type_id');
+            $table->index('started_at');
+            $table->index('finished_at');
+        });
+
+        Schema::create('subscription_entry_ownership_copies', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('subscription_entry_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('ownership_copy_id')->constrained()->cascadeOnDelete();
+            $table->timestamps();
+
+            $table->index('subscription_entry_id');
+            $table->index('ownership_copy_id');
+            $table->unique(['subscription_entry_id', 'ownership_copy_id'], 'subscription_entry_copy_unique');
+        });
+
+        Schema::create('in_app_purchases', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('library_game_id')->constrained()->cascadeOnDelete();
+            $table->string('title');
+            $table->decimal('amount_paid', 10, 2);
+            $table->date('purchased_at');
+            $table->timestamps();
+
+            $table->index('library_game_id');
+            $table->index('purchased_at');
         });
 
         Schema::create('snapshot_runs', function (Blueprint $table) {
@@ -249,6 +288,9 @@ return new class extends Migration
         Schema::dropIfExists('snapshot_best_games');
         Schema::dropIfExists('library_game_snapshots');
         Schema::dropIfExists('snapshot_runs');
+        Schema::dropIfExists('in_app_purchases');
+        Schema::dropIfExists('subscription_entry_ownership_copies');
+        Schema::dropIfExists('subscription_entries');
         Schema::dropIfExists('owned_dlcs');
         Schema::dropIfExists('dlcs');
         Schema::dropIfExists('ownership_copies');

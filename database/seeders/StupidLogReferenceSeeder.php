@@ -36,7 +36,9 @@ class StupidLogReferenceSeeder extends Seeder
         }
 
         foreach ($this->ownershipTypes() as $name) {
-            OwnershipType::updateOrCreate(['name' => $name], []);
+            OwnershipType::updateOrCreate(['name' => $name], [
+                'is_subscription' => in_array($name, $this->subscriptionOwnershipTypes(), true),
+            ]);
         }
 
         foreach ($this->devices() as $name) {
@@ -75,6 +77,11 @@ class StupidLogReferenceSeeder extends Seeder
     private function ownershipTypes(): array
     {
         return ['Digital', 'Physical', 'Game Pass', 'EA Play', 'U+', 'Family Sharing', 'Pre-owned', 'Borrowed', 'Crack', 'Emulation', 'PS Plus', 'Play Pass', 'Apple Arcade', 'Nintendo Switch Online'];
+    }
+
+    private function subscriptionOwnershipTypes(): array
+    {
+        return ['Game Pass', 'EA Play', 'U+', 'PS Plus', 'Play Pass', 'Apple Arcade', 'Nintendo Switch Online'];
     }
 
     private function devices(): array

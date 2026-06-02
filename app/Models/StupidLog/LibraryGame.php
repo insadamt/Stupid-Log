@@ -66,4 +66,9 @@ class LibraryGame extends Model
     {
         return $this->hasMany(OwnedDlc::class);
     }
+
+    public function inAppPurchases(): HasMany
+    {
+        return $this->hasMany(InAppPurchase::class);
+    }
 }

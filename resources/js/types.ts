@@ -107,10 +107,10 @@ export type ReferenceData = {
         id: number;
         name: string;
         devices: Array<{ id: number; name: string }>;
-        ownership_types: Array<{ id: number; name: string }>;
+        ownership_types: Array<{ id: number; name: string; is_subscription?: boolean }>;
     }>;
     devices: Array<{ id: number; name: string }>;
-    ownershipTypes: Array<{ id: number; name: string }>;
+    ownershipTypes: Array<{ id: number; name: string; is_subscription?: boolean }>;
     physicalStatuses: Array<{ id: number; name: string }>;
     statuses: Array<{ id: number; name: string; color_key?: string | null; color_hex?: string | null }>;
 };

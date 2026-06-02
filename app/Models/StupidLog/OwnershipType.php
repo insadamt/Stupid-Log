@@ -5,5 +5,13 @@ namespace App\Models\StupidLog;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['name'])]
-class OwnershipType extends Model {}
+#[Fillable(['name', 'is_subscription'])]
+class OwnershipType extends Model
+{
+    protected function casts(): array
+    {
+        return [
+            'is_subscription' => 'boolean',
+        ];
+    }
+}
