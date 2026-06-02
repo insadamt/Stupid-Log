@@ -8,7 +8,7 @@ export type Dlc = {
     purchased_at: string | null;
 };
 
-export type Mode = 'overview' | 'ownership' | 'dlcs';
+export type Mode = 'overview' | 'ownership' | 'dlcs' | 'purchases';
 export type EditTab = 'basics' | 'progress' | 'platform' | 'description';
 
 export type OwnershipCopyDetails = {
@@ -43,6 +43,37 @@ export type DlcForm = {
     acquisition_type: string;
     purchased_price: string;
     purchased_at: string;
+};
+
+export type InAppPurchase = {
+    id: number;
+    title: string;
+    amount_paid: string | number;
+    purchased_at: string | null;
+};
+
+export type InAppPurchaseForm = {
+    title: string;
+    amount_paid: string;
+    purchased_at: string;
+};
+
+export type PaidBreakdown = {
+    copy_purchased_value: number;
+    dlc_purchased_value: number;
+    subscription_allocated_value: number;
+    in_app_purchase_value: number;
+    total_purchased_value: number;
+    subscription_allocations: Array<{
+        subscription_entry_id: number;
+        ownership_type: string;
+        amount_paid: string | number;
+        selected_count: number;
+        allocated_amount: number;
+        started_at: string;
+        finished_at: string;
+    }>;
+    in_app_purchases: InAppPurchase[];
 };
 
 export type GameEditForm = {

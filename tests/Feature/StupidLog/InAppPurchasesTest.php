@@ -60,6 +60,24 @@ class InAppPurchasesTest extends TestCase
         $this->assertDatabaseMissing('in_app_purchases', ['id' => $purchase->id]);
     }
 
+    public function test_game_details_receives_paid_breakdown_and_iap_rows(): void
+    {
+        $libraryGame = $this->createLibraryGame($this->user, 'Details IAP Game');
+        $purchase = $libraryGame->inAppPurchases()->create([
+            'title' => 'Coin Pack',
+            'amount_paid' => 4.99,
+            'purchased_at' => '2026-03-01',
+        ]);
+
+        $page = $this->get("/games/{$libraryGame->id}")->assertOk()->viewData('page');
+
+        $this->assertSame('GameDetails', $page['component']);
+        $this->assertSame(4.99, $page['props']['paidBreakdown']['in_app_purchase_value']);
+        $this->assertSame(4.99, $page['props']['paidBreakdown']['total_purchased_value']);
+        $this->assertSame($purchase->id, $page['props']['paidBreakdown']['in_app_purchases'][0]['id']);
+        $this->assertSame('Coin Pack', $page['props']['paidBreakdown']['in_app_purchases'][0]['title']);
+    }
+
     public function test_in_app_purchase_requires_title_amount_and_purchase_date(): void
     {
         $libraryGame = $this->createLibraryGame($this->user, 'Validation Game');
