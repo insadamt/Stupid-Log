@@ -11,6 +11,7 @@ use App\Http\Controllers\StupidLog\SnapshotController;
 use App\Http\Controllers\StupidLog\SetupController;
 use App\Http\Controllers\StupidLog\SettingsController;
 use App\Http\Controllers\StupidLog\StatsController;
+use App\Http\Controllers\StupidLog\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/setup', [SetupController::class, 'setup'])->name('setup');
@@ -37,6 +38,11 @@ Route::post('/games/{libraryGame}/owned-dlcs', [OwnedDlcController::class, 'stor
 Route::patch('/owned-dlcs/{ownedDlc}', [OwnedDlcController::class, 'updateOwnedDlc'])->name('owned-dlcs.update');
 Route::delete('/owned-dlcs/{ownedDlc}', [OwnedDlcController::class, 'destroyOwnedDlc'])->name('owned-dlcs.destroy');
 Route::get('/stats', [StatsController::class, 'stats'])->name('stats');
+Route::get('/subscriptions', [SubscriptionController::class, 'index'])->name('subscriptions.index');
+Route::post('/subscriptions', [SubscriptionController::class, 'store'])->name('subscriptions.store');
+Route::patch('/subscriptions/{subscriptionEntry}', [SubscriptionController::class, 'update'])->name('subscriptions.update');
+Route::delete('/subscriptions/{subscriptionEntry}', [SubscriptionController::class, 'destroy'])->name('subscriptions.destroy');
+Route::patch('/subscriptions/{subscriptionEntry}/ownership-copies', [SubscriptionController::class, 'updateOwnershipCopies'])->name('subscriptions.ownership-copies.update');
 Route::get('/snapshots', [SnapshotController::class, 'snapshots'])->name('snapshots');
 Route::get('/snapshots-feed', [SnapshotController::class, 'snapshotFeed'])->name('snapshots.feed');
 Route::post('/snapshots', [SnapshotController::class, 'createSnapshot'])->name('snapshots.store');
