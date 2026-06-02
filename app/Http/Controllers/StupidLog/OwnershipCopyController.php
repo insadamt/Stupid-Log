@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\StupidLog\LibraryGame;
 use App\Models\StupidLog\OwnershipCopy;
 use App\Models\StupidLog\OwnershipType;
+use App\Services\FinancialSnapshotRefreshService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -28,6 +29,7 @@ class OwnershipCopyController extends Controller
     {
         $ownershipCopy->load('libraryGame.platform.ownershipTypes');
         $validated = $this->validateOwnershipCopyRequest($request);
+        $this->assertSubscriptionOwnershipTypeChangeAllowed($ownershipCopy, $validated);
         $this->assertOwnershipCopyAllowed($ownershipCopy->libraryGame, $validated, $ownershipCopy->id);
 
         $ownershipCopy->update($this->ownershipCopyAttributes($validated));
@@ -35,13 +37,23 @@ class OwnershipCopyController extends Controller
         return back();
     }
 
-    public function destroyOwnershipCopy(OwnershipCopy $ownershipCopy): RedirectResponse
+    public function destroyOwnershipCopy(OwnershipCopy $ownershipCopy, FinancialSnapshotRefreshService $refresh): RedirectResponse
     {
         if ($ownershipCopy->libraryGame->ownershipCopies()->count() <= 1) {
             return back()->withErrors(['ownership_copy' => 'At least one ownership copy is required.']);
         }
 
+        $ownershipCopy->load(['libraryGame', 'subscriptionEntries']);
+        $subscriptionPeriods = $ownershipCopy->subscriptionEntries
+            ->map(fn ($entry) => [
+                'started_at' => $entry->started_at,
+                'finished_at' => $entry->finished_at,
+            ])
+            ->all();
+        $userId = $ownershipCopy->libraryGame->user_id;
+
         $ownershipCopy->delete();
+        $refresh->refreshForCollectedSubscriptionPeriods($userId, $subscriptionPeriods);
 
         return back();
     }
@@ -81,6 +93,19 @@ class OwnershipCopyController extends Controller
 
         if (in_array($ownershipType->name, self::PHYSICAL_LIKE, true) && empty($payload['physical_status_id'])) {
             throw ValidationException::withMessages(['physical_status_id' => 'Physical-like ownership requires physical status.']);
+        }
+    }
+
+    private function assertSubscriptionOwnershipTypeChangeAllowed(OwnershipCopy $ownershipCopy, array $payload): void
+    {
+        if ((int) $ownershipCopy->ownership_type_id === (int) $payload['ownership_type_id']) {
+            return;
+        }
+
+        if ($ownershipCopy->subscriptionEntries()->exists()) {
+            throw ValidationException::withMessages([
+                'ownership_type_id' => 'This ownership copy is used by subscription entries. Remove it from those subscriptions before changing ownership type.',
+            ]);
         }
     }
 

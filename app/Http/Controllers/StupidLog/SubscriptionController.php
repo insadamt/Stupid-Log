@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\StupidLog\OwnershipCopy;
 use App\Models\StupidLog\OwnershipType;
 use App\Models\StupidLog\SubscriptionEntry;
+use App\Services\FinancialSnapshotRefreshService;
 use App\Services\LocalUserService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,22 +31,25 @@ class SubscriptionController extends Controller
         ]);
     }
 
-    public function store(Request $request, LocalUserService $localUser): RedirectResponse
+    public function store(Request $request, LocalUserService $localUser, FinancialSnapshotRefreshService $refresh): RedirectResponse
     {
         $validated = $this->validateSubscription($request);
 
-        SubscriptionEntry::create([
+        $entry = SubscriptionEntry::create([
             ...$validated,
             'user_id' => $localUser->get()->id,
         ]);
 
+        $refresh->refreshForSubscriptionCreated($entry);
+
         return back();
     }
 
-    public function update(Request $request, SubscriptionEntry $subscriptionEntry, LocalUserService $localUser): RedirectResponse
+    public function update(Request $request, SubscriptionEntry $subscriptionEntry, LocalUserService $localUser, FinancialSnapshotRefreshService $refresh): RedirectResponse
     {
         $this->assertSubscriptionBelongsToLocalUser($subscriptionEntry, $localUser);
         $validated = $this->validateSubscription($request);
+        $oldValues = $subscriptionEntry->only(['started_at', 'finished_at']);
         $ownershipTypeChanged = (int) $subscriptionEntry->ownership_type_id !== (int) $validated['ownership_type_id'];
 
         DB::transaction(function () use ($subscriptionEntry, $validated, $ownershipTypeChanged) {
@@ -56,18 +60,22 @@ class SubscriptionController extends Controller
             }
         });
 
+        $refresh->refreshForSubscriptionUpdated($subscriptionEntry->refresh(), $oldValues);
+
         return back();
     }
 
-    public function destroy(SubscriptionEntry $subscriptionEntry, LocalUserService $localUser): RedirectResponse
+    public function destroy(SubscriptionEntry $subscriptionEntry, LocalUserService $localUser, FinancialSnapshotRefreshService $refresh): RedirectResponse
     {
         $this->assertSubscriptionBelongsToLocalUser($subscriptionEntry, $localUser);
+        $oldEntry = clone $subscriptionEntry;
         $subscriptionEntry->delete();
+        $refresh->refreshForSubscriptionDeleted($oldEntry);
 
         return back();
     }
 
-    public function updateOwnershipCopies(Request $request, SubscriptionEntry $subscriptionEntry, LocalUserService $localUser): RedirectResponse
+    public function updateOwnershipCopies(Request $request, SubscriptionEntry $subscriptionEntry, LocalUserService $localUser, FinancialSnapshotRefreshService $refresh): RedirectResponse
     {
         $userId = $this->assertSubscriptionBelongsToLocalUser($subscriptionEntry, $localUser)->id;
         $validated = $request->validate([
@@ -97,6 +105,7 @@ class SubscriptionController extends Controller
         }
 
         $subscriptionEntry->ownershipCopies()->sync($copyIds->all());
+        $refresh->refreshForSubscriptionOwnershipCopiesChanged($subscriptionEntry->refresh());
 
         return back();
     }
