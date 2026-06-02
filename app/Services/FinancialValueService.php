@@ -103,6 +103,17 @@ class FinancialValueService
         return $this->roundComponentMap($values);
     }
 
+    public function calculateSnapshotFinancialValuesByOwnershipType(SnapshotRun $snapshot): array
+    {
+        $values = [];
+
+        foreach ($this->snapshotSubscriptionShares($snapshot) as $share) {
+            $this->addComponents($values, (string) $share['ownership_type'], (float) $share['amount'], 0.0);
+        }
+
+        return $this->roundComponentMap($values);
+    }
+
     public function calculateGamePaidBreakdown(LibraryGame $libraryGame): array
     {
         $libraryGame->loadMissing(['ownershipCopies.ownershipType', 'ownedDlcs.dlc', 'inAppPurchases']);

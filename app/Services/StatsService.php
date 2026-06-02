@@ -30,6 +30,12 @@ class StatsService
     private const SUMMARY_FLOAT_KEYS = [
         'playtime_hours',
         'achievement_progress',
+        'copy_base_value',
+        'copy_purchased_value',
+        'dlc_base_value',
+        'dlc_purchased_value',
+        'subscription_allocated_value',
+        'in_app_purchase_value',
         'base_value',
         'purchased_value',
     ];
@@ -37,13 +43,19 @@ class StatsService
     private const BREAKDOWN_FLOAT_KEYS = [
         'playtime_hours',
         'achievement_progress',
+        'copy_base_value',
+        'copy_purchased_value',
         'base_value',
         'purchased_value',
         'base_value_without_dlcs',
         'purchased_value_without_dlcs',
         'dlc_base_value',
         'dlc_purchased_value',
+        'subscription_allocated_value',
+        'in_app_purchase_value',
     ];
+
+    public function __construct(private FinancialValueService $financialValues) {}
 
     public function live(User $user): array
     {
@@ -68,6 +80,9 @@ class StatsService
         $copyPurchasedValue = $this->liveEligibleCopyValue($user, 'purchased_price');
         $dlcBaseValue = $this->liveOwnedDlcValue($user, 'base_price');
         $dlcPurchasedValue = $this->liveOwnedDlcValue($user, 'purchased_price');
+        $financialExtras = $this->financialValues->calculateLiveFinancialValuesForUser($user);
+        $subscriptionValue = (float) $financialExtras['subscription_allocated_value'];
+        $iapValue = (float) $financialExtras['in_app_purchase_value'];
 
         return [
             'unique_titles' => (int) ($totals?->unique_titles ?? 0),
@@ -82,8 +97,14 @@ class StatsService
             'earned_achievements' => $earnedAchievements,
             'total_achievements' => $totalAchievements,
             'achievement_progress' => $totalAchievements > 0 ? round(($earnedAchievements / $totalAchievements) * 100, 1) : 0,
+            'copy_base_value' => round($copyBaseValue, 2),
+            'copy_purchased_value' => round($copyPurchasedValue, 2),
+            'dlc_base_value' => round($dlcBaseValue, 2),
+            'dlc_purchased_value' => round($dlcPurchasedValue, 2),
+            'subscription_allocated_value' => round($subscriptionValue, 2),
+            'in_app_purchase_value' => round($iapValue, 2),
             'base_value' => round($copyBaseValue + $dlcBaseValue, 2),
-            'purchased_value' => round($copyPurchasedValue + $dlcPurchasedValue, 2),
+            'purchased_value' => round($copyPurchasedValue + $dlcPurchasedValue + $subscriptionValue + $iapValue, 2),
             'breakdowns' => $this->liveBreakdownsSql($user),
             'archive' => $this->liveArchiveSql($user),
         ];
@@ -169,13 +190,13 @@ class StatsService
             ->all();
 
         $summary['breakdowns']['ownership_types'] = collect($summary['breakdowns']['ownership_types'] ?? [])
-            ->map(fn (array $ownership) => $this->castFloatKeys($ownership, ['base_value', 'purchased_value']))
+            ->map(fn (array $ownership) => $this->castFloatKeys($ownership, ['copy_base_value', 'copy_purchased_value', 'subscription_allocated_value', 'base_value', 'purchased_value']))
             ->values()
             ->all();
 
         foreach (['most_played', 'biggest_base_price', 'biggest_paid_price'] as $archiveKey) {
             $summary['archive'][$archiveKey] = collect($summary['archive'][$archiveKey] ?? [])
-                ->map(fn (array $item) => $this->castFloatKeys($item, ['playtime_hours', 'base_value', 'purchased_value']))
+                ->map(fn (array $item) => $this->castFloatKeys($item, ['playtime_hours', 'copy_purchased_value', 'dlc_purchased_value', 'subscription_allocated_value', 'in_app_purchase_value', 'base_value', 'purchased_value']))
                 ->values()
                 ->all();
         }
@@ -212,6 +233,9 @@ class StatsService
         $copyPurchasedValue = $this->snapshotEligibleCopyValue($snapshot, 'purchased_price');
         $dlcBaseValue = $this->snapshotOwnedDlcValue($snapshot, 'base_price');
         $dlcPurchasedValue = $this->snapshotOwnedDlcValue($snapshot, 'purchased_price');
+        $financialExtras = $this->financialValues->calculateSnapshotFinancialValuesForRun($snapshot);
+        $subscriptionValue = (float) $financialExtras['subscription_allocated_value'];
+        $iapValue = (float) $financialExtras['in_app_purchase_value'];
 
         return [
             'snapshot_id' => $snapshot->id,
@@ -235,8 +259,14 @@ class StatsService
             'earned_achievements' => $earnedAchievements,
             'total_achievements' => $totalAchievements,
             'achievement_progress' => $totalAchievements > 0 ? round(($earnedAchievements / $totalAchievements) * 100, 1) : 0,
+            'copy_base_value' => round($copyBaseValue, 2),
+            'copy_purchased_value' => round($copyPurchasedValue, 2),
+            'dlc_base_value' => round($dlcBaseValue, 2),
+            'dlc_purchased_value' => round($dlcPurchasedValue, 2),
+            'subscription_allocated_value' => round($subscriptionValue, 2),
+            'in_app_purchase_value' => round($iapValue, 2),
             'base_value' => round($copyBaseValue + $dlcBaseValue, 2),
-            'purchased_value' => round($copyPurchasedValue + $dlcPurchasedValue, 2),
+            'purchased_value' => round($copyPurchasedValue + $dlcPurchasedValue + $subscriptionValue + $iapValue, 2),
             'breakdowns' => $this->snapshotBreakdowns($snapshot),
             'archive' => $this->snapshotArchive($snapshot),
             'best_games' => $this->snapshotBestGames($snapshot),
@@ -454,6 +484,7 @@ class StatsService
 
     private function livePlatformBreakdownsSql(User $user): array
     {
+        $financialByPlatform = $this->financialValues->calculateLiveFinancialValuesByPlatform($user);
         $platforms = DB::table('library_games')
             ->join('games', 'games.id', '=', 'library_games.game_id')
             ->join('platforms', 'platforms.id', '=', 'library_games.platform_id')
@@ -494,15 +525,18 @@ class StatsService
             ->groupBy('platform_id');
 
         return $platforms
-            ->map(function ($row) use ($copyValues, $dlcValues, $statusesByPlatform) {
+            ->map(function ($row) use ($copyValues, $dlcValues, $statusesByPlatform, $financialByPlatform) {
                 $copy = $copyValues->get($row->id);
                 $dlc = $dlcValues->get($row->id);
+                $financial = $financialByPlatform[$row->id] ?? ['subscription_allocated_value' => 0, 'in_app_purchase_value' => 0];
                 $earnedAchievements = (int) $row->earned_achievements;
                 $totalAchievements = (int) $row->total_achievements;
                 $copyBase = (float) ($copy?->base_value ?? 0);
                 $copyPaid = (float) ($copy?->purchased_value ?? 0);
                 $dlcBase = (float) ($dlc?->base_value ?? 0);
                 $dlcPaid = (float) ($dlc?->purchased_value ?? 0);
+                $subscriptionValue = (float) $financial['subscription_allocated_value'];
+                $iapValue = (float) $financial['in_app_purchase_value'];
 
                 return [
                     'label' => $row->label,
@@ -514,10 +548,14 @@ class StatsService
                     'achievement_progress' => $totalAchievements > 0 ? round(($earnedAchievements / $totalAchievements) * 100, 1) : 0,
                     'base_value_without_dlcs' => round($copyBase, 2),
                     'purchased_value_without_dlcs' => round($copyPaid, 2),
+                    'copy_base_value' => round($copyBase, 2),
+                    'copy_purchased_value' => round($copyPaid, 2),
                     'dlc_base_value' => round($dlcBase, 2),
                     'dlc_purchased_value' => round($dlcPaid, 2),
+                    'subscription_allocated_value' => round($subscriptionValue, 2),
+                    'in_app_purchase_value' => round($iapValue, 2),
                     'base_value' => round($copyBase + $dlcBase, 2),
-                    'purchased_value' => round($copyPaid + $dlcPaid, 2),
+                    'purchased_value' => round($copyPaid + $dlcPaid + $subscriptionValue + $iapValue, 2),
                     'statuses' => ($statusesByPlatform->get($row->id) ?? collect())
                         ->map(fn ($statusRow) => [
                             'label' => $statusRow->label,
@@ -558,6 +596,8 @@ class StatsService
 
     private function liveOwnershipBreakdownsSql(User $user): array
     {
+        $financialByOwnershipType = $this->financialValues->calculateLiveFinancialValuesByOwnershipType($user);
+
         return DB::table('ownership_copies')
             ->join('library_games', 'library_games.id', '=', 'ownership_copies.library_game_id')
             ->join('ownership_types', 'ownership_types.id', '=', 'ownership_copies.ownership_type_id')
@@ -565,12 +605,21 @@ class StatsService
             ->groupBy('ownership_types.name')
             ->selectRaw('ownership_types.name as label, count(*) as ownership_copies, sum(ownership_copies.base_price) as base_value, sum(ownership_copies.purchased_price) as purchased_value')
             ->get()
-            ->map(fn ($row) => [
-                'label' => $row->label,
-                'ownership_copies' => (int) $row->ownership_copies,
-                'base_value' => in_array($row->label, self::VALUE_OWNERSHIP_TYPES, true) ? round((float) $row->base_value, 2) : 0,
-                'purchased_value' => in_array($row->label, self::VALUE_OWNERSHIP_TYPES, true) ? round((float) $row->purchased_value, 2) : 0,
-            ])
+            ->map(function ($row) use ($financialByOwnershipType) {
+                $copyBase = in_array($row->label, self::VALUE_OWNERSHIP_TYPES, true) ? (float) $row->base_value : 0.0;
+                $copyPaid = in_array($row->label, self::VALUE_OWNERSHIP_TYPES, true) ? (float) $row->purchased_value : 0.0;
+                $subscriptionValue = (float) ($financialByOwnershipType[$row->label]['subscription_allocated_value'] ?? 0);
+
+                return [
+                    'label' => $row->label,
+                    'ownership_copies' => (int) $row->ownership_copies,
+                    'copy_base_value' => round($copyBase, 2),
+                    'copy_purchased_value' => round($copyPaid, 2),
+                    'subscription_allocated_value' => round($subscriptionValue, 2),
+                    'base_value' => round($copyBase, 2),
+                    'purchased_value' => round($copyPaid + $subscriptionValue, 2),
+                ];
+            })
             ->sortByDesc('ownership_copies')
             ->values()
             ->all();
@@ -578,6 +627,7 @@ class StatsService
 
     private function snapshotPlatformBreakdowns(SnapshotRun $snapshot): array
     {
+        $financialByPlatform = $this->financialValues->calculateSnapshotFinancialValuesByPlatform($snapshot);
         $platforms = DB::table('library_game_snapshots')
             ->join('platforms', 'platforms.id', '=', 'library_game_snapshots.platform_id')
             ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
@@ -622,15 +672,18 @@ class StatsService
             ->groupBy('platform_id');
 
         return $platforms
-            ->map(function ($row) use ($copyValues, $dlcValues, $statusesByPlatform) {
+            ->map(function ($row) use ($copyValues, $dlcValues, $statusesByPlatform, $financialByPlatform) {
                 $copy = $copyValues->get($row->id);
                 $dlc = $dlcValues->get($row->id);
+                $financial = $financialByPlatform[$row->id] ?? ['subscription_allocated_value' => 0, 'in_app_purchase_value' => 0];
                 $earnedAchievements = (int) $row->earned_achievements;
                 $totalAchievements = (int) $row->total_achievements;
                 $copyBase = (float) ($copy?->base_value ?? 0);
                 $copyPaid = (float) ($copy?->purchased_value ?? 0);
                 $dlcBase = (float) ($dlc?->base_value ?? 0);
                 $dlcPaid = (float) ($dlc?->purchased_value ?? 0);
+                $subscriptionValue = (float) $financial['subscription_allocated_value'];
+                $iapValue = (float) $financial['in_app_purchase_value'];
 
                 return [
                     'label' => $row->label,
@@ -642,10 +695,14 @@ class StatsService
                     'achievement_progress' => $totalAchievements > 0 ? round(($earnedAchievements / $totalAchievements) * 100, 1) : 0,
                     'base_value_without_dlcs' => round($copyBase, 2),
                     'purchased_value_without_dlcs' => round($copyPaid, 2),
+                    'copy_base_value' => round($copyBase, 2),
+                    'copy_purchased_value' => round($copyPaid, 2),
                     'dlc_base_value' => round($dlcBase, 2),
                     'dlc_purchased_value' => round($dlcPaid, 2),
+                    'subscription_allocated_value' => round($subscriptionValue, 2),
+                    'in_app_purchase_value' => round($iapValue, 2),
                     'base_value' => round($copyBase + $dlcBase, 2),
-                    'purchased_value' => round($copyPaid + $dlcPaid, 2),
+                    'purchased_value' => round($copyPaid + $dlcPaid + $subscriptionValue + $iapValue, 2),
                     'statuses' => ($statusesByPlatform->get($row->id) ?? collect())
                         ->map(fn ($statusRow) => [
                             'label' => $statusRow->label,
@@ -686,18 +743,48 @@ class StatsService
 
     private function snapshotOwnershipBreakdowns(SnapshotRun $snapshot): array
     {
-        return DB::table('ownership_copy_snapshots')
+        $financialByOwnershipType = $this->financialValues->calculateSnapshotFinancialValuesByOwnershipType($snapshot);
+
+        $breakdowns = DB::table('ownership_copy_snapshots')
             ->join('ownership_types', 'ownership_types.id', '=', 'ownership_copy_snapshots.ownership_type_id')
             ->where('snapshot_run_id', $snapshot->id)
             ->groupBy('ownership_types.name')
             ->selectRaw('ownership_types.name as label, count(*) as ownership_copies, sum(base_price) as base_value, sum(purchased_price) as purchased_value')
             ->get()
-            ->map(fn ($row) => [
-                'label' => $row->label,
-                'ownership_copies' => (int) $row->ownership_copies,
-                'base_value' => in_array($row->label, self::VALUE_OWNERSHIP_TYPES, true) ? round((float) $row->base_value, 2) : 0,
-                'purchased_value' => in_array($row->label, self::VALUE_OWNERSHIP_TYPES, true) ? round((float) $row->purchased_value, 2) : 0,
-            ])
+            ->mapWithKeys(function ($row) use ($financialByOwnershipType) {
+                $copyBase = in_array($row->label, self::VALUE_OWNERSHIP_TYPES, true) ? (float) $row->base_value : 0.0;
+                $copyPaid = in_array($row->label, self::VALUE_OWNERSHIP_TYPES, true) ? (float) $row->purchased_value : 0.0;
+                $subscriptionValue = (float) ($financialByOwnershipType[$row->label]['subscription_allocated_value'] ?? 0);
+
+                return [$row->label => [
+                    'label' => $row->label,
+                    'ownership_copies' => (int) $row->ownership_copies,
+                    'copy_base_value' => round($copyBase, 2),
+                    'copy_purchased_value' => round($copyPaid, 2),
+                    'subscription_allocated_value' => round($subscriptionValue, 2),
+                    'base_value' => round($copyBase, 2),
+                    'purchased_value' => round($copyPaid + $subscriptionValue, 2),
+                ]];
+            });
+
+        foreach ($financialByOwnershipType as $label => $financial) {
+            if ($breakdowns->has($label)) {
+                continue;
+            }
+
+            $subscriptionValue = (float) $financial['subscription_allocated_value'];
+            $breakdowns->put($label, [
+                'label' => $label,
+                'ownership_copies' => 0,
+                'copy_base_value' => 0,
+                'copy_purchased_value' => 0,
+                'subscription_allocated_value' => round($subscriptionValue, 2),
+                'base_value' => 0,
+                'purchased_value' => round($subscriptionValue, 2),
+            ]);
+        }
+
+        return $breakdowns
             ->sortByDesc('ownership_copies')
             ->values()
             ->all();
@@ -725,6 +812,7 @@ class StatsService
 
     private function liveArchiveRows(User $user, string $sortColumn, bool $positiveOnly): array
     {
+        $financialByGame = $this->financialValues->calculateLiveFinancialValuesByLibraryGame($user);
         $copyValues = DB::table('ownership_copies')
             ->join('ownership_types', 'ownership_types.id', '=', 'ownership_copies.ownership_type_id')
             ->whereIn('ownership_types.name', self::VALUE_OWNERSHIP_TYPES)
@@ -756,31 +844,43 @@ class StatsService
                 'statuses.color_hex as status_color_hex',
                 'library_games.playtime_hours',
             ])
-            ->selectRaw('coalesce(copy_values.base_value, 0) + coalesce(dlc_values.base_value, 0) as base_value')
-            ->selectRaw('coalesce(copy_values.purchased_value, 0) + coalesce(dlc_values.purchased_value, 0) as purchased_value');
-
-        if ($positiveOnly) {
-            $builder->whereRaw("coalesce(copy_values.{$sortColumn}, 0) + coalesce(dlc_values.{$sortColumn}, 0) > 0");
-        }
+            ->selectRaw('coalesce(copy_values.base_value, 0) as copy_base_value')
+            ->selectRaw('coalesce(copy_values.purchased_value, 0) as copy_purchased_value')
+            ->selectRaw('coalesce(dlc_values.base_value, 0) as dlc_base_value')
+            ->selectRaw('coalesce(dlc_values.purchased_value, 0) as dlc_purchased_value');
 
         return $builder
-            ->orderByDesc($sortColumn)
-            ->orderBy('games.title')
-            ->take(8)
             ->get()
-            ->map(fn ($row) => [
-                'library_game_id' => (int) $row->library_game_id,
-                'game_id' => (int) $row->game_id,
-                'title' => $row->title,
-                'cover_url' => $row->cover_path ? asset('storage/'.$row->cover_path) : $row->cover_url_original,
-                'platform' => $row->platform,
-                'status' => $row->status,
-                'status_color_key' => $row->status_color_key,
-                'status_color_hex' => $row->status_color_hex,
-                'playtime_hours' => (float) $row->playtime_hours,
-                'base_value' => round((float) $row->base_value, 2),
-                'purchased_value' => round((float) $row->purchased_value, 2),
-            ])
+            ->map(function ($row) use ($financialByGame) {
+                $financial = $financialByGame[$row->library_game_id] ?? ['subscription_allocated_value' => 0, 'in_app_purchase_value' => 0];
+                $copyBase = (float) $row->copy_base_value;
+                $copyPaid = (float) $row->copy_purchased_value;
+                $dlcBase = (float) $row->dlc_base_value;
+                $dlcPaid = (float) $row->dlc_purchased_value;
+                $subscriptionValue = (float) $financial['subscription_allocated_value'];
+                $iapValue = (float) $financial['in_app_purchase_value'];
+
+                return [
+                    'library_game_id' => (int) $row->library_game_id,
+                    'game_id' => (int) $row->game_id,
+                    'title' => $row->title,
+                    'cover_url' => $row->cover_path ? asset('storage/'.$row->cover_path) : $row->cover_url_original,
+                    'platform' => $row->platform,
+                    'status' => $row->status,
+                    'status_color_key' => $row->status_color_key,
+                    'status_color_hex' => $row->status_color_hex,
+                    'playtime_hours' => (float) $row->playtime_hours,
+                    'copy_purchased_value' => round($copyPaid, 2),
+                    'dlc_purchased_value' => round($dlcPaid, 2),
+                    'subscription_allocated_value' => round($subscriptionValue, 2),
+                    'in_app_purchase_value' => round($iapValue, 2),
+                    'base_value' => round($copyBase + $dlcBase, 2),
+                    'purchased_value' => round($copyPaid + $dlcPaid + $subscriptionValue + $iapValue, 2),
+                ];
+            })
+            ->filter(fn ($item) => ! $positiveOnly || $item[$sortColumn] > 0)
+            ->sortByDesc($sortColumn)
+            ->take(8)
             ->values()
             ->all();
     }
@@ -804,6 +904,7 @@ class StatsService
 
     private function snapshotArchive(SnapshotRun $snapshot): array
     {
+        $financialByGame = $this->financialValues->calculateSnapshotFinancialValuesByLibraryGame($snapshot);
         $rows = DB::table('library_game_snapshots')
             ->join('games', 'games.id', '=', 'library_game_snapshots.game_id')
             ->join('platforms', 'platforms.id', '=', 'library_game_snapshots.platform_id')
@@ -840,9 +941,16 @@ class StatsService
             ->get()
             ->keyBy('library_game_id');
 
-        $items = $rows->map(function ($row) use ($copyValues, $dlcValues) {
+        $items = $rows->map(function ($row) use ($copyValues, $dlcValues, $financialByGame) {
             $copy = $copyValues->get($row->library_game_id);
             $dlc = $dlcValues->get($row->library_game_id);
+            $financial = $financialByGame[$row->library_game_id] ?? ['subscription_allocated_value' => 0, 'in_app_purchase_value' => 0];
+            $copyBase = (float) ($copy?->base_value ?? 0);
+            $copyPaid = (float) ($copy?->purchased_value ?? 0);
+            $dlcBase = (float) ($dlc?->base_value ?? 0);
+            $dlcPaid = (float) ($dlc?->purchased_value ?? 0);
+            $subscriptionValue = (float) $financial['subscription_allocated_value'];
+            $iapValue = (float) $financial['in_app_purchase_value'];
 
             return [
                 'library_game_id' => (int) $row->library_game_id,
@@ -854,8 +962,12 @@ class StatsService
                 'status_color_key' => $row->status_color_key,
                 'status_color_hex' => $row->status_color_hex,
                 'playtime_hours' => (float) $row->playtime_hours,
-                'base_value' => round((float) ($copy?->base_value ?? 0) + (float) ($dlc?->base_value ?? 0), 2),
-                'purchased_value' => round((float) ($copy?->purchased_value ?? 0) + (float) ($dlc?->purchased_value ?? 0), 2),
+                'copy_purchased_value' => round($copyPaid, 2),
+                'dlc_purchased_value' => round($dlcPaid, 2),
+                'subscription_allocated_value' => round($subscriptionValue, 2),
+                'in_app_purchase_value' => round($iapValue, 2),
+                'base_value' => round($copyBase + $dlcBase, 2),
+                'purchased_value' => round($copyPaid + $dlcPaid + $subscriptionValue + $iapValue, 2),
             ];
         });
 
