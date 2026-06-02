@@ -1,12 +1,16 @@
 import {
     Activity,
+    ChevronDown,
     CheckCircle2,
     Clock3,
     Gamepad2,
     Plus,
+    ReceiptText,
     Trophy,
     WalletCards,
 } from 'lucide-react';
+import { router } from '@inertiajs/react';
+import { useState } from 'react';
 import AddGameWizard from '../../../Components/AddGameWizard';
 import { ReferenceData, StatsData } from '../../../types';
 import { moneyFormat, numberFormat } from '../formatters';
@@ -25,6 +29,7 @@ export default function BriefPanel({
         100,
     );
     const topPlatform = stats.breakdowns.platforms[0];
+    const [menuOpen, setMenuOpen] = useState(false);
 
     return (
         <aside className="flex h-full min-h-0 w-full flex-col gap-5 self-stretch">
@@ -124,20 +129,54 @@ export default function BriefPanel({
                     </div>
                 </div>
 
-                <AddGameWizard
-                    references={references}
-                    buttonClassName="group mt-5 h-[72px] w-full rounded-[999px] bg-[#b7ff63] px-5 text-left shadow-[0_18px_30px_rgb(0_0_0/0.18)] transition hover:-translate-y-1 hover:scale-[1.01]"
-                    buttonContent={
+                <div className="relative mt-5">
+                    <button
+                        type="button"
+                        onClick={() => setMenuOpen((open) => !open)}
+                        className="group h-[72px] w-full rounded-[999px] bg-[#b7ff63] px-5 text-left shadow-[0_18px_30px_rgb(0_0_0/0.18)] transition hover:-translate-y-1 hover:scale-[1.01]"
+                    >
                         <span className="flex h-full w-full items-center justify-center gap-4">
                             <span className="grid size-[44px] place-items-center rounded-full bg-black text-[#b7ff63] transition group-hover:rotate-90">
                                 <Plus size={30} strokeWidth={4} />
                             </span>
                             <span className="text-[24px] font-black text-black">
-                                Add Game
+                                Add
                             </span>
+                            <ChevronDown
+                                size={22}
+                                strokeWidth={4}
+                                className={`text-black transition ${menuOpen ? 'rotate-180' : ''}`}
+                            />
                         </span>
-                    }
-                />
+                    </button>
+
+                    {menuOpen && (
+                        <div className="absolute bottom-[84px] left-0 z-20 w-full rounded-[28px] bg-white p-2 text-black shadow-[0_18px_36px_rgb(0_0_0/0.26)] ring-1 ring-black/10">
+                            <AddGameWizard
+                                references={references}
+                                buttonClassName="flex w-full items-center gap-3 rounded-[22px] px-4 py-3 text-left font-black text-black transition hover:bg-black/5"
+                                buttonContent={
+                                    <>
+                                        <span className="grid size-10 place-items-center rounded-full bg-black text-[#b7ff63]">
+                                            <Gamepad2 size={22} strokeWidth={3} />
+                                        </span>
+                                        <span>Add Game</span>
+                                    </>
+                                }
+                            />
+                            <button
+                                type="button"
+                                onClick={() => router.visit('/subscriptions')}
+                                className="mt-1 flex w-full items-center gap-3 rounded-[22px] px-4 py-3 text-left font-black text-black transition hover:bg-black/5"
+                            >
+                                <span className="grid size-10 place-items-center rounded-full bg-black text-[#b7ff63]">
+                                    <ReceiptText size={22} strokeWidth={3} />
+                                </span>
+                                <span>Add Subscription</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
             </section>
         </aside>
     );

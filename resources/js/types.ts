@@ -33,6 +33,12 @@ export type StatsData = {
     earned_achievements: number;
     total_achievements: number;
     achievement_progress: number;
+    copy_base_value: number;
+    copy_purchased_value: number;
+    dlc_base_value: number;
+    dlc_purchased_value: number;
+    subscription_allocated_value: number;
+    in_app_purchase_value: number;
     base_value: number;
     purchased_value: number;
     breakdowns: StatsBreakdowns;
@@ -47,12 +53,16 @@ export type PlatformBreakdown = {
     earned_achievements: number;
     total_achievements: number;
     achievement_progress: number;
+    copy_base_value?: number;
+    copy_purchased_value?: number;
+    dlc_base_value?: number;
+    dlc_purchased_value?: number;
+    subscription_allocated_value?: number;
+    in_app_purchase_value?: number;
     base_value: number;
     purchased_value: number;
     base_value_without_dlcs?: number;
     purchased_value_without_dlcs?: number;
-    dlc_base_value?: number;
-    dlc_purchased_value?: number;
     statuses?: StatusBreakdown[];
 };
 
@@ -67,6 +77,9 @@ export type StatusBreakdown = {
 export type OwnershipTypeBreakdown = {
     label: string;
     ownership_copies: number;
+    copy_base_value?: number;
+    copy_purchased_value?: number;
+    subscription_allocated_value?: number;
     base_value: number;
     purchased_value: number;
 };
@@ -87,6 +100,10 @@ export type StatsArchiveGame = {
     status_color_key?: string | null;
     status_color_hex?: string | null;
     playtime_hours: number;
+    copy_purchased_value?: number;
+    dlc_purchased_value?: number;
+    subscription_allocated_value?: number;
+    in_app_purchase_value?: number;
     base_value: number;
     purchased_value: number;
 };
@@ -143,6 +160,12 @@ export type ConfirmedYearStats = {
     earned_achievements: number;
     total_achievements: number;
     achievement_progress: number;
+    copy_base_value: number;
+    copy_purchased_value: number;
+    dlc_base_value: number;
+    dlc_purchased_value: number;
+    subscription_allocated_value: number;
+    in_app_purchase_value: number;
     base_value: number;
     purchased_value: number;
     breakdowns: StatsBreakdowns;
