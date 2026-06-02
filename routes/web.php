@@ -4,6 +4,7 @@ use App\Http\Controllers\StupidLog\LibraryController;
 use App\Http\Controllers\StupidLog\LibraryGameMutationController;
 use App\Http\Controllers\StupidLog\GameDetailsController;
 use App\Http\Controllers\StupidLog\HomeController;
+use App\Http\Controllers\StupidLog\InAppPurchaseController;
 use App\Http\Controllers\StupidLog\OwnedDlcController;
 use App\Http\Controllers\StupidLog\OwnershipCopyController;
 use App\Http\Controllers\StupidLog\ProviderController;
@@ -43,6 +44,9 @@ Route::post('/subscriptions', [SubscriptionController::class, 'store'])->name('s
 Route::patch('/subscriptions/{subscriptionEntry}', [SubscriptionController::class, 'update'])->name('subscriptions.update');
 Route::delete('/subscriptions/{subscriptionEntry}', [SubscriptionController::class, 'destroy'])->name('subscriptions.destroy');
 Route::patch('/subscriptions/{subscriptionEntry}/ownership-copies', [SubscriptionController::class, 'updateOwnershipCopies'])->name('subscriptions.ownership-copies.update');
+Route::post('/games/{libraryGame}/in-app-purchases', [InAppPurchaseController::class, 'store'])->name('games.in-app-purchases.store');
+Route::patch('/in-app-purchases/{inAppPurchase}', [InAppPurchaseController::class, 'update'])->name('in-app-purchases.update');
+Route::delete('/in-app-purchases/{inAppPurchase}', [InAppPurchaseController::class, 'destroy'])->name('in-app-purchases.destroy');
 Route::get('/snapshots', [SnapshotController::class, 'snapshots'])->name('snapshots');
 Route::get('/snapshots-feed', [SnapshotController::class, 'snapshotFeed'])->name('snapshots.feed');
 Route::post('/snapshots', [SnapshotController::class, 'createSnapshot'])->name('snapshots.store');
