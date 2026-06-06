@@ -30,17 +30,20 @@ export default function Breakdowns({ stats, previous }: { stats: StatView; previ
     const platformPaidValue = (item: PlatformBreakdown) => {
         const hasComponentValues = item.copy_purchased_value !== undefined
             || item.dlc_purchased_value !== undefined
-            || item.subscription_allocated_value !== undefined
-            || item.in_app_purchase_value !== undefined;
+            || item.subscription_total_value !== undefined
+            || item.in_app_purchase_total_value !== undefined;
 
         if (!hasComponentValues) {
             return includeDlcs ? n(item.purchased_value) : n(item.purchased_value_without_dlcs ?? item.purchased_value);
         }
 
+        const subscriptionValue = item.subscription_total_value ?? item.subscription_allocated_value;
+        const inAppPurchaseValue = item.in_app_purchase_total_value ?? item.in_app_purchase_value;
+
         return n(item.copy_purchased_value)
             + (includeDlcs ? n(item.dlc_purchased_value) : 0)
-            + (includeSubscriptions ? n(item.subscription_allocated_value) : 0)
-            + (includeInAppPurchases ? n(item.in_app_purchase_value) : 0);
+            + (includeSubscriptions ? n(subscriptionValue) : 0)
+            + (includeInAppPurchases ? n(inAppPurchaseValue) : 0);
     };
 
     const valueGetter = (item: PlatformBreakdown) => valueMode === 'base'

@@ -38,6 +38,11 @@ export type StatsData = {
     dlc_base_value: number;
     dlc_purchased_value: number;
     subscription_allocated_value: number;
+    subscription_unallocated_value: number;
+    subscription_total_value: number;
+    in_app_purchase_allocated_value: number;
+    in_app_purchase_unallocated_value: number;
+    in_app_purchase_total_value: number;
     in_app_purchase_value: number;
     base_value: number;
     purchased_value: number;
@@ -46,6 +51,7 @@ export type StatsData = {
 };
 
 export type PlatformBreakdown = {
+    platform_id: number | null;
     label: string;
     library_games: number;
     completed: number;
@@ -58,6 +64,11 @@ export type PlatformBreakdown = {
     dlc_base_value?: number;
     dlc_purchased_value?: number;
     subscription_allocated_value?: number;
+    subscription_unallocated_value?: number;
+    subscription_total_value?: number;
+    in_app_purchase_allocated_value?: number;
+    in_app_purchase_unallocated_value?: number;
+    in_app_purchase_total_value?: number;
     in_app_purchase_value?: number;
     base_value: number;
     purchased_value: number;
@@ -80,6 +91,8 @@ export type OwnershipTypeBreakdown = {
     copy_base_value?: number;
     copy_purchased_value?: number;
     subscription_allocated_value?: number;
+    subscription_unallocated_value?: number;
+    subscription_total_value?: number;
     base_value: number;
     purchased_value: number;
 };
@@ -103,6 +116,7 @@ export type StatsArchiveGame = {
     copy_purchased_value?: number;
     dlc_purchased_value?: number;
     subscription_allocated_value?: number;
+    in_app_purchase_allocated_value?: number;
     in_app_purchase_value?: number;
     base_value: number;
     purchased_value: number;
@@ -112,6 +126,11 @@ export type StatsArchive = {
     most_played: StatsArchiveGame[];
     biggest_base_price: StatsArchiveGame[];
     biggest_paid_price: StatsArchiveGame[];
+    unallocated_financial: {
+        subscription_unallocated_value: number;
+        in_app_purchase_unallocated_value: number;
+        total_unallocated_value: number;
+    };
 };
 
 export type GrowthMetric = {
@@ -165,6 +184,11 @@ export type ConfirmedYearStats = {
     dlc_base_value: number;
     dlc_purchased_value: number;
     subscription_allocated_value: number;
+    subscription_unallocated_value: number;
+    subscription_total_value: number;
+    in_app_purchase_allocated_value: number;
+    in_app_purchase_unallocated_value: number;
+    in_app_purchase_total_value: number;
     in_app_purchase_value: number;
     base_value: number;
     purchased_value: number;
