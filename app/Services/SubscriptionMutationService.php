@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\StupidLog\LibraryGame;
 use App\Models\StupidLog\OwnershipCopy;
 use App\Models\StupidLog\SubscriptionEntry;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class SubscriptionMutationService
@@ -52,6 +53,65 @@ class SubscriptionMutationService
         }
 
         $this->allocations->synchronizeUnlockedYears($subscription);
+    }
+
+    public function validatedOwnershipCopies(
+        int $userId,
+        int $ownershipTypeId,
+        array $copyIds,
+    ): Collection {
+        $copyIds = collect($copyIds)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        $copies = OwnershipCopy::with('libraryGame')
+            ->whereIn('id', $copyIds)
+            ->get();
+
+        if ($copies->count() !== $copyIds->count()) {
+            throw ValidationException::withMessages([
+                'ownership_copy_ids' => 'Selected ownership copies are invalid.',
+            ]);
+        }
+
+        foreach ($copies as $copy) {
+            if ((int) $copy->libraryGame->user_id !== $userId) {
+                throw ValidationException::withMessages([
+                    'ownership_copy_ids' => 'Selected ownership copies must belong to the local user.',
+                ]);
+            }
+
+            if ((int) $copy->ownership_type_id !== $ownershipTypeId) {
+                throw ValidationException::withMessages([
+                    'ownership_copy_ids' => 'Selected ownership copies must match the subscription ownership type.',
+                ]);
+            }
+        }
+
+        return $copies;
+    }
+
+    public function replaceOwnershipCopies(
+        SubscriptionEntry $subscription,
+        array $copyIds,
+    ): void {
+        $currentCopyIds = $subscription->ownershipCopies()
+            ->pluck('ownership_copies.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $selectedCopyIds = collect($copyIds)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->assertCopiesCanBeRemoved(
+            $subscription,
+            array_values(array_diff($currentCopyIds, $selectedCopyIds)),
+        );
+
+        $subscription->ownershipCopies()->sync($selectedCopyIds);
+        $this->allocations->synchronizeUnlockedYears($subscription->refresh());
     }
 
     public function assertDeletionAllowed(SubscriptionEntry $subscription): void

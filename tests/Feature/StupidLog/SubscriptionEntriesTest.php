@@ -93,6 +93,142 @@ class SubscriptionEntriesTest extends TestCase
         $this->assertSame('2026-01-31', $entry->finished_at->format('Y-m-d'));
     }
 
+    public function test_create_stores_details_copies_and_yearly_allocations_atomically(): void
+    {
+        $copy = $this->createOwnershipCopy($this->user, 'Atomic Game', 'Xbox', 'Game Pass');
+        $gamePass = OwnershipType::where('name', 'Game Pass')->firstOrFail();
+
+        $this->post('/subscriptions', [
+            'ownership_type_id' => $gamePass->id,
+            'amount_paid' => 32,
+            'started_at' => '2025-12-12',
+            'finished_at' => '2026-01-12',
+            'ownership_copy_ids' => [$copy->id],
+        ])->assertRedirect();
+
+        $entry = SubscriptionEntry::firstOrFail();
+
+        $this->assertSame([$copy->id], $entry->ownershipCopies()->pluck('ownership_copies.id')->all());
+        $this->assertSame(
+            ['20.000000', '12.000000'],
+            $entry->years()->orderBy('year')->pluck('amount_allocated')->all(),
+        );
+        $this->assertDatabaseHas('subscription_entry_year_ownership_copies', [
+            'ownership_copy_id' => $copy->id,
+            'allocated_amount' => 20,
+        ]);
+    }
+
+    public function test_update_stores_core_details_and_copy_selection_atomically(): void
+    {
+        $firstCopy = $this->createOwnershipCopy($this->user, 'First Atomic Game', 'Xbox', 'Game Pass');
+        $secondCopy = $this->createOwnershipCopy($this->user, 'Second Atomic Game', 'Xbox', 'Game Pass');
+        $entry = $this->createSubscription('Game Pass');
+        $entry->ownershipCopies()->sync([$firstCopy->id]);
+        app(SubscriptionYearAllocationService::class)->synchronizeUnlockedYears($entry);
+        $gamePass = OwnershipType::where('name', 'Game Pass')->firstOrFail();
+
+        $this->patch("/subscriptions/{$entry->id}", [
+            'ownership_type_id' => $gamePass->id,
+            'amount_paid' => 30,
+            'started_at' => '2026-01-01',
+            'finished_at' => '2026-12-31',
+            'ownership_copy_ids' => [$firstCopy->id, $secondCopy->id],
+        ])->assertRedirect();
+
+        $entry->refresh();
+        $year = $entry->years()->firstOrFail();
+
+        $this->assertSame('30.00', $entry->amount_paid);
+        $this->assertEqualsCanonicalizing(
+            [$firstCopy->id, $secondCopy->id],
+            $entry->ownershipCopies()->pluck('ownership_copies.id')->all(),
+        );
+        $this->assertSame(
+            ['15.000000', '15.000000'],
+            $year->ownershipCopyAllocations()->orderBy('ownership_copy_id')->pluck('allocated_amount')->all(),
+        );
+    }
+
+    public function test_preview_returns_yearly_allocations_without_mutating_database(): void
+    {
+        $firstCopy = $this->createOwnershipCopy($this->user, 'Preview One', 'Xbox', 'Game Pass');
+        $secondCopy = $this->createOwnershipCopy($this->user, 'Preview Two', 'Xbox', 'Game Pass');
+        $gamePass = OwnershipType::where('name', 'Game Pass')->firstOrFail();
+
+        $response = $this->postJson('/subscriptions/preview', [
+            'ownership_type_id' => $gamePass->id,
+            'amount_paid' => 32,
+            'started_at' => '2025-12-12',
+            'finished_at' => '2026-01-12',
+            'ownership_copy_ids' => [$firstCopy->id, $secondCopy->id],
+        ])->assertOk();
+
+        $response->assertJsonPath('years.0.amount_allocated', '20.000000');
+        $response->assertJsonPath('years.0.selected_copy_count', 2);
+        $response->assertJsonPath('years.0.allocations.0.allocated_amount', '10.000000');
+        $response->assertJsonPath('years.1.amount_allocated', '12.000000');
+        $this->assertDatabaseCount('subscription_entries', 0);
+        $this->assertDatabaseCount('subscription_entry_years', 0);
+    }
+
+    public function test_preview_with_zero_copies_returns_full_unallocated_yearly_amount(): void
+    {
+        $gamePass = OwnershipType::where('name', 'Game Pass')->firstOrFail();
+
+        $this->postJson('/subscriptions/preview', [
+            'ownership_type_id' => $gamePass->id,
+            'amount_paid' => 12,
+            'started_at' => '2026-01-01',
+            'finished_at' => '2026-12-31',
+            'ownership_copy_ids' => [],
+        ])
+            ->assertOk()
+            ->assertJsonPath('years.0.amount_allocated', '12.000000')
+            ->assertJsonPath('years.0.unallocated_amount', '12.000000')
+            ->assertJsonPath('years.0.allocations', []);
+    }
+
+    public function test_preview_preserves_locked_year_and_projects_unlocked_year(): void
+    {
+        $lockedCopy = $this->createOwnershipCopy($this->user, 'Locked Preview', 'Xbox', 'Game Pass');
+        $newCopy = $this->createOwnershipCopy($this->user, 'New Preview', 'Xbox', 'Game Pass');
+        $entry = SubscriptionEntry::create([
+            'user_id' => $this->user->id,
+            'ownership_type_id' => OwnershipType::where('name', 'Game Pass')->firstOrFail()->id,
+            'amount_paid' => 30,
+            'started_at' => '2026-01-01',
+            'finished_at' => '2027-12-31',
+        ]);
+        $entry->ownershipCopies()->sync([$lockedCopy->id]);
+        app(SubscriptionYearAllocationService::class)->synchronizeUnlockedYears($entry);
+        $snapshot = SnapshotRun::create([
+            'user_id' => $this->user->id,
+            'year' => 2026,
+            'status' => 'confirmed',
+            'confirmed_at' => now(),
+        ]);
+        $entry->years()->where('year', 2026)->update([
+            'is_locked' => true,
+            'locked_by_snapshot_run_id' => $snapshot->id,
+        ]);
+
+        $response = $this->postJson('/subscriptions/preview', [
+            'subscription_entry_id' => $entry->id,
+            'ownership_type_id' => $entry->ownership_type_id,
+            'amount_paid' => 30,
+            'started_at' => '2026-01-01',
+            'finished_at' => '2027-12-31',
+            'ownership_copy_ids' => [$lockedCopy->id, $newCopy->id],
+        ])->assertOk();
+
+        $response->assertJsonPath('years.0.is_locked', true);
+        $response->assertJsonPath('years.0.selected_copy_count', 1);
+        $response->assertJsonPath('years.0.allocations.0.ownership_copy_id', $lockedCopy->id);
+        $response->assertJsonPath('years.1.is_locked', false);
+        $response->assertJsonPath('years.1.selected_copy_count', 2);
+    }
+
     public function test_subscription_entry_rejects_non_subscription_type_and_zero_amount(): void
     {
         $digital = OwnershipType::where('name', 'Digital')->firstOrFail();
@@ -111,6 +247,32 @@ class SubscriptionEntriesTest extends TestCase
             'started_at' => '2026-01-01',
             'finished_at' => '2026-01-31',
         ])->assertSessionHasErrors('amount_paid');
+    }
+
+    public function test_atomic_create_rejects_mismatched_and_cross_user_copies(): void
+    {
+        $gamePass = OwnershipType::where('name', 'Game Pass')->firstOrFail();
+        $wrongTypeCopy = $this->createOwnershipCopy($this->user, 'Wrong Atomic Type', 'Xbox', 'EA Play');
+        $otherUser = User::factory()->create();
+        $otherUserCopy = $this->createOwnershipCopy($otherUser, 'Other Atomic User', 'Xbox', 'Game Pass');
+        $payload = [
+            'ownership_type_id' => $gamePass->id,
+            'amount_paid' => 12,
+            'started_at' => '2026-01-01',
+            'finished_at' => '2026-01-31',
+        ];
+
+        $this->post('/subscriptions', [
+            ...$payload,
+            'ownership_copy_ids' => [$wrongTypeCopy->id],
+        ])->assertSessionHasErrors('ownership_copy_ids');
+
+        $this->post('/subscriptions', [
+            ...$payload,
+            'ownership_copy_ids' => [$otherUserCopy->id],
+        ])->assertSessionHasErrors('ownership_copy_ids');
+
+        $this->assertDatabaseCount('subscription_entries', 0);
     }
 
     public function test_can_attach_matching_ownership_copies_for_same_user(): void

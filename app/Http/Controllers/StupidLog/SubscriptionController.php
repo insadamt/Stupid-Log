@@ -10,11 +10,12 @@ use App\Services\ClosedFinancialYearService;
 use App\Services\FinancialSnapshotRefreshService;
 use App\Services\LocalUserService;
 use App\Services\SubscriptionMutationService;
+use App\Services\SubscriptionPreviewService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,13 +49,19 @@ class SubscriptionController extends Controller
     {
         $validated = $this->validateSubscription($request);
         $user = $localUser->get();
+        $copies = $mutations->validatedOwnershipCopies(
+            $user->id,
+            (int) $validated['ownership_type_id'],
+            $validated['ownership_copy_ids'] ?? [],
+        );
 
-        $entry = DB::transaction(function () use ($validated, $user, $mutations) {
+        $entry = DB::transaction(function () use ($validated, $user, $mutations, $copies) {
             $entry = SubscriptionEntry::create([
-                ...$validated,
+                ...$this->subscriptionAttributes($validated),
                 'user_id' => $user->id,
             ]);
-            $mutations->createYearlyAllocations($entry);
+            $entry->ownershipCopies()->sync($copies->pluck('id')->all());
+            $mutations->createYearlyAllocations($entry->refresh());
 
             return $entry;
         });
@@ -74,12 +81,30 @@ class SubscriptionController extends Controller
     {
         $this->assertSubscriptionBelongsToLocalUser($subscriptionEntry, $localUser);
         $validated = $this->validateSubscription($request);
+        $selectionProvided = array_key_exists('ownership_copy_ids', $validated);
+        $copies = $selectionProvided
+            ? $mutations->validatedOwnershipCopies(
+                $subscriptionEntry->user_id,
+                (int) $validated['ownership_type_id'],
+                $validated['ownership_copy_ids'],
+            )
+            : null;
         $mutations->assertCoreChangesAllowed($subscriptionEntry, $validated);
         $oldValues = $subscriptionEntry->only(['started_at', 'finished_at']);
         $ownershipTypeChanged = (int) $subscriptionEntry->ownership_type_id !== (int) $validated['ownership_type_id'];
 
-        DB::transaction(function () use ($subscriptionEntry, $validated, $ownershipTypeChanged, $mutations) {
-            $subscriptionEntry->update($validated);
+        DB::transaction(function () use ($subscriptionEntry, $validated, $copies, $mutations, $selectionProvided, $ownershipTypeChanged) {
+            $subscriptionEntry->update($this->subscriptionAttributes($validated));
+
+            if ($selectionProvided) {
+                $mutations->replaceOwnershipCopies(
+                    $subscriptionEntry->refresh(),
+                    $copies->pluck('id')->all(),
+                );
+
+                return;
+            }
+
             $mutations->synchronizeAfterCoreUpdate(
                 $subscriptionEntry->refresh(),
                 $ownershipTypeChanged,
@@ -116,42 +141,18 @@ class SubscriptionController extends Controller
     ): RedirectResponse
     {
         $userId = $this->assertSubscriptionBelongsToLocalUser($subscriptionEntry, $localUser)->id;
-        $validated = $request->validate([
-            'ownership_copy_ids' => ['array'],
-            'ownership_copy_ids.*' => ['integer', 'distinct', 'exists:ownership_copies,id'],
-        ]);
-        $copyIds = collect($validated['ownership_copy_ids'] ?? [])
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-        $copies = OwnershipCopy::with('libraryGame')
-            ->whereIn('id', $copyIds)
-            ->get();
+        $validated = $this->validateOwnershipCopyIds($request);
+        $copies = $mutations->validatedOwnershipCopies(
+            $userId,
+            $subscriptionEntry->ownership_type_id,
+            $validated['ownership_copy_ids'] ?? [],
+        );
 
-        if ($copies->count() !== $copyIds->count()) {
-            throw ValidationException::withMessages(['ownership_copy_ids' => 'Selected ownership copies are invalid.']);
-        }
-
-        foreach ($copies as $copy) {
-            if ((int) $copy->libraryGame->user_id !== (int) $userId) {
-                throw ValidationException::withMessages(['ownership_copy_ids' => 'Selected ownership copies must belong to the local user.']);
-            }
-
-            if ((int) $copy->ownership_type_id !== (int) $subscriptionEntry->ownership_type_id) {
-                throw ValidationException::withMessages(['ownership_copy_ids' => 'Selected ownership copies must match the subscription ownership type.']);
-            }
-        }
-
-        $currentCopyIds = $subscriptionEntry->ownershipCopies()
-            ->pluck('ownership_copies.id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-        $removedCopyIds = array_values(array_diff($currentCopyIds, $copyIds->all()));
-        $mutations->assertCopiesCanBeRemoved($subscriptionEntry, $removedCopyIds);
-
-        DB::transaction(function () use ($subscriptionEntry, $copyIds, $mutations) {
-            $subscriptionEntry->ownershipCopies()->sync($copyIds->all());
-            $mutations->recalculateUnlockedYears($subscriptionEntry->refresh());
+        DB::transaction(function () use ($subscriptionEntry, $copies, $mutations) {
+            $mutations->replaceOwnershipCopies(
+                $subscriptionEntry,
+                $copies->pluck('id')->all(),
+            );
         });
 
         $refresh->refreshForSubscriptionOwnershipCopiesChanged($subscriptionEntry->refresh());
@@ -159,7 +160,44 @@ class SubscriptionController extends Controller
         return back();
     }
 
-    private function validateSubscription(Request $request): array
+    public function preview(
+        Request $request,
+        LocalUserService $localUser,
+        SubscriptionMutationService $mutations,
+        SubscriptionPreviewService $previews,
+    ): JsonResponse {
+        $validated = $this->validateSubscription($request, true);
+        $user = $localUser->get();
+        $subscription = isset($validated['subscription_entry_id'])
+            ? SubscriptionEntry::findOrFail($validated['subscription_entry_id'])
+            : null;
+
+        if ($subscription) {
+            $this->assertSubscriptionBelongsToLocalUser($subscription, $localUser);
+            $mutations->assertCoreChangesAllowed($subscription, $validated);
+            $currentCopyIds = $subscription->ownershipCopies()->pluck('ownership_copies.id')->map(fn ($id) => (int) $id)->all();
+            $mutations->assertCopiesCanBeRemoved(
+                $subscription,
+                array_values(array_diff($currentCopyIds, $validated['ownership_copy_ids'] ?? [])),
+            );
+        }
+
+        $copies = $mutations->validatedOwnershipCopies(
+            $user->id,
+            (int) $validated['ownership_type_id'],
+            $validated['ownership_copy_ids'] ?? [],
+        );
+
+        return response()->json([
+            'years' => $previews->preview(
+                $this->subscriptionAttributes($validated),
+                $copies,
+                $subscription,
+            ),
+        ]);
+    }
+
+    private function validateSubscription(Request $request, bool $preview = false): array
     {
         return $request->validate([
             'ownership_type_id' => [
@@ -170,7 +208,29 @@ class SubscriptionController extends Controller
             'amount_paid' => ['required', 'numeric', 'min:0.01'],
             'started_at' => ['required', 'date'],
             'finished_at' => ['required', 'date', 'after_or_equal:started_at'],
+            'ownership_copy_ids' => ['array'],
+            'ownership_copy_ids.*' => ['integer', 'distinct', 'exists:ownership_copies,id'],
+            'subscription_entry_id' => [
+                $preview ? 'nullable' : 'prohibited',
+                'integer',
+                'exists:subscription_entries,id',
+            ],
         ]);
+    }
+
+    private function validateOwnershipCopyIds(Request $request): array
+    {
+        return $request->validate([
+            'ownership_copy_ids' => ['array'],
+            'ownership_copy_ids.*' => ['integer', 'distinct', 'exists:ownership_copies,id'],
+        ]);
+    }
+
+    private function subscriptionAttributes(array $validated): array
+    {
+        return collect($validated)
+            ->only(['ownership_type_id', 'amount_paid', 'started_at', 'finished_at'])
+            ->all();
     }
 
     private function assertSubscriptionBelongsToLocalUser(SubscriptionEntry $subscriptionEntry, LocalUserService $localUser)

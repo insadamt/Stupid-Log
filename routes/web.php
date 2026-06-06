@@ -40,6 +40,7 @@ Route::patch('/owned-dlcs/{ownedDlc}', [OwnedDlcController::class, 'updateOwnedD
 Route::delete('/owned-dlcs/{ownedDlc}', [OwnedDlcController::class, 'destroyOwnedDlc'])->name('owned-dlcs.destroy');
 Route::get('/stats', [StatsController::class, 'stats'])->name('stats');
 Route::get('/subscriptions', [SubscriptionController::class, 'index'])->name('subscriptions.index');
+Route::post('/subscriptions/preview', [SubscriptionController::class, 'preview'])->name('subscriptions.preview');
 Route::post('/subscriptions', [SubscriptionController::class, 'store'])->name('subscriptions.store');
 Route::patch('/subscriptions/{subscriptionEntry}', [SubscriptionController::class, 'update'])->name('subscriptions.update');
 Route::delete('/subscriptions/{subscriptionEntry}', [SubscriptionController::class, 'destroy'])->name('subscriptions.destroy');
