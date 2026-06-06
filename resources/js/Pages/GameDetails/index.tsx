@@ -8,6 +8,7 @@ import DlcModal from './components/DlcModal';
 import DlcsPanel from './components/DlcsPanel';
 import GameEditModal from './components/GameEditModal';
 import GameStage from './components/GameStage';
+import InAppPurchaseDialogs from './components/InAppPurchaseDialogs';
 import OverviewMetrics from './components/OverviewMetrics';
 import OverviewPanel from './components/OverviewPanel';
 import OwnershipCopyModal from './components/OwnershipCopyModal';
@@ -15,8 +16,9 @@ import OwnershipPanel from './components/OwnershipPanel';
 import PurchasesPanel from './components/PurchasesPanel';
 import { ModeButton } from './components/SharedUi';
 import { formFromCopy } from './forms';
-import { Details, Dlc, DlcForm, EditTab, GameEditForm, InAppPurchase, InAppPurchaseForm, Mode, OwnershipCopyDetails, OwnershipForm, PaidBreakdown } from './types';
+import { Details, Dlc, DlcForm, EditTab, GameEditForm, Mode, OwnershipCopyDetails, OwnershipForm, PaidBreakdown } from './types';
 import { useGameDetailsAnimations } from './useGameDetailsAnimations';
+import { useInAppPurchaseActions } from './useInAppPurchaseActions';
 
 export default function GameDetails({
     libraryGame,
@@ -79,14 +81,11 @@ export default function GameDetails({
     const [dlcErrors, setDlcErrors] = useState<Record<string, string>>({});
     const [savingDlc, setSavingDlc] = useState(false);
     const [refreshingDlcs, setRefreshingDlcs] = useState(false);
-    const [editingPurchaseId, setEditingPurchaseId] = useState<number | 'new' | null>(null);
-    const [purchaseForm, setPurchaseForm] = useState<InAppPurchaseForm>({
-        title: '',
-        amount_paid: '',
-        purchased_at: firstEditableFinancialDate ?? new Date().toISOString().slice(0, 10),
+    const purchaseActions = useInAppPurchaseActions({
+        libraryGameId: libraryGame.id,
+        purchases: paidBreakdown.in_app_purchases,
+        firstEditableFinancialDate,
     });
-    const [purchaseErrors, setPurchaseErrors] = useState<Record<string, string>>({});
-    const [savingPurchase, setSavingPurchase] = useState(false);
     const filteredDlcs = useMemo(
         () => dlcs.filter((dlc) => (filter === 'All' || dlc.state === filter) && dlc.title.toLowerCase().includes(query.toLowerCase().trim())),
         [dlcs, filter, query],
@@ -359,70 +358,6 @@ export default function GameDetails({
         });
     }
 
-    function updatePurchaseForm(patch: Partial<InAppPurchaseForm>) {
-        setPurchaseForm((current) => ({ ...current, ...patch }));
-    }
-
-    function startAddPurchase() {
-        setEditingPurchaseId('new');
-        setPurchaseForm({
-            title: '',
-            amount_paid: '',
-            purchased_at: firstEditableFinancialDate ?? new Date().toISOString().slice(0, 10),
-        });
-        setPurchaseErrors({});
-    }
-
-    function startEditPurchase(purchase: InAppPurchase) {
-        if (purchase.is_locked) return;
-
-        setEditingPurchaseId(purchase.id);
-        setPurchaseForm({
-            title: purchase.title,
-            amount_paid: String(purchase.amount_paid),
-            purchased_at: purchase.purchased_at ?? '',
-        });
-        setPurchaseErrors({});
-    }
-
-    function cancelPurchaseEdit() {
-        setEditingPurchaseId(null);
-        setPurchaseErrors({});
-    }
-
-    function submitPurchase() {
-        const payload = {
-            title: purchaseForm.title,
-            amount_paid: Number(purchaseForm.amount_paid),
-            purchased_at: purchaseForm.purchased_at,
-        };
-        const options = {
-            preserveScroll: true,
-            onStart: () => setSavingPurchase(true),
-            onFinish: () => setSavingPurchase(false),
-            onSuccess: () => cancelPurchaseEdit(),
-            onError: (errors: Record<string, string>) => setPurchaseErrors(errors),
-        };
-
-        if (editingPurchaseId === 'new') {
-            router.post(`/games/${libraryGame.id}/in-app-purchases`, payload, options);
-            return;
-        }
-
-        if (typeof editingPurchaseId === 'number') {
-            router.patch(`/in-app-purchases/${editingPurchaseId}`, payload, options);
-        }
-    }
-
-    function deletePurchase(purchase: InAppPurchase) {
-        if (purchase.is_locked) return;
-
-        router.delete(`/in-app-purchases/${purchase.id}`, {
-            preserveScroll: true,
-            onError: (errors: Record<string, string>) => setPurchaseErrors(errors),
-        });
-    }
-
     return (
         <AppLayout title={libraryGame.title} lockViewport>
             <section ref={pageRef} className="relative isolate h-full overflow-hidden rounded-[44px] border border-black/10 bg-[#e8eee8] px-7 pb-24 pt-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.75)]">
@@ -460,19 +395,12 @@ export default function GameDetails({
                         )}
                         {mode === 'purchases' && (
                             <PurchasesPanel
-                                paidBreakdown={paidBreakdown}
+                                purchases={paidBreakdown.in_app_purchases}
+                                totalValue={paidBreakdown.in_app_purchase_value}
                                 closedFinancialYear={closedFinancialYear}
-                                firstEditableFinancialDate={firstEditableFinancialDate}
-                                editingPurchaseId={editingPurchaseId}
-                                purchaseForm={purchaseForm}
-                                purchaseErrors={purchaseErrors}
-                                savingPurchase={savingPurchase}
-                                startAddPurchase={startAddPurchase}
-                                startEditPurchase={startEditPurchase}
-                                cancelPurchaseEdit={cancelPurchaseEdit}
-                                updatePurchaseForm={updatePurchaseForm}
-                                submitPurchase={submitPurchase}
-                                deletePurchase={deletePurchase}
+                                startAddPurchase={purchaseActions.startAddPurchase}
+                                startEditPurchase={purchaseActions.startEditPurchase}
+                                requestDeletePurchase={purchaseActions.requestDeletePurchase}
                             />
                         )}
                     </section>
@@ -482,7 +410,7 @@ export default function GameDetails({
                     <ModeButton active={mode === 'overview'} onClick={() => changeMode('overview')}>Game Page</ModeButton>
                     <ModeButton active={mode === 'ownership'} onClick={() => changeMode('ownership')}>Ownership</ModeButton>
                     <ModeButton active={mode === 'dlcs'} onClick={() => changeMode('dlcs')}>DLCs Page</ModeButton>
-                    <ModeButton active={mode === 'purchases'} onClick={() => changeMode('purchases')}>Purchases</ModeButton>
+                    <ModeButton active={mode === 'purchases'} onClick={() => changeMode('purchases')}>In-App Purchases</ModeButton>
                 </div>
 
                 {editingCopyId && (
@@ -512,6 +440,11 @@ export default function GameDetails({
                         submitDlc={submitDlc}
                     />
                 )}
+
+                <InAppPurchaseDialogs
+                    actions={purchaseActions}
+                    firstEditableFinancialDate={firstEditableFinancialDate}
+                />
 
                 {editingGame && (
                     <GameEditModal
