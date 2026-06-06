@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\StupidLog\OwnershipCopy;
 use App\Models\StupidLog\OwnershipType;
 use App\Models\StupidLog\SubscriptionEntry;
+use App\Services\ClosedFinancialYearService;
 use App\Services\FinancialSnapshotRefreshService;
 use App\Services\LocalUserService;
 use App\Services\SubscriptionMutationService;
@@ -19,9 +20,13 @@ use Inertia\Response;
 
 class SubscriptionController extends Controller
 {
-    public function index(LocalUserService $localUser): Response
+    public function index(
+        LocalUserService $localUser,
+        ClosedFinancialYearService $closedYears,
+    ): Response
     {
         $user = $localUser->get();
+        $closedFinancialYear = $closedYears->closedFinancialYear($user);
 
         return Inertia::render('Subscriptions', [
             'subscriptionEntries' => $this->subscriptionEntriesForUser($user->id),
@@ -29,6 +34,8 @@ class SubscriptionController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name', 'is_subscription']),
             'ownershipCopies' => $this->ownershipCopiesForUser($user->id),
+            'closedFinancialYear' => $closedFinancialYear,
+            'firstEditableDate' => $closedYears->firstEditableDate($user)?->format('Y-m-d'),
         ]);
     }
 
@@ -179,7 +186,12 @@ class SubscriptionController extends Controller
 
     private function subscriptionEntriesForUser(int $userId)
     {
-        return SubscriptionEntry::with(['ownershipType', 'ownershipCopies'])
+        return SubscriptionEntry::with([
+            'ownershipType',
+            'ownershipCopies',
+            'years.lockedBySnapshotRun',
+            'years.ownershipCopyAllocations',
+        ])
             ->where('user_id', $userId)
             ->latest('started_at')
             ->get()
@@ -192,6 +204,29 @@ class SubscriptionController extends Controller
                 'finished_at' => $entry->finished_at?->format('Y-m-d'),
                 'selected_ownership_copy_ids' => $entry->ownershipCopies->pluck('id')->values(),
                 'selected_count' => $entry->ownershipCopies->count(),
+                'has_locked_years' => $entry->years->contains('is_locked', true),
+                'locked_ownership_copy_ids' => $entry->years
+                    ->where('is_locked', true)
+                    ->flatMap(fn ($year) => $year->ownershipCopyAllocations->pluck('ownership_copy_id'))
+                    ->unique()
+                    ->values(),
+                'years' => $entry->years
+                    ->sortBy('year')
+                    ->map(fn ($year) => [
+                        'id' => $year->id,
+                        'year' => $year->year,
+                        'amount_allocated' => $year->amount_allocated,
+                        'is_locked' => $year->is_locked,
+                        'locked_by_snapshot_year' => $year->lockedBySnapshotRun?->year,
+                        'allocations' => $year->ownershipCopyAllocations
+                            ->sortBy('ownership_copy_id')
+                            ->map(fn ($allocation) => [
+                                'ownership_copy_id' => $allocation->ownership_copy_id,
+                                'allocated_amount' => $allocation->allocated_amount,
+                            ])
+                            ->values(),
+                    ])
+                    ->values(),
             ])
             ->values();
     }

@@ -84,7 +84,7 @@ class FinancialValueService
 
     public function calculateGamePaidBreakdown(LibraryGame $libraryGame): array
     {
-        $libraryGame->loadMissing(['ownershipCopies.ownershipType', 'ownedDlcs.dlc', 'inAppPurchases']);
+        $libraryGame->loadMissing(['ownershipCopies.ownershipType', 'ownedDlcs.dlc', 'inAppPurchases.lockedBySnapshotRun']);
         $copyPaid = (float) $libraryGame->ownershipCopies
             ->filter(fn ($copy) => in_array($copy->ownershipType?->name, ['Digital', 'Physical'], true))
             ->sum('purchased_price');
@@ -118,6 +118,7 @@ class FinancialValueService
                     'purchased_at' => $purchase->purchased_at?->format('Y-m-d'),
                     'is_locked' => $purchase->is_locked,
                     'locked_by_snapshot_run_id' => $purchase->locked_by_snapshot_run_id,
+                    'locked_by_snapshot_year' => $purchase->lockedBySnapshotRun?->year,
                 ])
                 ->values()
                 ->all(),
@@ -322,6 +323,7 @@ class FinancialValueService
             ->join('subscription_entries', 'subscription_entries.id', '=', 'subscription_entry_years.subscription_entry_id')
             ->join('ownership_types', 'ownership_types.id', '=', 'subscription_entries.ownership_type_id')
             ->join('ownership_copies', 'ownership_copies.id', '=', 'subscription_entry_year_ownership_copies.ownership_copy_id')
+            ->leftJoin('snapshot_runs', 'snapshot_runs.id', '=', 'subscription_entry_years.locked_by_snapshot_run_id')
             ->where('ownership_copies.library_game_id', $libraryGame->id)
             ->orderBy('subscription_entry_years.year')
             ->get([
@@ -331,6 +333,7 @@ class FinancialValueService
                 'subscription_entry_year_ownership_copies.allocated_amount',
                 'subscription_entry_years.is_locked',
                 'subscription_entry_years.locked_by_snapshot_run_id',
+                'snapshot_runs.year as locked_by_snapshot_year',
                 'ownership_types.name as ownership_type',
             ])
             ->map(fn ($row) => [
@@ -341,6 +344,9 @@ class FinancialValueService
                 'allocated_amount' => round((float) $row->allocated_amount, 2),
                 'is_locked' => (bool) $row->is_locked,
                 'locked_by_snapshot_run_id' => $row->locked_by_snapshot_run_id,
+                'locked_by_snapshot_year' => $row->locked_by_snapshot_year === null
+                    ? null
+                    : (int) $row->locked_by_snapshot_year,
             ])
             ->all();
     }

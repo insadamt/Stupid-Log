@@ -5,6 +5,7 @@ namespace App\Http\Controllers\StupidLog;
 use App\Http\Controllers\Controller;
 use App\Models\StupidLog\SnapshotRun;
 use App\Models\User;
+use App\Services\ClosedFinancialYearService;
 use App\Services\LocalUserService;
 use App\Services\SnapshotService;
 use App\Services\StatsService;
@@ -16,7 +17,11 @@ use Inertia\Response;
 
 class SnapshotController extends Controller
 {
-    public function snapshots(StatsService $stats, LocalUserService $users): Response
+    public function snapshots(
+        StatsService $stats,
+        LocalUserService $users,
+        ClosedFinancialYearService $closedYears,
+    ): Response
     {
         $user = $users->get();
         $snapshotPage = $this->snapshotFeedPayload($user, request(), $stats);
@@ -27,6 +32,7 @@ class SnapshotController extends Controller
             'liveStats' => $stats->live($user),
             'currentYear' => (int) now()->format('Y'),
             'confirmedCurrentYear' => $stats->confirmedYear($user, (int) now()->format('Y')),
+            'closedFinancialYear' => $closedYears->closedFinancialYear($user),
         ]);
     }
 
@@ -35,8 +41,13 @@ class SnapshotController extends Controller
         return response()->json($this->snapshotFeedPayload($users->get(), $request, $stats));
     }
 
-    public function snapshotDetails(SnapshotRun $snapshotRun, StatsService $stats, SnapshotService $snapshotService, LocalUserService $users): Response
-    {
+    public function snapshotDetails(
+        SnapshotRun $snapshotRun,
+        StatsService $stats,
+        SnapshotService $snapshotService,
+        LocalUserService $users,
+        ClosedFinancialYearService $closedYears,
+    ): Response {
         $user = $users->get();
         $snapshotPage = $this->snapshotFeedPayload($user, request(), $stats);
         $gameRows = $stats->snapshotRows($snapshotRun, request());
@@ -55,6 +66,7 @@ class SnapshotController extends Controller
             'liveStats' => $stats->live($user),
             'currentYear' => (int) now()->format('Y'),
             'confirmedCurrentYear' => $stats->confirmedYear($user, (int) now()->format('Y')),
+            'closedFinancialYear' => $closedYears->closedFinancialYear($user),
         ]);
     }
 

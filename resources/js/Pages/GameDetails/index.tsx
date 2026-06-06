@@ -24,12 +24,16 @@ export default function GameDetails({
     references,
     dlcs,
     paidBreakdown,
+    closedFinancialYear,
+    firstEditableFinancialDate,
 }: {
     libraryGame: GameCardData;
     details: Details;
     references: ReferenceData;
     dlcs: Dlc[];
     paidBreakdown: PaidBreakdown;
+    closedFinancialYear: number | null;
+    firstEditableFinancialDate: string | null;
 }) {
     const pageRef = useRef<HTMLElement>(null);
     const layoutRef = useRef<HTMLElement>(null);
@@ -76,7 +80,11 @@ export default function GameDetails({
     const [savingDlc, setSavingDlc] = useState(false);
     const [refreshingDlcs, setRefreshingDlcs] = useState(false);
     const [editingPurchaseId, setEditingPurchaseId] = useState<number | 'new' | null>(null);
-    const [purchaseForm, setPurchaseForm] = useState<InAppPurchaseForm>({ title: '', amount_paid: '', purchased_at: new Date().toISOString().slice(0, 10) });
+    const [purchaseForm, setPurchaseForm] = useState<InAppPurchaseForm>({
+        title: '',
+        amount_paid: '',
+        purchased_at: firstEditableFinancialDate ?? new Date().toISOString().slice(0, 10),
+    });
     const [purchaseErrors, setPurchaseErrors] = useState<Record<string, string>>({});
     const [savingPurchase, setSavingPurchase] = useState(false);
     const filteredDlcs = useMemo(
@@ -357,11 +365,17 @@ export default function GameDetails({
 
     function startAddPurchase() {
         setEditingPurchaseId('new');
-        setPurchaseForm({ title: '', amount_paid: '', purchased_at: new Date().toISOString().slice(0, 10) });
+        setPurchaseForm({
+            title: '',
+            amount_paid: '',
+            purchased_at: firstEditableFinancialDate ?? new Date().toISOString().slice(0, 10),
+        });
         setPurchaseErrors({});
     }
 
     function startEditPurchase(purchase: InAppPurchase) {
+        if (purchase.is_locked) return;
+
         setEditingPurchaseId(purchase.id);
         setPurchaseForm({
             title: purchase.title,
@@ -401,6 +415,8 @@ export default function GameDetails({
     }
 
     function deletePurchase(purchase: InAppPurchase) {
+        if (purchase.is_locked) return;
+
         router.delete(`/in-app-purchases/${purchase.id}`, {
             preserveScroll: true,
             onError: (errors: Record<string, string>) => setPurchaseErrors(errors),
@@ -445,6 +461,8 @@ export default function GameDetails({
                         {mode === 'purchases' && (
                             <PurchasesPanel
                                 paidBreakdown={paidBreakdown}
+                                closedFinancialYear={closedFinancialYear}
+                                firstEditableFinancialDate={firstEditableFinancialDate}
                                 editingPurchaseId={editingPurchaseId}
                                 purchaseForm={purchaseForm}
                                 purchaseErrors={purchaseErrors}

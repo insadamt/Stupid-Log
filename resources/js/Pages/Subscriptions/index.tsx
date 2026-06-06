@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { Check, Edit3, Plus, Trash2 } from 'lucide-react';
+import { Check, Edit3, LockKeyhole, Plus, Trash2 } from 'lucide-react';
 import { ReactNode, useMemo, useState } from 'react';
 import AppLayout from '../../Components/AppLayout';
 import { moneyFormat } from '../Home/formatters';
@@ -13,6 +13,21 @@ type SubscriptionEntry = {
     finished_at: string;
     selected_ownership_copy_ids: number[];
     selected_count: number;
+    has_locked_years: boolean;
+    locked_ownership_copy_ids: number[];
+    years: SubscriptionYear[];
+};
+
+type SubscriptionYear = {
+    id: number;
+    year: number;
+    amount_allocated: string | number;
+    is_locked: boolean;
+    locked_by_snapshot_year: number | null;
+    allocations: Array<{
+        ownership_copy_id: number;
+        allocated_amount: string | number;
+    }>;
 };
 
 type SubscriptionOwnershipType = {
@@ -42,10 +57,14 @@ export default function Subscriptions({
     subscriptionEntries,
     subscriptionOwnershipTypes,
     ownershipCopies,
+    closedFinancialYear,
+    firstEditableDate,
 }: {
     subscriptionEntries: SubscriptionEntry[];
     subscriptionOwnershipTypes: SubscriptionOwnershipType[];
     ownershipCopies: SubscriptionOwnershipCopy[];
+    closedFinancialYear: number | null;
+    firstEditableDate: string | null;
 }) {
     const [editingId, setEditingId] = useState<number | 'new' | null>(null);
     const [selectedEntryId, setSelectedEntryId] = useState<number | null>(subscriptionEntries[0]?.id ?? null);
@@ -54,6 +73,9 @@ export default function Subscriptions({
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const selectedEntry = subscriptionEntries.find((entry) => entry.id === selectedEntryId) ?? null;
+    const editingEntry = typeof editingId === 'number'
+        ? subscriptionEntries.find((entry) => entry.id === editingId) ?? null
+        : null;
     const activeOwnershipTypeId = Number(editingId ? form.ownership_type_id : selectedEntry?.ownership_type_id ?? subscriptionOwnershipTypes[0]?.id ?? 0);
     const matchingCopies = ownershipCopies.filter((copy) => copy.ownership_type_id === activeOwnershipTypeId);
     const allocationPreview = selectedCopyIds.length ? Number(form.amount_paid || 0) / selectedCopyIds.length : 0;
@@ -140,6 +162,10 @@ export default function Subscriptions({
     }
 
     function toggleCopy(copyId: number) {
+        if (editingEntry?.locked_ownership_copy_ids.includes(copyId) && selectedCopyIds.includes(copyId)) {
+            return;
+        }
+
         setSelectedCopyIds((current) => current.includes(copyId) ? current.filter((id) => id !== copyId) : [...current, copyId]);
     }
 
@@ -182,6 +208,9 @@ export default function Subscriptions({
                                 ownershipTypes={subscriptionOwnershipTypes}
                                 errors={errors}
                                 saving={saving}
+                                coreLocked={editingEntry?.has_locked_years ?? false}
+                                closedFinancialYear={closedFinancialYear}
+                                firstEditableDate={firstEditableDate}
                                 updateForm={updateForm}
                                 submitEntry={submitEntry}
                                 cancelEdit={cancelEdit}
@@ -191,6 +220,8 @@ export default function Subscriptions({
                                 selectedCopyIds={selectedCopyIds}
                                 allocationPreview={allocationPreview}
                                 canSave={typeof editingId === 'number'}
+                                lockedCopyIds={editingEntry?.locked_ownership_copy_ids ?? []}
+                                hasLockedYears={editingEntry?.has_locked_years ?? false}
                                 toggleCopy={toggleCopy}
                                 saveAllocation={saveAllocation}
                             />
@@ -227,11 +258,14 @@ function emptyForm(firstOwnershipTypeId?: number): SubscriptionForm {
     };
 }
 
-function EntryForm({ form, ownershipTypes, errors, saving, updateForm, submitEntry, cancelEdit }: {
+function EntryForm({ form, ownershipTypes, errors, saving, coreLocked, closedFinancialYear, firstEditableDate, updateForm, submitEntry, cancelEdit }: {
     form: SubscriptionForm;
     ownershipTypes: SubscriptionOwnershipType[];
     errors: Record<string, string>;
     saving: boolean;
+    coreLocked: boolean;
+    closedFinancialYear: number | null;
+    firstEditableDate: string | null;
     updateForm: (patch: Partial<SubscriptionForm>) => void;
     submitEntry: () => void;
     cancelEdit: () => void;
@@ -239,37 +273,49 @@ function EntryForm({ form, ownershipTypes, errors, saving, updateForm, submitEnt
     return (
         <div className="rounded-[28px] bg-white p-5">
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-black/40">Entry details</p>
+            {closedFinancialYear !== null && (
+                <p className="mt-3 rounded-[18px] bg-black/5 px-4 py-3 text-sm font-bold text-black/50">
+                    {closedFinancialYear} and earlier are locked by confirmed snapshots.
+                </p>
+            )}
+            {coreLocked && (
+                <p className="mt-3 flex items-center gap-2 rounded-[18px] bg-[#fff0f0] px-4 py-3 text-sm font-bold text-[#b42318]">
+                    <LockKeyhole size={16} /> Core details are locked by a confirmed snapshot.
+                </p>
+            )}
             <div className="mt-4 grid gap-3">
                 <Field label="Ownership type" error={errors.ownership_type_id}>
-                    <select value={form.ownership_type_id} onChange={(event) => updateForm({ ownership_type_id: event.target.value })} className="w-full rounded-2xl bg-black/5 px-4 py-3 font-bold outline-none ring-1 ring-black/10">
+                    <select disabled={coreLocked} value={form.ownership_type_id} onChange={(event) => updateForm({ ownership_type_id: event.target.value })} className="w-full rounded-2xl bg-black/5 px-4 py-3 font-bold outline-none ring-1 ring-black/10 disabled:opacity-45">
                         {ownershipTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
                     </select>
                 </Field>
                 <Field label="Amount paid" error={errors.amount_paid}>
-                    <input type="number" min="0.01" step="0.01" value={form.amount_paid} onChange={(event) => updateForm({ amount_paid: event.target.value })} className="w-full rounded-2xl bg-black/5 px-4 py-3 font-bold outline-none ring-1 ring-black/10" />
+                    <input disabled={coreLocked} type="number" min="0.01" step="0.01" value={form.amount_paid} onChange={(event) => updateForm({ amount_paid: event.target.value })} className="w-full rounded-2xl bg-black/5 px-4 py-3 font-bold outline-none ring-1 ring-black/10 disabled:opacity-45" />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                     <Field label="Started" error={errors.started_at}>
-                        <input type="date" value={form.started_at} onChange={(event) => updateForm({ started_at: event.target.value })} className="w-full rounded-2xl bg-black/5 px-4 py-3 font-bold outline-none ring-1 ring-black/10" />
+                        <input disabled={coreLocked} type="date" min={firstEditableDate ?? undefined} value={form.started_at} onChange={(event) => updateForm({ started_at: event.target.value })} className="w-full rounded-2xl bg-black/5 px-4 py-3 font-bold outline-none ring-1 ring-black/10 disabled:opacity-45" />
                     </Field>
                     <Field label="Finished" error={errors.finished_at}>
-                        <input type="date" value={form.finished_at} onChange={(event) => updateForm({ finished_at: event.target.value })} className="w-full rounded-2xl bg-black/5 px-4 py-3 font-bold outline-none ring-1 ring-black/10" />
+                        <input disabled={coreLocked} type="date" min={firstEditableDate ?? undefined} value={form.finished_at} onChange={(event) => updateForm({ finished_at: event.target.value })} className="w-full rounded-2xl bg-black/5 px-4 py-3 font-bold outline-none ring-1 ring-black/10 disabled:opacity-45" />
                     </Field>
                 </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
                 <button type="button" onClick={cancelEdit} className="rounded-full px-4 py-2 text-sm font-black text-black/45">Cancel</button>
-                <button type="button" disabled={saving} onClick={submitEntry} className="rounded-full bg-black px-5 py-2 text-sm font-black text-white disabled:opacity-50">Save</button>
+                <button type="button" disabled={saving || coreLocked} onClick={submitEntry} className="rounded-full bg-black px-5 py-2 text-sm font-black text-white disabled:opacity-50">Save</button>
             </div>
         </div>
     );
 }
 
-function AllocationPanel({ matchingCopies, selectedCopyIds, allocationPreview, canSave, toggleCopy, saveAllocation }: {
+function AllocationPanel({ matchingCopies, selectedCopyIds, allocationPreview, canSave, lockedCopyIds, hasLockedYears, toggleCopy, saveAllocation }: {
     matchingCopies: SubscriptionOwnershipCopy[];
     selectedCopyIds: number[];
     allocationPreview: number;
     canSave: boolean;
+    lockedCopyIds: number[];
+    hasLockedYears: boolean;
     toggleCopy: (copyId: number) => void;
     saveAllocation: () => void;
 }) {
@@ -285,9 +331,13 @@ function AllocationPanel({ matchingCopies, selectedCopyIds, allocationPreview, c
                 </button>
             </div>
             {!selectedCopyIds.length && <p className="mt-4 rounded-[20px] bg-black/5 p-4 text-sm font-bold text-black/45">This subscription does not affect paid value until at least one ownership copy is selected.</p>}
+            {hasLockedYears && <p className="mt-4 rounded-[20px] bg-black/5 p-4 text-sm font-bold text-black/45">New copies affect editable years only. Copies used by locked years cannot be removed.</p>}
             <div className="mt-4 max-h-[520px] space-y-2 overflow-y-auto pr-1">
-                {matchingCopies.map((copy) => (
-                    <button key={copy.id} type="button" onClick={() => toggleCopy(copy.id)} className={`flex w-full items-center gap-3 rounded-[22px] p-3 text-left ring-1 ring-black/8 ${selectedCopyIds.includes(copy.id) ? 'bg-[#b7ff63]' : 'bg-black/5'}`}>
+                {matchingCopies.map((copy) => {
+                    const removalLocked = lockedCopyIds.includes(copy.id) && selectedCopyIds.includes(copy.id);
+
+                    return (
+                    <button key={copy.id} type="button" disabled={removalLocked} onClick={() => toggleCopy(copy.id)} className={`flex w-full items-center gap-3 rounded-[22px] p-3 text-left ring-1 ring-black/8 disabled:cursor-not-allowed ${selectedCopyIds.includes(copy.id) ? 'bg-[#b7ff63]' : 'bg-black/5'}`}>
                         <div className="size-12 overflow-hidden rounded-2xl bg-black/10">
                             {copy.cover_url && <img src={copy.cover_url} alt="" className="h-full w-full object-cover" />}
                         </div>
@@ -295,8 +345,10 @@ function AllocationPanel({ matchingCopies, selectedCopyIds, allocationPreview, c
                             <p className="truncate font-black">{copy.game_title}</p>
                             <p className="text-xs font-bold text-black/45">{copy.platform} · {copy.ownership_type}</p>
                         </div>
+                        {removalLocked && <LockKeyhole size={16} className="ml-auto shrink-0" />}
                     </button>
-                ))}
+                    );
+                })}
                 {!matchingCopies.length && <p className="rounded-[22px] bg-black/5 p-5 text-sm font-bold text-black/45">No matching ownership copies.</p>}
             </div>
         </div>
@@ -310,7 +362,6 @@ function EntryDetails({ entry, ownershipCopies, startEdit, deleteEntry }: {
     deleteEntry: (entry: SubscriptionEntry) => void;
 }) {
     const selectedCopies = useMemo(() => ownershipCopies.filter((copy) => entry.selected_ownership_copy_ids.includes(copy.id)), [entry, ownershipCopies]);
-    const perCopy = selectedCopies.length ? Number(entry.amount_paid) / selectedCopies.length : 0;
 
     return (
         <div className="rounded-[28px] bg-white p-6">
@@ -322,22 +373,68 @@ function EntryDetails({ entry, ownershipCopies, startEdit, deleteEntry }: {
                 </div>
                 <div className="flex gap-2">
                     <button type="button" onClick={() => startEdit(entry)} className="grid size-11 place-items-center rounded-full bg-black text-white"><Edit3 size={18} /></button>
-                    <button type="button" onClick={() => deleteEntry(entry)} className="grid size-11 place-items-center rounded-full bg-black/8 text-black"><Trash2 size={18} /></button>
+                    <button type="button" disabled={entry.has_locked_years} onClick={() => deleteEntry(entry)} className="grid size-11 place-items-center rounded-full bg-black/8 text-black disabled:cursor-not-allowed disabled:opacity-35"><Trash2 size={18} /></button>
                 </div>
             </div>
-            <div className="mt-6 rounded-[24px] bg-black p-5 text-white">
-                <p className="text-sm font-black text-white/45">Allocation</p>
-                <p className="mt-1 text-2xl font-black">{selectedCopies.length ? `${moneyFormat(perCopy)} per selected copy` : 'No selected copies'}</p>
-            </div>
-            <div className="mt-5 grid gap-2 md:grid-cols-2">
-                {selectedCopies.map((copy) => (
-                    <div key={copy.id} className="rounded-[22px] bg-black/5 p-4">
-                        <p className="font-black">{copy.game_title}</p>
-                        <p className="text-sm font-bold text-black/45">{copy.platform} · {copy.ownership_type}</p>
-                    </div>
+            <div className="mt-6 space-y-3">
+                {entry.years.map((year) => (
+                    <YearAllocation key={year.id} year={year} ownershipCopies={ownershipCopies} />
                 ))}
             </div>
+            <div className="mt-5">
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-black/40">Global membership</p>
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                    {selectedCopies.map((copy) => (
+                    <div key={copy.id} className="rounded-[22px] bg-black/5 p-4">
+                        <div className="flex items-center gap-2">
+                            <p className="min-w-0 flex-1 truncate font-black">{copy.game_title}</p>
+                            {entry.locked_ownership_copy_ids.includes(copy.id) && <LockKeyhole size={15} />}
+                        </div>
+                        <p className="text-sm font-bold text-black/45">{copy.platform} · {copy.ownership_type}</p>
+                    </div>
+                    ))}
+                </div>
+            </div>
         </div>
+    );
+}
+
+function YearAllocation({ year, ownershipCopies }: {
+    year: SubscriptionYear;
+    ownershipCopies: SubscriptionOwnershipCopy[];
+}) {
+    return (
+        <section className="rounded-[24px] bg-black p-5 text-white">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p className="text-sm font-black text-white/45">{year.year} yearly budget</p>
+                    <p className="mt-1 text-2xl font-black">{moneyFormat(year.amount_allocated)}</p>
+                </div>
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${year.is_locked ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-white'}`}>
+                    {year.is_locked && <LockKeyhole size={12} />}
+                    {year.is_locked ? `Locked by ${year.locked_by_snapshot_year} snapshot` : 'Editable'}
+                </span>
+            </div>
+            {!year.allocations.length ? (
+                <p className="mt-4 rounded-[18px] bg-white/8 px-4 py-3 text-sm font-bold text-white/50">Full budget counts as unallocated paid value.</p>
+            ) : (
+                <div className="mt-4 grid gap-2 md:grid-cols-2">
+                    {year.allocations.map((allocation) => {
+                        const copy = ownershipCopies.find((candidate) => candidate.id === allocation.ownership_copy_id);
+
+                        return (
+                            <div key={allocation.ownership_copy_id} className="rounded-[18px] bg-white/8 px-4 py-3">
+                                <div className="flex justify-between gap-3 font-black">
+                                    <span className="truncate">{copy?.game_title ?? 'Unavailable copy'}</span>
+                                    <span className="shrink-0 text-[#b7ff63]">{moneyFormat(allocation.allocated_amount)}</span>
+                                </div>
+                                {copy && <p className="mt-1 text-xs font-bold text-white/40">{copy.platform}</p>}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </section>
     );
 }
 

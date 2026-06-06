@@ -7,9 +7,11 @@ use App\Models\StupidLog\LibraryGame;
 use App\Models\StupidLog\OwnershipCopy;
 use App\Models\StupidLog\OwnershipType;
 use App\Models\StupidLog\Platform;
+use App\Models\StupidLog\SnapshotRun;
 use App\Models\StupidLog\Status;
 use App\Models\StupidLog\SubscriptionEntry;
 use App\Models\User;
+use App\Services\SubscriptionYearAllocationService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -40,6 +42,35 @@ class SubscriptionEntriesTest extends TestCase
         $this->assertSame($entry->id, $page['props']['subscriptionEntries'][0]['id']);
         $this->assertSame($copy->id, $page['props']['ownershipCopies'][0]['id']);
         $this->assertTrue(collect($page['props']['subscriptionOwnershipTypes'])->contains('name', 'Game Pass'));
+    }
+
+    public function test_subscriptions_page_exposes_yearly_locks_and_closed_date_boundary(): void
+    {
+        $copy = $this->createOwnershipCopy($this->user, 'Locked Library Game', 'Xbox', 'Game Pass');
+        $entry = $this->createSubscription('Game Pass');
+        $entry->ownershipCopies()->sync([$copy->id]);
+        app(SubscriptionYearAllocationService::class)->synchronizeUnlockedYears($entry->refresh());
+        $snapshot = SnapshotRun::create([
+            'user_id' => $this->user->id,
+            'year' => 2026,
+            'status' => 'confirmed',
+            'confirmed_at' => now(),
+        ]);
+        $entry->years()->update([
+            'is_locked' => true,
+            'locked_by_snapshot_run_id' => $snapshot->id,
+        ]);
+
+        $page = $this->get('/subscriptions')->assertOk()->viewData('page');
+        $payload = $page['props']['subscriptionEntries'][0];
+
+        $this->assertTrue($payload['has_locked_years']);
+        $this->assertSame([$copy->id], $payload['locked_ownership_copy_ids']);
+        $this->assertTrue($payload['years'][0]['is_locked']);
+        $this->assertSame(2026, $payload['years'][0]['locked_by_snapshot_year']);
+        $this->assertSame($copy->id, $payload['years'][0]['allocations'][0]['ownership_copy_id']);
+        $this->assertSame(2026, $page['props']['closedFinancialYear']);
+        $this->assertSame('2027-01-01', $page['props']['firstEditableDate']);
     }
 
     public function test_can_create_subscription_entry_with_required_fields(): void

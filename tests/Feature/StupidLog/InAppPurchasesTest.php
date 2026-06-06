@@ -6,6 +6,7 @@ use App\Models\StupidLog\Game;
 use App\Models\StupidLog\InAppPurchase;
 use App\Models\StupidLog\LibraryGame;
 use App\Models\StupidLog\Platform;
+use App\Models\StupidLog\SnapshotRun;
 use App\Models\StupidLog\Status;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -76,6 +77,33 @@ class InAppPurchasesTest extends TestCase
         $this->assertSame(4.99, $page['props']['paidBreakdown']['total_purchased_value']);
         $this->assertSame($purchase->id, $page['props']['paidBreakdown']['in_app_purchases'][0]['id']);
         $this->assertSame('Coin Pack', $page['props']['paidBreakdown']['in_app_purchases'][0]['title']);
+    }
+
+    public function test_game_details_exposes_iap_lock_provenance_and_closed_date_boundary(): void
+    {
+        $libraryGame = $this->createLibraryGame($this->user, 'Locked IAP Game');
+        $snapshot = SnapshotRun::create([
+            'user_id' => $this->user->id,
+            'year' => 2026,
+            'status' => 'confirmed',
+            'confirmed_at' => now(),
+        ]);
+        $purchase = $libraryGame->inAppPurchases()->create([
+            'title' => 'Locked Coins',
+            'amount_paid' => 4.99,
+            'purchased_at' => '2026-03-01',
+            'is_locked' => true,
+            'locked_by_snapshot_run_id' => $snapshot->id,
+        ]);
+
+        $page = $this->get("/games/{$libraryGame->id}")->assertOk()->viewData('page');
+        $payload = $page['props']['paidBreakdown']['in_app_purchases'][0];
+
+        $this->assertSame($purchase->id, $payload['id']);
+        $this->assertTrue($payload['is_locked']);
+        $this->assertSame(2026, $payload['locked_by_snapshot_year']);
+        $this->assertSame(2026, $page['props']['closedFinancialYear']);
+        $this->assertSame('2027-01-01', $page['props']['firstEditableFinancialDate']);
     }
 
     public function test_in_app_purchase_requires_title_amount_and_purchase_date(): void

@@ -50,6 +50,9 @@ export type InAppPurchase = {
     title: string;
     amount_paid: string | number;
     purchased_at: string | null;
+    is_locked: boolean;
+    locked_by_snapshot_run_id: number | null;
+    locked_by_snapshot_year: number | null;
 };
 
 export type InAppPurchaseForm = {
@@ -66,12 +69,13 @@ export type PaidBreakdown = {
     total_purchased_value: number;
     subscription_allocations: Array<{
         subscription_entry_id: number;
+        year: number;
         ownership_type: string;
-        amount_paid: string | number;
-        selected_count: number;
+        yearly_amount: string | number;
         allocated_amount: number;
-        started_at: string;
-        finished_at: string;
+        is_locked: boolean;
+        locked_by_snapshot_run_id: number | null;
+        locked_by_snapshot_year: number | null;
     }>;
     in_app_purchases: InAppPurchase[];
 };

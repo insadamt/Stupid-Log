@@ -17,12 +17,14 @@ export default function Snapshots({
     snapshotsNextCursor = null,
     currentYear,
     confirmedCurrentYear,
+    closedFinancialYear,
     selectedSnapshot = null,
 }: {
     snapshots: Snapshot[];
     snapshotsNextCursor?: string | null;
     currentYear: number;
     confirmedCurrentYear: Snapshot | null;
+    closedFinancialYear: number | null;
     liveStats: unknown;
     selectedSnapshot?: SnapshotDetailsData | null;
 }) {
@@ -47,6 +49,7 @@ export default function Snapshots({
     const confirmed = snapshotItems.filter((snapshot) => snapshot.status === 'confirmed');
     const selectedYear = Number(snapshotYear);
     const selectedYearIsValid = Number.isInteger(selectedYear) && selectedYear >= 1970 && selectedYear <= 2100;
+    const selectedYearIsClosed = closedFinancialYear !== null && selectedYear <= closedFinancialYear;
     const selectedYearExisting = snapshotItems.find((snapshot) => snapshot.year === selectedYear) ?? null;
     const selectedYearConfirmed = selectedYearExisting?.status === 'confirmed' || confirmedCurrentYear?.year === selectedYear;
     const selectedSnapshotId = selectedSnapshot?.snapshot_id ?? null;
@@ -58,7 +61,7 @@ export default function Snapshots({
     }, [selectedSnapshot?.snapshot_id, selectedSnapshotBestGamesKey]);
 
     function createDraft() {
-        if (!selectedYearIsValid || selectedYearExisting) return;
+        if (!selectedYearIsValid || selectedYearExisting || selectedYearIsClosed) return;
 
         setCreating(true);
         router.post('/snapshots', { year: selectedYear }, {
@@ -68,6 +71,10 @@ export default function Snapshots({
     }
 
     function confirm(snapshot: Snapshot | SnapshotDetailsData) {
+        if (!window.confirm(`Confirming ${snapshot.year} will close ${snapshot.year} and all previous years. You will not be able to add IAPs, subscriptions, or snapshots for ${snapshot.year} or earlier.`)) {
+            return;
+        }
+
         setConfirmingId(snapshot.snapshot_id);
 
         if (selectedSnapshot && snapshot.snapshot_id === selectedSnapshot.snapshot_id && snapshot.status === 'draft') {
@@ -155,6 +162,8 @@ export default function Snapshots({
 
     const yearMessage = selectedYearExisting
         ? `${selectedYear} ${selectedYearExisting.status} exists`
+        : selectedYearIsClosed
+            ? `${selectedYear} is closed by the ${closedFinancialYear} snapshot`
         : selectedYearIsValid
             ? 'Ready for draft capture'
             : 'Year must be 1970-2100';
@@ -184,7 +193,7 @@ export default function Snapshots({
                                         className="h-11 w-[110px] rounded-[18px] border border-white/10 bg-white/8 px-4 text-center text-lg font-black text-white outline-none focus:border-[#b7ff63]"
                                     />
                                     <button type="button" onClick={() => shiftYear(1)} className="grid size-11 place-items-center rounded-[18px] bg-black text-white ring-1 ring-white/10 transition hover:text-[#b7ff63]"><ChevronRight size={18} /></button>
-                                    <ManagerButton onClick={createDraft} disabled={creating || !!selectedYearExisting || selectedYearConfirmed || !selectedYearIsValid} tone="green">
+                                    <ManagerButton onClick={createDraft} disabled={creating || !!selectedYearExisting || selectedYearConfirmed || selectedYearIsClosed || !selectedYearIsValid} tone="green">
                                         <CalendarClock size={16} strokeWidth={3} />
                                         {creating ? 'Creating' : 'Create Draft'}
                                     </ManagerButton>

@@ -1,10 +1,12 @@
-import { Edit3, Plus, Trash2 } from 'lucide-react';
+import { Edit3, LockKeyhole, Plus, Trash2 } from 'lucide-react';
 import { ReactNode } from 'react';
 import { moneyFormat } from '../../Home/formatters';
 import { InAppPurchase, InAppPurchaseForm, PaidBreakdown } from '../types';
 
 export default function PurchasesPanel({
     paidBreakdown,
+    closedFinancialYear,
+    firstEditableFinancialDate,
     editingPurchaseId,
     purchaseForm,
     purchaseErrors,
@@ -17,6 +19,8 @@ export default function PurchasesPanel({
     deletePurchase,
 }: {
     paidBreakdown: PaidBreakdown;
+    closedFinancialYear: number | null;
+    firstEditableFinancialDate: string | null;
     editingPurchaseId: number | 'new' | null;
     purchaseForm: InAppPurchaseForm;
     purchaseErrors: Record<string, string>;
@@ -49,6 +53,12 @@ export default function PurchasesPanel({
                 <Metric label="IAP" value={paidBreakdown.in_app_purchase_value} />
             </div>
 
+            {closedFinancialYear !== null && (
+                <p className="mt-5 rounded-[20px] bg-white/10 px-4 py-3 text-sm font-bold text-white/50">
+                    {closedFinancialYear} and earlier are locked by confirmed snapshots.
+                </p>
+            )}
+
             {editing && (
                 <div className="mt-5 rounded-[26px] bg-white p-4 text-black">
                     <div className="grid gap-3">
@@ -60,7 +70,7 @@ export default function PurchasesPanel({
                                 <input type="number" min="0.01" step="0.01" value={purchaseForm.amount_paid} onChange={(event) => updatePurchaseForm({ amount_paid: event.target.value })} className="w-full rounded-2xl bg-black/5 px-4 py-3 font-bold outline-none ring-1 ring-black/10" />
                             </Field>
                             <Field label="Purchased" error={purchaseErrors.purchased_at}>
-                                <input type="date" value={purchaseForm.purchased_at} onChange={(event) => updatePurchaseForm({ purchased_at: event.target.value })} className="w-full rounded-2xl bg-black/5 px-4 py-3 font-bold outline-none ring-1 ring-black/10" />
+                                <input type="date" min={firstEditableFinancialDate ?? undefined} value={purchaseForm.purchased_at} onChange={(event) => updatePurchaseForm({ purchased_at: event.target.value })} className="w-full rounded-2xl bg-black/5 px-4 py-3 font-bold outline-none ring-1 ring-black/10" />
                             </Field>
                         </div>
                     </div>
@@ -76,16 +86,27 @@ export default function PurchasesPanel({
                     <div key={purchase.id} className="flex items-center justify-between gap-3 rounded-[24px] bg-white/10 px-4 py-3">
                         <div className="min-w-0">
                             <p className="truncate font-black">{purchase.title}</p>
-                            <p className="text-xs font-bold text-white/45">{purchase.purchased_at ?? 'No date'}</p>
+                            <p className="text-xs font-bold text-white/45">
+                                {purchase.purchased_at ?? 'No date'}
+                                {purchase.is_locked && ` · Locked by ${purchase.locked_by_snapshot_year} snapshot`}
+                            </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                             <span className="font-black text-[#b7ff63]">{moneyFormat(purchase.amount_paid)}</span>
-                            <button type="button" onClick={() => startEditPurchase(purchase)} className="grid size-9 place-items-center rounded-full bg-white/10">
-                                <Edit3 size={16} />
-                            </button>
-                            <button type="button" onClick={() => deletePurchase(purchase)} className="grid size-9 place-items-center rounded-full bg-white/10">
-                                <Trash2 size={16} />
-                            </button>
+                            {purchase.is_locked ? (
+                                <span title={`Locked by ${purchase.locked_by_snapshot_year} snapshot`} className="grid size-9 place-items-center rounded-full bg-[#b7ff63] text-black">
+                                    <LockKeyhole size={16} />
+                                </span>
+                            ) : (
+                                <>
+                                    <button type="button" onClick={() => startEditPurchase(purchase)} className="grid size-9 place-items-center rounded-full bg-white/10">
+                                        <Edit3 size={16} />
+                                    </button>
+                                    <button type="button" onClick={() => deletePurchase(purchase)} className="grid size-9 place-items-center rounded-full bg-white/10">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -98,12 +119,15 @@ export default function PurchasesPanel({
                 <div className="mt-5 space-y-2">
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">Subscription shares</p>
                     {paidBreakdown.subscription_allocations.map((allocation) => (
-                        <div key={allocation.subscription_entry_id} className="rounded-[20px] bg-white/8 px-4 py-3 text-sm">
+                        <div key={`${allocation.subscription_entry_id}-${allocation.year}`} className="rounded-[20px] bg-white/8 px-4 py-3 text-sm">
                             <div className="flex justify-between gap-3 font-black">
-                                <span>{allocation.ownership_type}</span>
+                                <span>{allocation.ownership_type} · {allocation.year}</span>
                                 <span>{moneyFormat(allocation.allocated_amount)}</span>
                             </div>
-                            <p className="mt-1 font-bold text-white/40">{allocation.started_at} - {allocation.finished_at} · {allocation.selected_count} copies</p>
+                            <p className="mt-1 font-bold text-white/40">
+                                {moneyFormat(allocation.yearly_amount)} yearly budget
+                                {allocation.is_locked && ` · Locked by ${allocation.locked_by_snapshot_year} snapshot`}
+                            </p>
                         </div>
                     ))}
                 </div>
