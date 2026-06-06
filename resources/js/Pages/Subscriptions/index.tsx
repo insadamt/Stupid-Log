@@ -171,7 +171,7 @@ export default function Subscriptions({
 
     return (
         <AppLayout title="Subscriptions">
-            <main className="mx-auto grid min-h-[calc(100vh-64px)] max-w-7xl gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
+            <main className="mx-auto grid min-h-[calc(100vh-64px)] max-w-7xl gap-6 md:pl-[88px] lg:grid-cols-[380px_minmax(0,1fr)]">
                 <section className="rounded-[34px] bg-black p-5 text-white shadow-[0_20px_42px_rgb(0_0_0/0.22)]">
                     <div className="flex items-center justify-between gap-3">
                         <div>
