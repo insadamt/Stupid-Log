@@ -42,45 +42,11 @@ function ArchiveList({ title, sub, games, metric }: { title: string; sub: string
 }
 
 export default function ArchivePanel({ stats }: { stats: StatView }) {
-    const unallocated = stats.archive?.unallocated_financial;
-    const hasUnallocated = Boolean(unallocated && unallocated.total_unallocated_value > 0);
-    const archiveLists = (
-        <div className="grid min-h-0 gap-4 xl:grid-cols-3">
+    return (
+        <div className="grid h-full min-h-0 gap-4 xl:grid-cols-3">
             <ArchiveList title="Most Played" sub="Playtime record" games={stats.archive?.most_played ?? []} metric="playtime" />
             <ArchiveList title="Biggest Base Price" sub="Base value record" games={stats.archive?.biggest_base_price ?? []} metric="base" />
             <ArchiveList title="Biggest Paid Price" sub="Paid value record" games={stats.archive?.biggest_paid_price ?? []} metric="paid" />
-        </div>
-    );
-
-    return (
-        <div className={hasUnallocated ? 'grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4' : 'h-full min-h-0'}>
-            {hasUnallocated && unallocated && (
-                <section className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] bg-black px-5 py-4 text-white">
-                    <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#b7ff63]/70">Outside game rows</p>
-                        <p className="mt-1 text-lg font-black">Unallocated financial value</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2 text-sm font-black">
-                        <ArchiveFinancialMetric label="Subscriptions" value={unallocated.subscription_unallocated_value} />
-                        <ArchiveFinancialMetric label="In-app purchases" value={unallocated.in_app_purchase_unallocated_value} />
-                        <ArchiveFinancialMetric label="Total" value={unallocated.total_unallocated_value} highlight />
-                    </div>
-                </section>
-            )}
-            {archiveLists}
-        </div>
-    );
-}
-
-function ArchiveFinancialMetric({ label, value, highlight = false }: {
-    label: string;
-    value: number;
-    highlight?: boolean;
-}) {
-    return (
-        <div className={`rounded-[18px] px-4 py-2 ${highlight ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-white'}`}>
-            <span className="text-[10px] uppercase tracking-[0.14em] opacity-50">{label}</span>
-            <span className="ml-2">{money(value)}</span>
         </div>
     );
 }
