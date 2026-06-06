@@ -6,36 +6,56 @@ use App\Http\Controllers\Controller;
 use App\Models\StupidLog\InAppPurchase;
 use App\Models\StupidLog\LibraryGame;
 use App\Services\FinancialSnapshotRefreshService;
+use App\Services\InAppPurchaseMutationService;
 use App\Services\LocalUserService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class InAppPurchaseController extends Controller
 {
-    public function store(Request $request, LibraryGame $libraryGame, LocalUserService $localUser, FinancialSnapshotRefreshService $refresh): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        LibraryGame $libraryGame,
+        LocalUserService $localUser,
+        FinancialSnapshotRefreshService $refresh,
+        InAppPurchaseMutationService $mutations,
+    ): RedirectResponse {
         $this->assertLibraryGameBelongsToLocalUser($libraryGame, $localUser);
+        $validated = $this->validatePurchase($request);
+        $mutations->assertCreationAllowed($libraryGame, $validated['purchased_at']);
 
-        $purchase = $libraryGame->inAppPurchases()->create($this->validatePurchase($request));
+        $purchase = $libraryGame->inAppPurchases()->create($validated);
         $refresh->refreshForInAppPurchaseCreated($purchase);
 
         return back();
     }
 
-    public function update(Request $request, InAppPurchase $inAppPurchase, LocalUserService $localUser, FinancialSnapshotRefreshService $refresh): RedirectResponse
-    {
+    public function update(
+        Request $request,
+        InAppPurchase $inAppPurchase,
+        LocalUserService $localUser,
+        FinancialSnapshotRefreshService $refresh,
+        InAppPurchaseMutationService $mutations,
+    ): RedirectResponse {
         $this->assertPurchaseBelongsToLocalUser($inAppPurchase, $localUser);
+        $validated = $this->validatePurchase($request);
+        $mutations->assertUpdateAllowed($inAppPurchase, $validated);
         $oldValues = $inAppPurchase->only(['purchased_at']);
 
-        $inAppPurchase->update($this->validatePurchase($request));
+        $inAppPurchase->update($validated);
         $refresh->refreshForInAppPurchaseUpdated($inAppPurchase->refresh(), $oldValues);
 
         return back();
     }
 
-    public function destroy(InAppPurchase $inAppPurchase, LocalUserService $localUser, FinancialSnapshotRefreshService $refresh): RedirectResponse
-    {
+    public function destroy(
+        InAppPurchase $inAppPurchase,
+        LocalUserService $localUser,
+        FinancialSnapshotRefreshService $refresh,
+        InAppPurchaseMutationService $mutations,
+    ): RedirectResponse {
         $this->assertPurchaseBelongsToLocalUser($inAppPurchase, $localUser);
+        $mutations->assertDeletionAllowed($inAppPurchase);
         $oldPurchase = clone $inAppPurchase;
 
         $inAppPurchase->delete();

@@ -11,8 +11,15 @@ use Illuminate\Validation\ValidationException;
 
 class SnapshotService
 {
+    public function __construct(
+        private ClosedFinancialYearService $closedYears,
+        private CumulativeFinancialLockService $financialLocks,
+    ) {}
+
     public function createDraft(User $user, int $year): SnapshotRun
     {
+        $this->assertSnapshotYearIsOpen($user, $year);
+
         return DB::transaction(function () use ($user, $year) {
             if (SnapshotRun::where('user_id', $user->id)
                 ->where('year', $year)
@@ -44,6 +51,11 @@ class SnapshotService
             ]);
         }
 
+        $this->assertSnapshotYearIsOpen(
+            User::findOrFail($snapshot->user_id),
+            (int) $snapshot->year,
+        );
+
         return DB::transaction(function () use ($snapshot) {
             DB::table('snapshot_best_games')->where('snapshot_run_id', $snapshot->id)->delete();
             DB::table('owned_dlc_snapshots')->where('snapshot_run_id', $snapshot->id)->delete();
@@ -64,24 +76,40 @@ class SnapshotService
             return $snapshot;
         }
 
-        $alreadyConfirmed = SnapshotRun::where('user_id', $snapshot->user_id)
-            ->where('year', $snapshot->year)
-            ->where('status', 'confirmed')
-            ->exists();
+        $user = User::findOrFail($snapshot->user_id);
+        $this->assertSnapshotYearIsOpen($user, (int) $snapshot->year);
 
-        if ($alreadyConfirmed) {
-            throw ValidationException::withMessages([
-                'year' => 'This year already has a confirmed snapshot.',
+        DB::transaction(function () use ($snapshot) {
+            SnapshotRun::where('user_id', $snapshot->user_id)
+                ->where('status', 'draft')
+                ->where('year', '<=', $snapshot->year)
+                ->whereKeyNot($snapshot->id)
+                ->delete();
+
+            $snapshot->update([
+                'status' => 'confirmed',
+                'confirmed_at' => now(),
             ]);
-        }
+            $this->financialLocks->lockThroughSnapshot($snapshot->refresh());
+            $this->refreshSummary($snapshot);
+        });
 
-        $snapshot->update([
-            'status' => 'confirmed',
-            'confirmed_at' => now(),
-        ]);
-        $this->refreshSummary($snapshot);
+        return $snapshot->refresh();
+    }
 
-        return $snapshot;
+    public function delete(SnapshotRun $snapshot): void
+    {
+        DB::transaction(function () use ($snapshot) {
+            $nextSnapshot = $snapshot->status === 'confirmed'
+                ? $this->financialLocks->reassignOrUnlockRowsForDeletedSnapshot($snapshot)
+                : null;
+
+            $snapshot->delete();
+
+            if ($nextSnapshot) {
+                $this->refreshSummary($nextSnapshot->refresh());
+            }
+        });
     }
 
     public function updateBestGames(SnapshotRun $snapshot, array $libraryGameIds): SnapshotRun
@@ -224,6 +252,19 @@ class SnapshotService
     private function refreshSummary(SnapshotRun $snapshot): void
     {
         app(StatsService::class)->refreshSnapshotSummary($snapshot->refresh());
+    }
+
+    private function assertSnapshotYearIsOpen(User $user, int $year): void
+    {
+        if (! $this->closedYears->isYearClosed($user, $year)) {
+            return;
+        }
+
+        $closedYear = $this->closedYears->closedFinancialYear($user);
+
+        throw ValidationException::withMessages([
+            'year' => "{$closedYear} and earlier are locked by confirmed snapshots.",
+        ]);
     }
 
     public function eligibleBestGames(SnapshotRun $snapshot, ?Request $request = null, bool $all = false): array

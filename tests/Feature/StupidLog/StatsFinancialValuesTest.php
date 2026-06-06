@@ -13,6 +13,7 @@ use App\Models\StupidLog\Status;
 use App\Models\StupidLog\SubscriptionEntry;
 use App\Models\User;
 use App\Services\StatsService;
+use App\Services\SubscriptionYearAllocationService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +40,7 @@ class StatsFinancialValuesTest extends TestCase
         $this->addIap($copy->libraryGame, 5, '2026-06-01');
         $subscription = $this->createSubscription('Game Pass', 15);
         $subscription->ownershipCopies()->sync([$copy->id]);
+        $this->generateYearlyAllocations($subscription);
 
         $stats = app(StatsService::class)->live($this->user);
 
@@ -49,6 +51,11 @@ class StatsFinancialValuesTest extends TestCase
         $this->assertSame(30.0, $stats['dlc_base_value']);
         $this->assertSame(10.0, $stats['dlc_purchased_value']);
         $this->assertSame(15.0, $stats['subscription_allocated_value']);
+        $this->assertSame(0.0, $stats['subscription_unallocated_value']);
+        $this->assertSame(15.0, $stats['subscription_total_value']);
+        $this->assertSame(5.0, $stats['in_app_purchase_allocated_value']);
+        $this->assertSame(0.0, $stats['in_app_purchase_unallocated_value']);
+        $this->assertSame(5.0, $stats['in_app_purchase_total_value']);
         $this->assertSame(5.0, $stats['in_app_purchase_value']);
     }
 
@@ -58,6 +65,7 @@ class StatsFinancialValuesTest extends TestCase
         $this->addIap($copy->libraryGame, 6, '2026-06-01');
         $subscription = $this->createSubscription('Game Pass', 24);
         $subscription->ownershipCopies()->sync([$copy->id]);
+        $this->generateYearlyAllocations($subscription);
 
         $stats = app(StatsService::class)->live($this->user);
         $platform = collect($stats['breakdowns']['platforms'])->firstWhere('label', 'Xbox');
@@ -76,6 +84,7 @@ class StatsFinancialValuesTest extends TestCase
         $steam = Platform::where('name', 'Steam')->firstOrFail();
         $subscription = $this->createSubscription('Game Pass', 12);
         $subscription->ownershipCopies()->sync([$copy->id]);
+        $this->generateYearlyAllocations($subscription);
         $this->addIap($copy->libraryGame, 8, '2026-06-01');
         $snapshot = $this->createSnapshotRun(2026);
         $this->insertSnapshotGame($snapshot, $copy->libraryGame, $steam->id);
@@ -98,6 +107,7 @@ class StatsFinancialValuesTest extends TestCase
         $this->addIap($subscriptionCopy->libraryGame, 6, '2026-06-01');
         $subscription = $this->createSubscription('Game Pass', 40);
         $subscription->ownershipCopies()->sync([$subscriptionCopy->id]);
+        $this->generateYearlyAllocations($subscription);
 
         $archive = app(StatsService::class)->live($this->user)['archive']['biggest_paid_price'];
 
@@ -119,12 +129,82 @@ class StatsFinancialValuesTest extends TestCase
         $archive = $stats['archive']['biggest_paid_price'][0];
 
         $this->assertSame(0.0, $stats['subscription_allocated_value']);
+        $this->assertSame(0.0, $stats['subscription_unallocated_value']);
+        $this->assertSame(0.0, $stats['subscription_total_value']);
+        $this->assertSame(0.0, $stats['in_app_purchase_allocated_value']);
+        $this->assertSame(0.0, $stats['in_app_purchase_unallocated_value']);
+        $this->assertSame(0.0, $stats['in_app_purchase_total_value']);
         $this->assertSame(0.0, $stats['in_app_purchase_value']);
         $this->assertSame(0.0, $platform['subscription_allocated_value']);
         $this->assertSame(0.0, $platform['in_app_purchase_value']);
         $this->assertSame(0.0, $ownership['subscription_allocated_value']);
         $this->assertSame(0.0, $archive['subscription_allocated_value']);
         $this->assertSame(0.0, $archive['in_app_purchase_value']);
+    }
+
+    public function test_unallocated_financial_value_is_explained_without_fake_game_rows(): void
+    {
+        $visibleCopy = $this->createOwnershipCopy($this->user, 'Visible Financial Game', 'Xbox', 'Game Pass');
+        $hiddenCopy = $this->createOwnershipCopy($this->user, 'Hidden Financial Game', 'Xbox', 'Game Pass');
+        $subscription = $this->createSubscription('Game Pass', 30);
+        $subscription->ownershipCopies()->sync([$visibleCopy->id, $hiddenCopy->id]);
+        $this->generateYearlyAllocations($subscription);
+        $this->addIap($hiddenCopy->libraryGame, 9, '2026-06-01');
+        $snapshot = $this->createSnapshotRun(2026);
+        $this->insertSnapshotGame($snapshot, $visibleCopy->libraryGame, $visibleCopy->libraryGame->platform_id);
+
+        $summary = app(StatsService::class)->refreshSnapshotSummary($snapshot);
+        $unallocated = collect($summary['breakdowns']['platforms'])
+            ->firstWhere('label', 'Unallocated financial');
+        $ownership = collect($summary['breakdowns']['ownership_types'])
+            ->firstWhere('label', 'Game Pass');
+
+        $this->assertSame(15.0, $summary['subscription_allocated_value']);
+        $this->assertSame(15.0, $summary['subscription_unallocated_value']);
+        $this->assertSame(30.0, $summary['subscription_total_value']);
+        $this->assertSame(0.0, $summary['in_app_purchase_allocated_value']);
+        $this->assertSame(9.0, $summary['in_app_purchase_unallocated_value']);
+        $this->assertSame(39.0, $summary['purchased_value']);
+        $this->assertNull($unallocated['platform_id']);
+        $this->assertSame(15.0, $unallocated['subscription_unallocated_value']);
+        $this->assertSame(9.0, $unallocated['in_app_purchase_unallocated_value']);
+        $this->assertSame(24.0, $unallocated['purchased_value']);
+        $this->assertSame(15.0, $ownership['subscription_allocated_value']);
+        $this->assertSame(15.0, $ownership['subscription_unallocated_value']);
+        $this->assertSame(30.0, $ownership['subscription_total_value']);
+        $this->assertSame(24.0, $summary['archive']['unallocated_financial']['total_unallocated_value']);
+        $this->assertCount(1, $summary['archive']['biggest_paid_price']);
+    }
+
+    public function test_snapshot_financial_totals_are_cumulative_and_use_stored_year_values(): void
+    {
+        $copy = $this->createOwnershipCopy($this->user, 'Cumulative Financial Game', 'Xbox', 'Game Pass');
+        $subscription = SubscriptionEntry::create([
+            'user_id' => $this->user->id,
+            'ownership_type_id' => OwnershipType::where('name', 'Game Pass')->firstOrFail()->id,
+            'amount_paid' => 32,
+            'started_at' => '2025-12-12',
+            'finished_at' => '2026-01-12',
+        ]);
+        $subscription->ownershipCopies()->sync([$copy->id]);
+        $this->generateYearlyAllocations($subscription);
+        $subscription->years()->where('year', 2025)->update([
+            'amount_allocated' => '21.000000',
+            'is_locked' => true,
+        ]);
+        $subscription->years()->where('year', 2025)->firstOrFail()
+            ->ownershipCopyAllocations()
+            ->update(['allocated_amount' => '21.000000']);
+        $this->addIap($copy->libraryGame, 4, '2025-06-01');
+        $this->addIap($copy->libraryGame, 6, '2026-06-01');
+        $snapshot = $this->createSnapshotRun(2026);
+        $this->insertSnapshotGame($snapshot, $copy->libraryGame, $copy->libraryGame->platform_id);
+
+        $summary = app(StatsService::class)->refreshSnapshotSummary($snapshot);
+
+        $this->assertSame(33.0, $summary['subscription_total_value']);
+        $this->assertSame(10.0, $summary['in_app_purchase_total_value']);
+        $this->assertSame(43.0, $summary['purchased_value']);
     }
 
     private function createOwnershipCopy(User $user, string $title, string $platformName, string $ownershipTypeName, float $basePrice = 0, float $paidPrice = 0): OwnershipCopy
@@ -157,6 +237,12 @@ class StatsFinancialValuesTest extends TestCase
             'started_at' => '2026-01-01',
             'finished_at' => '2026-12-31',
         ]);
+    }
+
+    private function generateYearlyAllocations(SubscriptionEntry $subscription): void
+    {
+        app(SubscriptionYearAllocationService::class)
+            ->synchronizeUnlockedYears($subscription->refresh());
     }
 
     private function addIap(LibraryGame $libraryGame, float $amount, string $purchasedAt): void

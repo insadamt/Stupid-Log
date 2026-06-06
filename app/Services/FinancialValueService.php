@@ -10,108 +10,76 @@ use Illuminate\Support\Facades\DB;
 
 class FinancialValueService
 {
-    public function __construct(private FinancialPeriodService $periods) {}
+    private const UNALLOCATED_KEY = '__unallocated__';
+
+    public function __construct(private FinancialAmountService $amounts) {}
 
     public function calculateLiveFinancialValuesForUser(User $user): array
     {
-        $byGame = collect($this->calculateLiveFinancialValuesByLibraryGame($user));
-
-        return $this->roundComponents([
-            'subscription_allocated_value' => $byGame->sum('subscription_allocated_value'),
-            'in_app_purchase_value' => $byGame->sum('in_app_purchase_value'),
-        ]);
+        return $this->totals(
+            $this->liveSubscriptionYears($user),
+            $this->liveSubscriptionAllocations($user),
+            $this->liveIaps($user),
+        );
     }
 
     public function calculateLiveFinancialValuesByPlatform(User $user): array
     {
-        $values = [];
-
-        foreach ($this->liveSubscriptionShares($user) as $share) {
-            $this->addComponents($values, (int) $share['platform_id'], (float) $share['amount'], 0.0);
-        }
-
-        foreach ($this->liveIapRows($user) as $row) {
-            $this->addComponents($values, (int) $row->platform_id, 0.0, (float) $row->amount_paid);
-        }
-
-        return $this->roundComponentMap($values);
+        return $this->platformValues(
+            $this->liveSubscriptionYears($user),
+            $this->liveSubscriptionAllocations($user),
+            $this->liveIaps($user),
+        );
     }
 
     public function calculateLiveFinancialValuesByOwnershipType(User $user): array
     {
-        $values = [];
-
-        foreach ($this->liveSubscriptionShares($user) as $share) {
-            $this->addComponents($values, (string) $share['ownership_type'], (float) $share['amount'], 0.0);
-        }
-
-        return $this->roundComponentMap($values);
+        return $this->ownershipTypeValues(
+            $this->liveSubscriptionYears($user),
+            $this->liveSubscriptionAllocations($user),
+        );
     }
 
     public function calculateLiveFinancialValuesByLibraryGame(User $user): array
     {
-        $values = [];
-
-        foreach ($this->liveSubscriptionShares($user) as $share) {
-            $this->addComponents($values, (int) $share['library_game_id'], (float) $share['amount'], 0.0);
-        }
-
-        foreach ($this->liveIapRows($user) as $row) {
-            $this->addComponents($values, (int) $row->library_game_id, 0.0, (float) $row->amount_paid);
-        }
-
-        return $this->roundComponentMap($values);
+        return $this->gameValues(
+            $this->liveSubscriptionAllocations($user),
+            $this->liveIaps($user),
+        );
     }
 
     public function calculateSnapshotFinancialValuesForRun(SnapshotRun $snapshot): array
     {
-        $byGame = collect($this->calculateSnapshotFinancialValuesByLibraryGame($snapshot));
-
-        return $this->roundComponents([
-            'subscription_allocated_value' => $byGame->sum('subscription_allocated_value'),
-            'in_app_purchase_value' => $byGame->sum('in_app_purchase_value'),
-        ]);
+        return $this->totals(
+            $this->snapshotSubscriptionYears($snapshot),
+            $this->snapshotSubscriptionAllocations($snapshot),
+            $this->snapshotIaps($snapshot),
+        );
     }
 
     public function calculateSnapshotFinancialValuesByPlatform(SnapshotRun $snapshot): array
     {
-        $values = [];
-
-        foreach ($this->snapshotSubscriptionShares($snapshot) as $share) {
-            $this->addComponents($values, (int) $share['platform_id'], (float) $share['amount'], 0.0);
-        }
-
-        foreach ($this->snapshotIapRows($snapshot) as $row) {
-            $this->addComponents($values, (int) $row->platform_id, 0.0, (float) $row->amount_paid);
-        }
-
-        return $this->roundComponentMap($values);
+        return $this->platformValues(
+            $this->snapshotSubscriptionYears($snapshot),
+            $this->snapshotSubscriptionAllocations($snapshot),
+            $this->snapshotIaps($snapshot),
+        );
     }
 
     public function calculateSnapshotFinancialValuesByLibraryGame(SnapshotRun $snapshot): array
     {
-        $values = [];
-
-        foreach ($this->snapshotSubscriptionShares($snapshot) as $share) {
-            $this->addComponents($values, (int) $share['library_game_id'], (float) $share['amount'], 0.0);
-        }
-
-        foreach ($this->snapshotIapRows($snapshot) as $row) {
-            $this->addComponents($values, (int) $row->library_game_id, 0.0, (float) $row->amount_paid);
-        }
-
-        return $this->roundComponentMap($values);
+        return $this->gameValues(
+            $this->snapshotSubscriptionAllocations($snapshot),
+            $this->snapshotIaps($snapshot),
+        );
     }
 
     public function calculateSnapshotFinancialValuesByOwnershipType(SnapshotRun $snapshot): array
     {
-        $values = [];
-
-        foreach ($this->snapshotSubscriptionShares($snapshot) as $share) {
-            $this->addComponents($values, (string) $share['ownership_type'], (float) $share['amount'], 0.0);
-        }
-
-        return $this->roundComponentMap($values);
+        return $this->ownershipTypeValues(
+            $this->snapshotSubscriptionYears($snapshot),
+            $this->snapshotSubscriptionAllocations($snapshot),
+        );
     }
 
     public function calculateGamePaidBreakdown(LibraryGame $libraryGame): array
@@ -128,10 +96,15 @@ class FinancialValueService
         $iapPaid = (float) $libraryGame->inAppPurchases->sum('amount_paid');
 
         return [
-            ...$this->roundComponents([
+            ...$this->roundValues([
                 'copy_purchased_value' => $copyPaid,
                 'dlc_purchased_value' => $dlcPaid,
                 'subscription_allocated_value' => $subscriptionPaid,
+                'subscription_unallocated_value' => 0,
+                'subscription_total_value' => $subscriptionPaid,
+                'in_app_purchase_allocated_value' => $iapPaid,
+                'in_app_purchase_unallocated_value' => 0,
+                'in_app_purchase_total_value' => $iapPaid,
                 'in_app_purchase_value' => $iapPaid,
                 'total_purchased_value' => $copyPaid + $dlcPaid + $subscriptionPaid + $iapPaid,
             ]),
@@ -143,202 +116,297 @@ class FinancialValueService
                     'title' => $purchase->title,
                     'amount_paid' => $purchase->amount_paid,
                     'purchased_at' => $purchase->purchased_at?->format('Y-m-d'),
+                    'is_locked' => $purchase->is_locked,
+                    'locked_by_snapshot_run_id' => $purchase->locked_by_snapshot_run_id,
                 ])
                 ->values()
                 ->all(),
         ];
     }
 
-    private function calculateSubscriptionPerCopyAllocation($amountPaid, int $selectedCopyCount): string|float
+    public function unallocatedPlatformKey(): string
     {
-        if ($selectedCopyCount === 0) {
-            return 0.0;
-        }
-
-        return (float) $amountPaid / $selectedCopyCount;
+        return self::UNALLOCATED_KEY;
     }
 
-    private function liveSubscriptionShares(User $user): array
+    private function totals(Collection $subscriptionYears, Collection $subscriptionAllocations, Collection $iaps): array
     {
-        $entries = DB::table('subscription_entries')
-            ->join('ownership_types', 'ownership_types.id', '=', 'subscription_entries.ownership_type_id')
-            ->where('subscription_entries.user_id', $user->id)
-            ->select([
-                'subscription_entries.id',
-                'subscription_entries.amount_paid',
-                'ownership_types.name as ownership_type',
-            ])
-            ->get();
+        $subscriptionTotal = $this->sumMillionths($subscriptionYears, 'amount_allocated');
+        $subscriptionAllocated = $this->sumMillionths($subscriptionAllocations, 'allocated_amount');
+        $iapTotal = $this->sumMillionths($iaps, 'amount_paid');
+        $iapAllocated = $this->sumMillionths($iaps->whereNotNull('platform_id'), 'amount_paid');
 
-        return $this->subscriptionShares($entries, fn ($entry) => (float) $entry->amount_paid, $user, null);
-    }
-
-    private function snapshotSubscriptionShares(SnapshotRun $snapshot): array
-    {
-        [$yearStart, $yearEnd] = $this->periods->periodBoundsForYear((int) $snapshot->year);
-        $entries = DB::table('subscription_entries')
-            ->join('ownership_types', 'ownership_types.id', '=', 'subscription_entries.ownership_type_id')
-            ->where('subscription_entries.user_id', $snapshot->user_id)
-            ->whereDate('subscription_entries.started_at', '<=', $yearEnd->toDateString())
-            ->whereDate('subscription_entries.finished_at', '>=', $yearStart->toDateString())
-            ->select([
-                'subscription_entries.id',
-                'subscription_entries.amount_paid',
-                'subscription_entries.started_at',
-                'subscription_entries.finished_at',
-                'ownership_types.name as ownership_type',
-            ])
-            ->get();
-
-        return $this->subscriptionShares(
-            $entries,
-            fn ($entry) => $this->periods->proratedAmount($entry->amount_paid, $entry->started_at, $entry->finished_at, $yearStart, $yearEnd),
-            null,
-            $snapshot,
+        return $this->financialComponents(
+            $subscriptionAllocated,
+            $subscriptionTotal,
+            $iapAllocated,
+            $iapTotal,
         );
     }
 
-    private function subscriptionShares(Collection $entries, callable $amountForEntry, ?User $user, ?SnapshotRun $snapshot): array
+    private function platformValues(Collection $subscriptionYears, Collection $subscriptionAllocations, Collection $iaps): array
     {
-        $shares = [];
+        $values = [];
 
-        foreach ($entries as $entry) {
-            $selectedCopies = DB::table('subscription_entry_ownership_copies')
-                ->join('ownership_copies', 'ownership_copies.id', '=', 'subscription_entry_ownership_copies.ownership_copy_id')
-                ->join('library_games', 'library_games.id', '=', 'ownership_copies.library_game_id')
-                ->where('subscription_entry_ownership_copies.subscription_entry_id', $entry->id)
-                ->when($user, fn ($query) => $query->where('library_games.user_id', $user->id))
-                ->select(['ownership_copies.id', 'ownership_copies.library_game_id', 'library_games.platform_id'])
-                ->get();
-            $selected_copy_count = $selectedCopies->count();
-
-            if ($selected_copy_count === 0) {
-                continue;
-            }
-
-            $perCopyAllocation = $this->calculateSubscriptionPerCopyAllocation($amountForEntry($entry), $selected_copy_count);
-
-            if ($snapshot) {
-                $snapshotGames = DB::table('library_game_snapshots')
-                    ->where('snapshot_run_id', $snapshot->id)
-                    ->whereIn('library_game_id', $selectedCopies->pluck('library_game_id')->all())
-                    ->get(['library_game_id', 'platform_id'])
-                    ->keyBy('library_game_id');
-
-                foreach ($selectedCopies as $copy) {
-                    $snapshotGame = $snapshotGames->get($copy->library_game_id);
-
-                    if (! $snapshotGame) {
-                        continue;
-                    }
-
-                    $shares[] = [
-                        'library_game_id' => (int) $copy->library_game_id,
-                        'platform_id' => (int) $snapshotGame->platform_id,
-                        'ownership_type' => (string) $entry->ownership_type,
-                        'amount' => $perCopyAllocation,
-                    ];
-                }
-
-                continue;
-            }
-
-            foreach ($selectedCopies as $copy) {
-                $shares[] = [
-                    'library_game_id' => (int) $copy->library_game_id,
-                    'platform_id' => (int) $copy->platform_id,
-                    'ownership_type' => (string) $entry->ownership_type,
-                    'amount' => $perCopyAllocation,
-                ];
-            }
+        foreach ($subscriptionAllocations as $allocation) {
+            $key = (int) $allocation->platform_id;
+            $values[$key] ??= $this->emptyMillionthComponents();
+            $values[$key]['subscription_allocated_value'] += $this->amounts->toMillionths($allocation->allocated_amount);
+            $values[$key]['subscription_total_value'] += $this->amounts->toMillionths($allocation->allocated_amount);
         }
 
-        return $shares;
+        foreach ($iaps->whereNotNull('platform_id') as $iap) {
+            $key = (int) $iap->platform_id;
+            $values[$key] ??= $this->emptyMillionthComponents();
+            $amount = $this->amounts->toMillionths($iap->amount_paid);
+            $values[$key]['in_app_purchase_allocated_value'] += $amount;
+            $values[$key]['in_app_purchase_total_value'] += $amount;
+        }
+
+        $totals = $this->totals($subscriptionYears, $subscriptionAllocations, $iaps);
+        $unallocatedSubscription = $this->amounts->toMillionths($totals['subscription_unallocated_value']);
+        $unallocatedIap = $this->amounts->toMillionths($totals['in_app_purchase_unallocated_value']);
+
+        if ($unallocatedSubscription > 0 || $unallocatedIap > 0) {
+            $values[self::UNALLOCATED_KEY] = [
+                'subscription_allocated_value' => 0,
+                'subscription_unallocated_value' => $unallocatedSubscription,
+                'subscription_total_value' => $unallocatedSubscription,
+                'in_app_purchase_allocated_value' => 0,
+                'in_app_purchase_unallocated_value' => $unallocatedIap,
+                'in_app_purchase_total_value' => $unallocatedIap,
+            ];
+        }
+
+        return $this->convertComponentMap($values);
     }
 
-    private function liveIapRows(User $user): Collection
+    private function ownershipTypeValues(Collection $subscriptionYears, Collection $subscriptionAllocations): array
     {
-        return DB::table('in_app_purchases')
-            ->join('library_games', 'library_games.id', '=', 'in_app_purchases.library_game_id')
-            ->where('library_games.user_id', $user->id)
-            ->select(['in_app_purchases.library_game_id', 'library_games.platform_id', 'in_app_purchases.amount_paid'])
-            ->get();
-    }
+        $values = [];
 
-    private function snapshotIapRows(SnapshotRun $snapshot): Collection
-    {
-        [$yearStart, $yearEnd] = $this->periods->periodBoundsForYear((int) $snapshot->year);
-
-        return DB::table('in_app_purchases')
-            ->join('library_game_snapshots', function ($join) use ($snapshot) {
-                $join->on('library_game_snapshots.library_game_id', '=', 'in_app_purchases.library_game_id')
-                    ->where('library_game_snapshots.snapshot_run_id', '=', $snapshot->id);
-            })
-            ->whereBetween('in_app_purchases.purchased_at', [$yearStart->toDateString(), $yearEnd->toDateString()])
-            ->select(['in_app_purchases.library_game_id', 'library_game_snapshots.platform_id', 'in_app_purchases.amount_paid'])
-            ->get();
-    }
-
-    private function gameSubscriptionAllocations(LibraryGame $libraryGame): array
-    {
-        $entries = DB::table('subscription_entries')
-            ->join('ownership_types', 'ownership_types.id', '=', 'subscription_entries.ownership_type_id')
-            ->join('subscription_entry_ownership_copies', 'subscription_entry_ownership_copies.subscription_entry_id', '=', 'subscription_entries.id')
-            ->join('ownership_copies', 'ownership_copies.id', '=', 'subscription_entry_ownership_copies.ownership_copy_id')
-            ->where('ownership_copies.library_game_id', $libraryGame->id)
-            ->select([
-                'subscription_entries.id',
-                'subscription_entries.amount_paid',
-                'subscription_entries.started_at',
-                'subscription_entries.finished_at',
-                'ownership_types.name as ownership_type',
-            ])
-            ->distinct()
-            ->get();
-
-        return $entries
-            ->map(function ($entry) {
-                $selected_copy_count = DB::table('subscription_entry_ownership_copies')
-                    ->where('subscription_entry_id', $entry->id)
-                    ->count();
-                $allocatedAmount = $this->calculateSubscriptionPerCopyAllocation($entry->amount_paid, $selected_copy_count);
-
-                return [
-                    'subscription_entry_id' => (int) $entry->id,
-                    'ownership_type' => $entry->ownership_type,
-                    'amount_paid' => $entry->amount_paid,
-                    'selected_count' => $selected_copy_count,
-                    'allocated_amount' => round((float) $allocatedAmount, 2),
-                    'started_at' => $entry->started_at,
-                    'finished_at' => $entry->finished_at,
-                ];
-            })
-            ->values()
-            ->all();
-    }
-
-    private function addComponents(array &$values, int|string $key, float $subscriptionAmount, float $iapAmount): void
-    {
-        $values[$key] ??= ['subscription_allocated_value' => 0.0, 'in_app_purchase_value' => 0.0];
-        $values[$key]['subscription_allocated_value'] += $subscriptionAmount;
-        $values[$key]['in_app_purchase_value'] += $iapAmount;
-    }
-
-    private function roundComponentMap(array $values): array
-    {
-        foreach ($values as $key => $components) {
-            $values[$key] = $this->roundComponents($components);
+        foreach ($subscriptionYears->groupBy('ownership_type') as $label => $years) {
+            $total = $this->sumMillionths($years, 'amount_allocated');
+            $allocated = $this->sumMillionths(
+                $subscriptionAllocations->where('ownership_type', $label),
+                'allocated_amount',
+            );
+            $values[$label] = $this->subscriptionComponents($allocated, $total);
         }
 
         return $values;
     }
 
-    private function roundComponents(array $components): array
+    private function gameValues(Collection $subscriptionAllocations, Collection $iaps): array
     {
-        foreach ($components as $key => $value) {
-            $components[$key] = round((float) $value, 2);
+        $values = [];
+
+        foreach ($subscriptionAllocations as $allocation) {
+            $key = (int) $allocation->library_game_id;
+            $values[$key] ??= $this->emptyGameComponents();
+            $amount = $this->amounts->toMillionths($allocation->allocated_amount);
+            $values[$key]['subscription_allocated_value'] += $amount;
+            $values[$key]['subscription_total_value'] += $amount;
         }
 
-        return $components;
+        foreach ($iaps->whereNotNull('platform_id') as $iap) {
+            $key = (int) $iap->library_game_id;
+            $values[$key] ??= $this->emptyGameComponents();
+            $amount = $this->amounts->toMillionths($iap->amount_paid);
+            $values[$key]['in_app_purchase_allocated_value'] += $amount;
+            $values[$key]['in_app_purchase_total_value'] += $amount;
+        }
+
+        return $this->convertComponentMap($values);
+    }
+
+    private function liveSubscriptionYears(User $user): Collection
+    {
+        return $this->subscriptionYearQuery($user->id)->get();
+    }
+
+    private function snapshotSubscriptionYears(SnapshotRun $snapshot): Collection
+    {
+        return $this->subscriptionYearQuery($snapshot->user_id)
+            ->where('subscription_entry_years.year', '<=', $snapshot->year)
+            ->get();
+    }
+
+    private function subscriptionYearQuery(int $userId)
+    {
+        return DB::table('subscription_entry_years')
+            ->join('subscription_entries', 'subscription_entries.id', '=', 'subscription_entry_years.subscription_entry_id')
+            ->join('ownership_types', 'ownership_types.id', '=', 'subscription_entries.ownership_type_id')
+            ->where('subscription_entries.user_id', $userId)
+            ->select([
+                'subscription_entry_years.id',
+                'subscription_entry_years.year',
+                'subscription_entry_years.amount_allocated',
+                'ownership_types.name as ownership_type',
+            ]);
+    }
+
+    private function liveSubscriptionAllocations(User $user): Collection
+    {
+        return $this->subscriptionAllocationQuery($user->id)
+            ->join('library_games', 'library_games.id', '=', 'ownership_copies.library_game_id')
+            ->selectRaw('library_games.id as library_game_id, library_games.platform_id')
+            ->addSelect([
+                'subscription_entry_year_ownership_copies.allocated_amount',
+                'ownership_types.name as ownership_type',
+            ])
+            ->get();
+    }
+
+    private function snapshotSubscriptionAllocations(SnapshotRun $snapshot): Collection
+    {
+        return $this->subscriptionAllocationQuery($snapshot->user_id)
+            ->join('library_game_snapshots', function ($join) use ($snapshot) {
+                $join->on('library_game_snapshots.library_game_id', '=', 'ownership_copies.library_game_id')
+                    ->where('library_game_snapshots.snapshot_run_id', $snapshot->id);
+            })
+            ->where('subscription_entry_years.year', '<=', $snapshot->year)
+            ->selectRaw('library_game_snapshots.library_game_id, library_game_snapshots.platform_id')
+            ->addSelect([
+                'subscription_entry_year_ownership_copies.allocated_amount',
+                'ownership_types.name as ownership_type',
+            ])
+            ->get();
+    }
+
+    private function subscriptionAllocationQuery(int $userId)
+    {
+        return DB::table('subscription_entry_year_ownership_copies')
+            ->join('subscription_entry_years', 'subscription_entry_years.id', '=', 'subscription_entry_year_ownership_copies.subscription_entry_year_id')
+            ->join('subscription_entries', 'subscription_entries.id', '=', 'subscription_entry_years.subscription_entry_id')
+            ->join('ownership_types', 'ownership_types.id', '=', 'subscription_entries.ownership_type_id')
+            ->join('ownership_copies', 'ownership_copies.id', '=', 'subscription_entry_year_ownership_copies.ownership_copy_id')
+            ->where('subscription_entries.user_id', $userId);
+    }
+
+    private function liveIaps(User $user): Collection
+    {
+        return DB::table('in_app_purchases')
+            ->join('library_games', 'library_games.id', '=', 'in_app_purchases.library_game_id')
+            ->where('library_games.user_id', $user->id)
+            ->select([
+                'in_app_purchases.library_game_id',
+                'library_games.platform_id',
+                'in_app_purchases.amount_paid',
+            ])
+            ->get();
+    }
+
+    private function snapshotIaps(SnapshotRun $snapshot): Collection
+    {
+        return DB::table('in_app_purchases')
+            ->join('library_games', 'library_games.id', '=', 'in_app_purchases.library_game_id')
+            ->leftJoin('library_game_snapshots', function ($join) use ($snapshot) {
+                $join->on('library_game_snapshots.library_game_id', '=', 'in_app_purchases.library_game_id')
+                    ->where('library_game_snapshots.snapshot_run_id', $snapshot->id);
+            })
+            ->where('library_games.user_id', $snapshot->user_id)
+            ->whereYear('in_app_purchases.purchased_at', '<=', $snapshot->year)
+            ->select([
+                'in_app_purchases.library_game_id',
+                'library_game_snapshots.platform_id',
+                'in_app_purchases.amount_paid',
+            ])
+            ->get();
+    }
+
+    private function gameSubscriptionAllocations(LibraryGame $libraryGame): array
+    {
+        return DB::table('subscription_entry_year_ownership_copies')
+            ->join('subscription_entry_years', 'subscription_entry_years.id', '=', 'subscription_entry_year_ownership_copies.subscription_entry_year_id')
+            ->join('subscription_entries', 'subscription_entries.id', '=', 'subscription_entry_years.subscription_entry_id')
+            ->join('ownership_types', 'ownership_types.id', '=', 'subscription_entries.ownership_type_id')
+            ->join('ownership_copies', 'ownership_copies.id', '=', 'subscription_entry_year_ownership_copies.ownership_copy_id')
+            ->where('ownership_copies.library_game_id', $libraryGame->id)
+            ->orderBy('subscription_entry_years.year')
+            ->get([
+                'subscription_entries.id as subscription_entry_id',
+                'subscription_entry_years.year',
+                'subscription_entry_years.amount_allocated as yearly_amount',
+                'subscription_entry_year_ownership_copies.allocated_amount',
+                'subscription_entry_years.is_locked',
+                'subscription_entry_years.locked_by_snapshot_run_id',
+                'ownership_types.name as ownership_type',
+            ])
+            ->map(fn ($row) => [
+                'subscription_entry_id' => (int) $row->subscription_entry_id,
+                'year' => (int) $row->year,
+                'ownership_type' => $row->ownership_type,
+                'yearly_amount' => $row->yearly_amount,
+                'allocated_amount' => round((float) $row->allocated_amount, 2),
+                'is_locked' => (bool) $row->is_locked,
+                'locked_by_snapshot_run_id' => $row->locked_by_snapshot_run_id,
+            ])
+            ->all();
+    }
+
+    private function financialComponents(int $subscriptionAllocated, int $subscriptionTotal, int $iapAllocated, int $iapTotal): array
+    {
+        return $this->convertComponents([
+            'subscription_allocated_value' => $subscriptionAllocated,
+            'subscription_unallocated_value' => max(0, $subscriptionTotal - $subscriptionAllocated),
+            'subscription_total_value' => $subscriptionTotal,
+            'in_app_purchase_allocated_value' => $iapAllocated,
+            'in_app_purchase_unallocated_value' => max(0, $iapTotal - $iapAllocated),
+            'in_app_purchase_total_value' => $iapTotal,
+        ]);
+    }
+
+    private function subscriptionComponents(int $allocated, int $total): array
+    {
+        return $this->convertComponents([
+            'subscription_allocated_value' => $allocated,
+            'subscription_unallocated_value' => max(0, $total - $allocated),
+            'subscription_total_value' => $total,
+        ]);
+    }
+
+    private function convertComponentMap(array $values): array
+    {
+        return array_map(fn (array $components) => $this->convertComponents($components), $values);
+    }
+
+    private function convertComponents(array $components): array
+    {
+        $converted = array_map(
+            fn (int $value) => round((float) $this->amounts->fromMillionths($value), 2),
+            $components,
+        );
+
+        $converted['in_app_purchase_value'] = $converted['in_app_purchase_total_value'] ?? 0.0;
+
+        return $converted;
+    }
+
+    private function sumMillionths(Collection $rows, string $field): int
+    {
+        return $rows->sum(fn ($row) => $this->amounts->toMillionths($row->{$field}));
+    }
+
+    private function emptyMillionthComponents(): array
+    {
+        return [
+            'subscription_allocated_value' => 0,
+            'subscription_unallocated_value' => 0,
+            'subscription_total_value' => 0,
+            'in_app_purchase_allocated_value' => 0,
+            'in_app_purchase_unallocated_value' => 0,
+            'in_app_purchase_total_value' => 0,
+        ];
+    }
+
+    private function emptyGameComponents(): array
+    {
+        return $this->emptyMillionthComponents();
+    }
+
+    private function roundValues(array $values): array
+    {
+        return array_map(fn ($value) => round((float) $value, 2), $values);
     }
 }

@@ -8,13 +8,16 @@ use App\Models\StupidLog\LibraryGame;
 use App\Models\StupidLog\Platform;
 use App\Models\StupidLog\Status;
 use App\Services\DuplicateDetectionService;
+use App\Services\FinancialSnapshotRefreshService;
 use App\Services\LibraryGameCreator;
 use App\Services\LocalUserService;
 use App\Services\SteamEnrichmentService;
+use App\Services\SubscriptionMutationService;
 use App\Services\TitleNormalizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -96,9 +99,34 @@ class LibraryGameMutationController extends Controller
         return back();
     }
 
-    public function destroyLibraryGame(LibraryGame $libraryGame): RedirectResponse
+    public function destroyLibraryGame(
+        LibraryGame $libraryGame,
+        SubscriptionMutationService $mutations,
+        FinancialSnapshotRefreshService $refresh,
+    ): RedirectResponse
     {
-        $libraryGame->delete();
+        $mutations->assertLibraryGameDeletionAllowed($libraryGame);
+        $libraryGame->load('ownershipCopies.subscriptionEntries');
+        $subscriptions = $libraryGame->ownershipCopies
+            ->flatMap->subscriptionEntries
+            ->unique('id')
+            ->values();
+        $subscriptionPeriods = $subscriptions
+            ->map(fn ($subscription) => [
+                'started_at' => $subscription->started_at,
+                'finished_at' => $subscription->finished_at,
+            ])
+            ->all();
+        $userId = $libraryGame->user_id;
+
+        DB::transaction(function () use ($libraryGame, $subscriptions, $mutations) {
+            $libraryGame->delete();
+            $subscriptions->each(
+                fn ($subscription) => $mutations->recalculateUnlockedYears($subscription->refresh()),
+            );
+        });
+
+        $refresh->refreshForCollectedSubscriptionPeriods($userId, $subscriptionPeriods);
 
         return redirect()->route('library');
     }

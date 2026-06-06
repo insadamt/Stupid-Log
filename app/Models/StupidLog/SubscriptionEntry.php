@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['user_id', 'ownership_type_id', 'amount_paid', 'started_at', 'finished_at'])]
 class SubscriptionEntry extends Model
@@ -34,5 +35,10 @@ class SubscriptionEntry extends Model
     {
         return $this->belongsToMany(OwnershipCopy::class, 'subscription_entry_ownership_copies')
             ->withTimestamps();
+    }
+
+    public function years(): HasMany
+    {
+        return $this->hasMany(SubscriptionEntryYear::class);
     }
 }

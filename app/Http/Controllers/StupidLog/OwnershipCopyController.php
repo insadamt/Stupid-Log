@@ -7,8 +7,10 @@ use App\Models\StupidLog\LibraryGame;
 use App\Models\StupidLog\OwnershipCopy;
 use App\Models\StupidLog\OwnershipType;
 use App\Services\FinancialSnapshotRefreshService;
+use App\Services\SubscriptionMutationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class OwnershipCopyController extends Controller
@@ -37,8 +39,13 @@ class OwnershipCopyController extends Controller
         return back();
     }
 
-    public function destroyOwnershipCopy(OwnershipCopy $ownershipCopy, FinancialSnapshotRefreshService $refresh): RedirectResponse
-    {
+    public function destroyOwnershipCopy(
+        OwnershipCopy $ownershipCopy,
+        FinancialSnapshotRefreshService $refresh,
+        SubscriptionMutationService $mutations,
+    ): RedirectResponse {
+        $mutations->assertOwnershipCopyDeletionAllowed($ownershipCopy);
+
         if ($ownershipCopy->libraryGame->ownershipCopies()->count() <= 1) {
             return back()->withErrors(['ownership_copy' => 'At least one ownership copy is required.']);
         }
@@ -52,7 +59,15 @@ class OwnershipCopyController extends Controller
             ->all();
         $userId = $ownershipCopy->libraryGame->user_id;
 
-        $ownershipCopy->delete();
+        DB::transaction(function () use ($ownershipCopy, $mutations) {
+            $subscriptions = $ownershipCopy->subscriptionEntries;
+            $ownershipCopy->delete();
+
+            $subscriptions->each(
+                fn ($subscription) => $mutations->recalculateUnlockedYears($subscription->refresh()),
+            );
+        });
+
         $refresh->refreshForCollectedSubscriptionPeriods($userId, $subscriptionPeriods);
 
         return back();

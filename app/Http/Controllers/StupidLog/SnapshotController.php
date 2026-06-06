@@ -102,9 +102,12 @@ class SnapshotController extends Controller
         return back();
     }
 
-    public function destroySnapshot(SnapshotRun $snapshotRun): RedirectResponse
+    public function destroySnapshot(
+        SnapshotRun $snapshotRun,
+        SnapshotService $snapshots,
+    ): RedirectResponse
     {
-        $snapshotRun->delete();
+        $snapshots->delete($snapshotRun);
 
         return redirect()->route('snapshots');
     }

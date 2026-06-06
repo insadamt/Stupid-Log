@@ -91,7 +91,7 @@ class FinancialSnapshotRefreshService
         }
 
         SnapshotRun::where('user_id', $userId)
-            ->whereIn('year', $years)
+            ->where('year', '>=', $years->min())
             ->get()
             ->each(fn (SnapshotRun $snapshot) => $this->stats->refreshSnapshotSummary($snapshot->refresh()));
     }

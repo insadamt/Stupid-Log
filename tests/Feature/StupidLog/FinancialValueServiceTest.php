@@ -13,6 +13,7 @@ use App\Models\StupidLog\SubscriptionEntry;
 use App\Models\User;
 use App\Services\FinancialPeriodService;
 use App\Services\FinancialValueService;
+use App\Services\SubscriptionYearAllocationService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -46,13 +47,16 @@ class FinancialValueServiceTest extends TestCase
         $this->assertSame(12.0, round($periods->proratedAmount(32, '2025-12-12', '2026-01-12', $start2026, $end2026), 2));
     }
 
-    public function test_subscription_allocation_is_zero_when_no_selected_copy_exists(): void
+    public function test_subscription_without_selected_copies_is_fully_unallocated(): void
     {
-        $this->createSubscription('Game Pass', 30);
+        $subscription = $this->createSubscription('Game Pass', 30);
+        $this->generateYearlyAllocations($subscription);
 
         $values = app(FinancialValueService::class)->calculateLiveFinancialValuesForUser($this->user);
 
         $this->assertSame(0.0, $values['subscription_allocated_value']);
+        $this->assertSame(30.0, $values['subscription_unallocated_value']);
+        $this->assertSame(30.0, $values['subscription_total_value']);
         $this->assertSame(0.0, $values['in_app_purchase_value']);
     }
 
@@ -62,6 +66,7 @@ class FinancialValueServiceTest extends TestCase
         $secondCopy = $this->createOwnershipCopy($this->user, 'Second Game', 'Xbox', 'Game Pass');
         $subscription = $this->createSubscription('Game Pass', 30);
         $subscription->ownershipCopies()->sync([$firstCopy->id, $secondCopy->id]);
+        $this->generateYearlyAllocations($subscription);
 
         $byGame = app(FinancialValueService::class)->calculateLiveFinancialValuesByLibraryGame($this->user);
         $totals = app(FinancialValueService::class)->calculateLiveFinancialValuesForUser($this->user);
@@ -81,6 +86,7 @@ class FinancialValueServiceTest extends TestCase
         $hiddenPlayStationCopy->update(['ownership_type_id' => $gamePass->id]);
         $subscription = $this->createSubscription('Game Pass', 30);
         $subscription->ownershipCopies()->sync([$visibleCopy->id, $hiddenPcCopy->id, $hiddenPlayStationCopy->id]);
+        $this->generateYearlyAllocations($subscription);
         $snapshot = $this->createSnapshotRun(2026);
         $this->insertSnapshotGame($snapshot, $visibleCopy->libraryGame);
 
@@ -90,7 +96,8 @@ class FinancialValueServiceTest extends TestCase
         $byGame = $service->calculateSnapshotFinancialValuesByLibraryGame($snapshot);
 
         $this->assertSame(10.0, $totals['subscription_allocated_value']);
-        $this->assertNotSame(30.0, $totals['subscription_allocated_value']);
+        $this->assertSame(20.0, $totals['subscription_unallocated_value']);
+        $this->assertSame(30.0, $totals['subscription_total_value']);
         $this->assertSame(10.0, $byPlatform[$visibleCopy->libraryGame->platform_id]['subscription_allocated_value']);
         $this->assertSame(10.0, $byGame[$visibleCopy->library_game_id]['subscription_allocated_value']);
         $this->assertArrayNotHasKey($hiddenPcCopy->library_game_id, $byGame);
@@ -116,7 +123,10 @@ class FinancialValueServiceTest extends TestCase
 
         $values = app(FinancialValueService::class)->calculateSnapshotFinancialValuesForRun($snapshot);
 
-        $this->assertSame(5.0, $values['in_app_purchase_value']);
+        $this->assertSame(5.0, $values['in_app_purchase_allocated_value']);
+        $this->assertSame(50.0, $values['in_app_purchase_unallocated_value']);
+        $this->assertSame(55.0, $values['in_app_purchase_total_value']);
+        $this->assertSame(55.0, $values['in_app_purchase_value']);
     }
 
     public function test_cross_year_subscription_proration_rounds_after_aggregation(): void
@@ -125,10 +135,17 @@ class FinancialValueServiceTest extends TestCase
         $secondCopy = $this->createOwnershipCopy($this->user, 'Second Prorated Game', 'Xbox', 'Game Pass');
         $subscription = $this->createSubscription('Game Pass', 10, '2026-01-01', '2026-01-01');
         $subscription->ownershipCopies()->sync([$firstCopy->id, $secondCopy->id]);
+        $this->generateYearlyAllocations($subscription);
 
         $values = app(FinancialValueService::class)->calculateLiveFinancialValuesForUser($this->user);
 
         $this->assertSame(10.0, $values['subscription_allocated_value']);
+    }
+
+    private function generateYearlyAllocations(SubscriptionEntry $subscription): void
+    {
+        app(SubscriptionYearAllocationService::class)
+            ->synchronizeUnlockedYears($subscription->refresh());
     }
 
     private function createSubscription(string $ownershipTypeName, float $amount, string $startedAt = '2026-01-01', string $finishedAt = '2026-01-31'): SubscriptionEntry

@@ -12,6 +12,7 @@ use App\Models\StupidLog\Status;
 use App\Models\StupidLog\SubscriptionEntry;
 use App\Models\User;
 use App\Services\SnapshotService;
+use App\Services\SubscriptionYearAllocationService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
@@ -45,7 +46,7 @@ class FinancialSnapshotRefreshTest extends TestCase
 
         $purchase = $copy->libraryGame->inAppPurchases()->firstOrFail();
         $this->assertEquals(8.0, $snapshot2026->refresh()->summary_json['in_app_purchase_value']);
-        $this->assertEquals(0.0, $snapshot2027->refresh()->summary_json['in_app_purchase_value']);
+        $this->assertEquals(8.0, $snapshot2027->refresh()->summary_json['in_app_purchase_value']);
 
         $this->patch("/in-app-purchases/{$purchase->id}", [
             'title' => 'Coins',
@@ -82,7 +83,7 @@ class FinancialSnapshotRefreshTest extends TestCase
         ])->assertRedirect();
 
         $this->assertEquals(20.0, $snapshot2025->refresh()->summary_json['subscription_allocated_value']);
-        $this->assertEquals(12.0, $snapshot2026->refresh()->summary_json['subscription_allocated_value']);
+        $this->assertEquals(32.0, $snapshot2026->refresh()->summary_json['subscription_allocated_value']);
 
         $this->patch("/subscriptions/{$entry->id}", [
             'ownership_type_id' => $eaPlay->id,
@@ -99,12 +100,46 @@ class FinancialSnapshotRefreshTest extends TestCase
         $this->assertEquals(0.0, $snapshot2026->refresh()->summary_json['subscription_allocated_value']);
     }
 
+    public function test_updating_subscription_dates_into_previous_year_refreshes_both_snapshot_summaries(): void
+    {
+        $copy = $this->createOwnershipCopy($this->user, 'Cross Year Subscription Game', 'Xbox', 'Game Pass');
+        $gamePass = OwnershipType::where('name', 'Game Pass')->firstOrFail();
+        $snapshot2026 = app(SnapshotService::class)->createDraft($this->user, 2026)->refresh();
+        $snapshot2027 = app(SnapshotService::class)->createDraft($this->user, 2027)->refresh();
+
+        $this->post('/subscriptions', [
+            'ownership_type_id' => $gamePass->id,
+            'amount_paid' => 32,
+            'started_at' => '2027-01-01',
+            'finished_at' => '2027-01-20',
+        ])->assertRedirect();
+
+        $entry = SubscriptionEntry::firstOrFail();
+        $this->patch("/subscriptions/{$entry->id}/ownership-copies", [
+            'ownership_copy_ids' => [$copy->id],
+        ])->assertRedirect();
+
+        $this->assertEquals(0.0, $snapshot2026->refresh()->summary_json['subscription_allocated_value']);
+        $this->assertEquals(32.0, $snapshot2027->refresh()->summary_json['subscription_allocated_value']);
+
+        $this->patch("/subscriptions/{$entry->id}", [
+            'ownership_type_id' => $gamePass->id,
+            'amount_paid' => 32,
+            'started_at' => '2026-12-20',
+            'finished_at' => '2027-01-20',
+        ])->assertRedirect();
+
+        $this->assertEquals(12.0, $snapshot2026->refresh()->summary_json['subscription_allocated_value']);
+        $this->assertEquals(32.0, $snapshot2027->refresh()->summary_json['subscription_allocated_value']);
+    }
+
     public function test_deleting_attached_ownership_copy_refreshes_subscription_snapshot_summaries(): void
     {
         $copy = $this->createOwnershipCopy($this->user, 'Deletable Subscription Game', 'Xbox', 'Game Pass');
         $extraCopy = $this->createOwnershipCopyForLibraryGame($copy->libraryGame, 'Family Sharing');
         $subscription = $this->createSubscription('Game Pass', 12);
         $subscription->ownershipCopies()->sync([$copy->id]);
+        app(SubscriptionYearAllocationService::class)->synchronizeUnlockedYears($subscription->refresh());
         $snapshot = app(SnapshotService::class)->createDraft($this->user, 2026)->refresh();
 
         $this->assertEquals(12.0, $snapshot->summary_json['subscription_allocated_value']);
@@ -114,6 +149,9 @@ class FinancialSnapshotRefreshTest extends TestCase
         $this->assertDatabaseMissing('ownership_copies', ['id' => $copy->id]);
         $this->assertDatabaseHas('ownership_copies', ['id' => $extraCopy->id]);
         $this->assertEquals(0.0, $snapshot->refresh()->summary_json['subscription_allocated_value']);
+        $this->assertEquals(12.0, $snapshot->summary_json['subscription_unallocated_value']);
+        $this->assertEquals(12.0, $snapshot->summary_json['subscription_total_value']);
+        $this->assertEquals(12.0, $snapshot->summary_json['purchased_value']);
     }
 
     public function test_changing_ownership_type_is_blocked_when_copy_is_attached_to_subscription(): void
