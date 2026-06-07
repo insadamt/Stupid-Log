@@ -1,4 +1,4 @@
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     Archive,
     BarChart3,
@@ -60,6 +60,7 @@ export default function AppLayout({
 }: PropsWithChildren<{ title: string; lockViewport?: boolean }>) {
     const layoutRef = useRef<HTMLElement>(null);
     const pageRef = useRef<HTMLDivElement>(null);
+    const { appVersion } = usePage<{ appVersion: string }>().props;
     const currentIndex = nav.findIndex((item) => item.label === title);
 
     useGSAP(() => {
@@ -265,6 +266,10 @@ export default function AppLayout({
                         </Link>
                     );
                 })}
+
+                <span className="text-center text-[9px] font-black uppercase tracking-wider text-white/32">
+                    v{appVersion}
+                </span>
             </nav>
 
             <MainPageTransitionContext.Provider value={{ navigateWithTransition }}>

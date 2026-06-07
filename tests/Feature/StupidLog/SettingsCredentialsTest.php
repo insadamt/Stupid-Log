@@ -149,7 +149,7 @@ class SettingsCredentialsTest extends TestCase
 
     public function test_setup_completes_without_currency_payload(): void
     {
-        $user = User::firstOrFail();
+        User::query()->delete();
 
         $this->post('/setup', [
             'username' => 'No Currency Player',
@@ -158,7 +158,8 @@ class SettingsCredentialsTest extends TestCase
             'steam_api_key' => '',
         ])->assertRedirect('/');
 
-        $this->assertSame('No Currency Player', $user->refresh()->username);
+        $user = User::firstOrFail();
+        $this->assertSame('No Currency Player', $user->username);
         $this->assertDatabaseHas('app_settings', [
             'user_id' => $user->id,
             'currency_code' => 'USD',

@@ -1,4 +1,5 @@
-import { ArchiveRestore, Play } from 'lucide-react';
+import { usePage } from '@inertiajs/react';
+import { ArchiveRestore, Play, ShieldAlert } from 'lucide-react';
 import Background from './Background';
 import { ControlButton } from './SetupControls';
 
@@ -9,6 +10,8 @@ export default function SetupIntro({
     startFreshSetup: () => void;
     startBackupImport: () => void;
 }) {
+    const { appVersion } = usePage<{ appVersion: string }>().props;
+
     return (
         <section className="relative grid min-h-screen place-items-center px-5 py-8">
             <Background />
@@ -23,8 +26,13 @@ export default function SetupIntro({
                 </div>
 
                 <div className="mt-8" data-intro-copy>
-                    <div className="text-xs font-black uppercase text-[#b7ff63]">Stupid Log</div>
+                    <div className="text-xs font-black uppercase text-[#b7ff63]">Stupid Log v{appVersion}</div>
                     <h1 className="mt-2 text-5xl font-black leading-none md:text-7xl">Press Start</h1>
+                </div>
+
+                <div className="mt-6 flex max-w-[590px] items-start gap-3 rounded-[18px] border border-[#b7ff63]/25 bg-[#b7ff63]/10 px-4 py-3 text-left text-sm font-bold leading-relaxed text-white/64" data-intro-copy>
+                    <ShieldAlert className="mt-0.5 shrink-0 text-[#b7ff63]" size={20} strokeWidth={3} />
+                    <span>Stupid Log v{appVersion} is for trusted LAN or VPN access only. Do not expose it directly to the public internet.</span>
                 </div>
 
                 <div className="mt-8 flex items-center gap-3" data-intro-start>
