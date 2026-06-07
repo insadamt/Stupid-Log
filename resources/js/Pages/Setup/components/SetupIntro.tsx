@@ -1,8 +1,14 @@
-import { Play } from 'lucide-react';
+import { ArchiveRestore, Play } from 'lucide-react';
 import Background from './Background';
 import { ControlButton } from './SetupControls';
 
-export default function SetupIntro({ startWizard }: { startWizard: () => void }) {
+export default function SetupIntro({
+    startFreshSetup,
+    startBackupImport,
+}: {
+    startFreshSetup: () => void;
+    startBackupImport: () => void;
+}) {
     return (
         <section className="relative grid min-h-screen place-items-center px-5 py-8">
             <Background />
@@ -21,10 +27,14 @@ export default function SetupIntro({ startWizard }: { startWizard: () => void })
                     <h1 className="mt-2 text-5xl font-black leading-none md:text-7xl">Press Start</h1>
                 </div>
 
-                <div className="mt-8" data-intro-start>
-                    <ControlButton tone="lime" onClick={startWizard}>
+                <div className="mt-8 flex items-center gap-3" data-intro-start>
+                    <ControlButton tone="lime" onClick={startFreshSetup}>
                         <Play size={17} strokeWidth={3} />
-                        Start
+                        New setup
+                    </ControlButton>
+                    <ControlButton tone="ghost" onClick={startBackupImport}>
+                        <ArchiveRestore size={17} strokeWidth={3} />
+                        Import backup
                     </ControlButton>
                 </div>
             </div>

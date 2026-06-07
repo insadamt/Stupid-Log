@@ -871,7 +871,7 @@ class StatsService
         $totals = $this->financialValues->calculateLiveFinancialValuesForUser($user);
 
         return [
-            'most_played' => $this->liveArchiveRows($user, 'playtime_hours', false),
+            'most_played' => $this->liveArchiveRows($user, 'library_games.playtime_hours', false),
             'biggest_base_price' => $this->liveArchiveRows($user, 'base_value', true),
             'biggest_paid_price' => $this->liveArchiveRows($user, 'purchased_value', true),
             'unallocated_financial' => $this->unallocatedArchiveSummary($totals),
@@ -880,7 +880,6 @@ class StatsService
 
     private function liveArchiveRows(User $user, string $sortColumn, bool $positiveOnly): array
     {
-        $financialByGame = $this->financialValues->calculateLiveFinancialValuesByLibraryGame($user);
         $copyValues = DB::table('ownership_copies')
             ->join('ownership_types', 'ownership_types.id', '=', 'ownership_copies.ownership_type_id')
             ->whereIn('ownership_types.name', self::VALUE_OWNERSHIP_TYPES)
@@ -893,12 +892,31 @@ class StatsService
             ->groupBy('owned_dlcs.library_game_id')
             ->selectRaw('owned_dlcs.library_game_id, sum(dlcs.base_price) as base_value, sum(owned_dlcs.purchased_price) as purchased_value');
 
+        $subscriptionValues = DB::table('subscription_entry_year_ownership_copies')
+            ->join('subscription_entry_years', 'subscription_entry_years.id', '=', 'subscription_entry_year_ownership_copies.subscription_entry_year_id')
+            ->join('subscription_entries', 'subscription_entries.id', '=', 'subscription_entry_years.subscription_entry_id')
+            ->join('ownership_copies', 'ownership_copies.id', '=', 'subscription_entry_year_ownership_copies.ownership_copy_id')
+            ->where('subscription_entries.user_id', $user->id)
+            ->groupBy('ownership_copies.library_game_id')
+            ->selectRaw('ownership_copies.library_game_id, sum(subscription_entry_year_ownership_copies.allocated_amount) as allocated_value');
+
+        $iapValues = DB::table('in_app_purchases')
+            ->join('library_games', 'library_games.id', '=', 'in_app_purchases.library_game_id')
+            ->where('library_games.user_id', $user->id)
+            ->groupBy('in_app_purchases.library_game_id')
+            ->selectRaw('in_app_purchases.library_game_id, sum(in_app_purchases.amount_paid) as allocated_value');
+
+        $baseValueSql = '(coalesce(copy_values.base_value, 0) + coalesce(dlc_values.base_value, 0))';
+        $purchasedValueSql = '(coalesce(copy_values.purchased_value, 0) + coalesce(dlc_values.purchased_value, 0) + coalesce(subscription_values.allocated_value, 0) + coalesce(iap_values.allocated_value, 0))';
+
         $builder = DB::table('library_games')
             ->join('games', 'games.id', '=', 'library_games.game_id')
             ->join('platforms', 'platforms.id', '=', 'library_games.platform_id')
             ->join('statuses', 'statuses.id', '=', 'library_games.status_id')
             ->leftJoinSub($copyValues, 'copy_values', fn ($join) => $join->on('copy_values.library_game_id', '=', 'library_games.id'))
             ->leftJoinSub($dlcValues, 'dlc_values', fn ($join) => $join->on('dlc_values.library_game_id', '=', 'library_games.id'))
+            ->leftJoinSub($subscriptionValues, 'subscription_values', fn ($join) => $join->on('subscription_values.library_game_id', '=', 'library_games.id'))
+            ->leftJoinSub($iapValues, 'iap_values', fn ($join) => $join->on('iap_values.library_game_id', '=', 'library_games.id'))
             ->where('library_games.user_id', $user->id)
             ->select([
                 'library_games.id as library_game_id',
@@ -915,12 +933,23 @@ class StatsService
             ->selectRaw('coalesce(copy_values.base_value, 0) as copy_base_value')
             ->selectRaw('coalesce(copy_values.purchased_value, 0) as copy_purchased_value')
             ->selectRaw('coalesce(dlc_values.base_value, 0) as dlc_base_value')
-            ->selectRaw('coalesce(dlc_values.purchased_value, 0) as dlc_purchased_value');
+            ->selectRaw('coalesce(dlc_values.purchased_value, 0) as dlc_purchased_value')
+            ->selectRaw('coalesce(subscription_values.allocated_value, 0) as subscription_allocated_value')
+            ->selectRaw('coalesce(iap_values.allocated_value, 0) as in_app_purchase_allocated_value')
+            ->selectRaw("{$baseValueSql} as base_value")
+            ->selectRaw("{$purchasedValueSql} as purchased_value");
+
+        if ($positiveOnly) {
+            $valueSql = $sortColumn === 'base_value' ? $baseValueSql : $purchasedValueSql;
+            $builder->whereRaw("{$valueSql} > 0");
+        }
 
         return $builder
+            ->orderByDesc($sortColumn)
+            ->orderBy('library_games.id')
+            ->limit(8)
             ->get()
-            ->map(function ($row) use ($financialByGame) {
-                $financial = $financialByGame[$row->library_game_id] ?? $this->emptyFinancialComponents();
+            ->map(function ($row) {
                 $copyBase = (float) $row->copy_base_value;
                 $copyPaid = (float) $row->copy_purchased_value;
                 $dlcBase = (float) $row->dlc_base_value;
@@ -937,22 +966,13 @@ class StatsService
                     'playtime_hours' => (float) $row->playtime_hours,
                     'copy_purchased_value' => round($copyPaid, 2),
                     'dlc_purchased_value' => round($dlcPaid, 2),
-                    'subscription_allocated_value' => (float) $financial['subscription_allocated_value'],
-                    'in_app_purchase_allocated_value' => (float) $financial['in_app_purchase_allocated_value'],
-                    'in_app_purchase_value' => (float) $financial['in_app_purchase_allocated_value'],
-                    'base_value' => round($copyBase + $dlcBase, 2),
-                    'purchased_value' => round(
-                        $copyPaid
-                        + $dlcPaid
-                        + (float) $financial['subscription_allocated_value']
-                        + (float) $financial['in_app_purchase_allocated_value'],
-                        2,
-                    ),
+                    'subscription_allocated_value' => (float) $row->subscription_allocated_value,
+                    'in_app_purchase_allocated_value' => (float) $row->in_app_purchase_allocated_value,
+                    'in_app_purchase_value' => (float) $row->in_app_purchase_allocated_value,
+                    'base_value' => round((float) $row->base_value, 2),
+                    'purchased_value' => round((float) $row->purchased_value, 2),
                 ];
             })
-            ->filter(fn ($item) => ! $positiveOnly || $item[$sortColumn] > 0)
-            ->sortByDesc($sortColumn)
-            ->take(8)
             ->values()
             ->all();
     }

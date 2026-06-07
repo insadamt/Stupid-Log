@@ -4,15 +4,18 @@ namespace App\Http\Controllers\StupidLog;
 
 use App\Http\Controllers\Controller;
 use App\Models\StupidLog\AppSetting;
-use App\Models\StupidLog\Provider;
-use App\Models\StupidLog\ProviderCredential;
 use App\Models\User;
+use App\Services\DataPortability\BackupPreviewStore;
+use App\Services\DataPortability\BackupRestorer;
 use App\Services\LocalUserService;
+use App\Services\ProviderCredentialService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt;
 use Inertia\Inertia;
 use Inertia\Response;
+use InvalidArgumentException;
+use RuntimeException;
 
 class SetupController extends Controller
 {
@@ -21,8 +24,11 @@ class SetupController extends Controller
         return Inertia::render('Setup');
     }
 
-    public function storeSetup(Request $request, LocalUserService $users): RedirectResponse
-    {
+    public function storeSetup(
+        Request $request,
+        LocalUserService $users,
+        ProviderCredentialService $credentials,
+    ): RedirectResponse {
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:255'],
             'igdb_client_id' => ['nullable', 'string'],
@@ -32,33 +38,56 @@ class SetupController extends Controller
 
         $user = User::updateOrCreate(['id' => $users->get()->id], ['username' => $validated['username']]);
         AppSetting::updateOrCreate(['user_id' => $user->id], ['currency_code' => 'USD']);
-        $this->storeCredential($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null);
-        $this->storeCredential($user, 'steam', null, null, $validated['steam_api_key'] ?? null);
+        $credentials->store($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null);
+        $credentials->store($user, 'steam', null, null, $validated['steam_api_key'] ?? null);
 
         return redirect()->route('home');
     }
 
-    private function storeCredential(User $user, string $providerKey, ?string $clientId, ?string $clientSecret, ?string $apiKey, bool $preserveBlankFields = false): void
-    {
-        $provider = Provider::where('key', $providerKey)->first();
-        if (! $provider || (! $clientId && ! $clientSecret && ! $apiKey)) {
-            return;
+    public function restoreBackup(
+        Request $request,
+        BackupPreviewStore $previews,
+        BackupRestorer $restorer,
+        LocalUserService $users,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'token' => ['required', 'string', 'size:64'],
+        ]);
+
+        if (User::query()->exists() && AppSetting::query()->exists()) {
+            return response()->json(['message' => 'Setup import is only available before setup is complete.'], 409);
         }
 
-        $existing = ProviderCredential::where('user_id', $user->id)
-            ->where('provider_id', $provider->id)
-            ->first();
+        try {
+            $restorer->restore($previews->archivePath($validated['token']), $users->get());
+            $previews->delete($validated['token']);
+            $request->session()->put('setup_backup_imported', true);
+        } catch (InvalidArgumentException|RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
 
-        ProviderCredential::updateOrCreate(
-            ['user_id' => $user->id, 'provider_id' => $provider->id],
-            [
-                'encrypted_client_id' => $clientId ? Crypt::encryptString($clientId) : ($preserveBlankFields ? $existing?->encrypted_client_id : null),
-                'encrypted_client_secret' => $clientSecret ? Crypt::encryptString($clientSecret) : ($preserveBlankFields ? $existing?->encrypted_client_secret : null),
-                'encrypted_api_key' => $apiKey ? Crypt::encryptString($apiKey) : ($preserveBlankFields ? $existing?->encrypted_api_key : null),
-                'is_enabled' => true,
-                'last_tested_at' => now(),
-                'last_test_status' => 'stored',
-            ],
-        );
+        return response()->json(['restored' => true]);
+    }
+
+    public function storeImportedCredentials(
+        Request $request,
+        LocalUserService $users,
+        ProviderCredentialService $credentials,
+    ): JsonResponse {
+        if (! $request->session()->pull('setup_backup_imported', false)) {
+            return response()->json(['message' => 'Import provider setup is no longer available.'], 409);
+        }
+
+        $validated = $request->validate([
+            'igdb_client_id' => ['nullable', 'string'],
+            'igdb_client_secret' => ['nullable', 'string'],
+            'steam_api_key' => ['nullable', 'string'],
+        ]);
+
+        $user = $users->get();
+        $credentials->store($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null, true);
+        $credentials->store($user, 'steam', null, null, $validated['steam_api_key'] ?? null, true);
+
+        return response()->json(['saved' => true]);
     }
 }

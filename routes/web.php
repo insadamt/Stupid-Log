@@ -1,22 +1,25 @@
 <?php
 
-use App\Http\Controllers\StupidLog\LibraryController;
-use App\Http\Controllers\StupidLog\LibraryGameMutationController;
+use App\Http\Controllers\StupidLog\DataPortabilityController;
 use App\Http\Controllers\StupidLog\GameDetailsController;
 use App\Http\Controllers\StupidLog\HomeController;
 use App\Http\Controllers\StupidLog\InAppPurchaseController;
+use App\Http\Controllers\StupidLog\LibraryController;
+use App\Http\Controllers\StupidLog\LibraryGameMutationController;
 use App\Http\Controllers\StupidLog\OwnedDlcController;
 use App\Http\Controllers\StupidLog\OwnershipCopyController;
 use App\Http\Controllers\StupidLog\ProviderController;
-use App\Http\Controllers\StupidLog\SnapshotController;
-use App\Http\Controllers\StupidLog\SetupController;
 use App\Http\Controllers\StupidLog\SettingsController;
+use App\Http\Controllers\StupidLog\SetupController;
+use App\Http\Controllers\StupidLog\SnapshotController;
 use App\Http\Controllers\StupidLog\StatsController;
 use App\Http\Controllers\StupidLog\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/setup', [SetupController::class, 'setup'])->name('setup');
 Route::post('/setup', [SetupController::class, 'storeSetup'])->name('setup.store');
+Route::post('/setup/import/restore', [SetupController::class, 'restoreBackup'])->name('setup.import.restore');
+Route::post('/setup/import/providers', [SetupController::class, 'storeImportedCredentials'])->name('setup.import.providers');
 
 Route::get('/', [HomeController::class, 'home'])->name('home');
 Route::get('/library', [LibraryController::class, 'library'])->name('library');
@@ -63,3 +66,6 @@ Route::patch('/settings', [SettingsController::class, 'updateSettings'])->name('
 Route::post('/settings/reset', [SettingsController::class, 'resetApp'])->name('settings.reset');
 Route::post('/settings/igdb/test', [SettingsController::class, 'testIgdbCredentials'])->name('settings.igdb.test');
 Route::post('/settings/steam/test', [SettingsController::class, 'testSteamCredentials'])->name('settings.steam.test');
+Route::get('/settings/data-portability/export', [DataPortabilityController::class, 'export'])->name('settings.data-portability.export');
+Route::post('/settings/data-portability/preview', [DataPortabilityController::class, 'preview'])->name('settings.data-portability.preview');
+Route::post('/settings/data-portability/restore', [DataPortabilityController::class, 'restore'])->name('settings.data-portability.restore');

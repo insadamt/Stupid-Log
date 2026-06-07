@@ -12,6 +12,7 @@ use App\Models\StupidLog\ProviderCredential;
 use App\Models\StupidLog\ProviderImportDraft;
 use App\Models\User;
 use App\Services\LocalUserService;
+use App\Services\ProviderCredentialService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -48,8 +49,11 @@ class SettingsController extends Controller
         ]);
     }
 
-    public function updateSettings(UpdateSettingsRequest $request, LocalUserService $users): RedirectResponse
-    {
+    public function updateSettings(
+        UpdateSettingsRequest $request,
+        LocalUserService $users,
+        ProviderCredentialService $credentials,
+    ): RedirectResponse {
         $validated = $request->validated();
         $user = $users->get();
 
@@ -60,7 +64,7 @@ class SettingsController extends Controller
             ['currency_code' => $user->settings?->currency_code ?? 'USD']
         );
 
-        $this->storeCredential(
+        $credentials->store(
             $user,
             'igdb',
             $validated['igdb_client_id'] ?? null,
@@ -69,7 +73,7 @@ class SettingsController extends Controller
             preserveBlankFields: true,
         );
 
-        $this->storeCredential(
+        $credentials->store(
             $user,
             'steam',
             null,
@@ -195,30 +199,6 @@ class SettingsController extends Controller
                 'message' => 'Steam test failed: '.$exception->getMessage(),
             ], 422);
         }
-    }
-
-    private function storeCredential(User $user, string $providerKey, ?string $clientId, ?string $clientSecret, ?string $apiKey, bool $preserveBlankFields = false): void
-    {
-        $provider = Provider::where('key', $providerKey)->first();
-        if (! $provider || (! $clientId && ! $clientSecret && ! $apiKey)) {
-            return;
-        }
-
-        $existing = ProviderCredential::where('user_id', $user->id)
-            ->where('provider_id', $provider->id)
-            ->first();
-
-        ProviderCredential::updateOrCreate(
-            ['user_id' => $user->id, 'provider_id' => $provider->id],
-            [
-                'encrypted_client_id' => $clientId ? Crypt::encryptString($clientId) : ($preserveBlankFields ? $existing?->encrypted_client_id : null),
-                'encrypted_client_secret' => $clientSecret ? Crypt::encryptString($clientSecret) : ($preserveBlankFields ? $existing?->encrypted_client_secret : null),
-                'encrypted_api_key' => $apiKey ? Crypt::encryptString($apiKey) : ($preserveBlankFields ? $existing?->encrypted_api_key : null),
-                'is_enabled' => true,
-                'last_tested_at' => now(),
-                'last_test_status' => 'stored',
-            ],
-        );
     }
 
     private function credential(User $user, string $providerKey): ?ProviderCredential

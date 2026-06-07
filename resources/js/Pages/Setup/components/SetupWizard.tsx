@@ -81,8 +81,9 @@ export default function SetupWizard({
                                 <button
                                     key={item.eyebrow}
                                     type="button"
+                                    disabled={submitting || testing !== null}
                                     onClick={() => setStep(index)}
-                                    className={`h-2 rounded-full transition ${active || complete ? 'bg-[#b7ff63]' : 'bg-white/12'}`}
+                                    className={`h-2 rounded-full transition disabled:cursor-not-allowed disabled:opacity-40 ${active || complete ? 'bg-[#b7ff63]' : 'bg-white/12'}`}
                                     aria-label={item.title}
                                     data-wizard-item
                                 />
