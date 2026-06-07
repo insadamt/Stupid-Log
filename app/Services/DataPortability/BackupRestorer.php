@@ -23,6 +23,7 @@ final class BackupRestorer
         private readonly NdjsonReader $ndjson,
         private readonly RestoreIdMap $ids,
         private readonly BackupMediaStager $media,
+        private readonly PostgresSequenceSynchronizer $sequences,
     ) {}
 
     public function restore(string $archivePath, User $user): void
@@ -49,6 +50,7 @@ final class BackupRestorer
 
                     $this->restoreCurrency($user, $validated->manifest['currency_code']);
                     $this->promoteMedia($stagedMedia['files'], $createdMedia);
+                    $this->sequences->synchronize($this->registry->tables());
                 } finally {
                     $this->ids->drop();
                 }
