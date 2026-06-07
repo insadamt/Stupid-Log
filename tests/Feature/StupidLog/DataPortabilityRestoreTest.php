@@ -123,6 +123,14 @@ class DataPortabilityRestoreTest extends TestCase
         Storage::disk('public')->assertExists($restoredGame->cover_path);
         Storage::disk('public')->assertMissing('covers/games/current.webp');
         $this->assertDirectoryDoesNotExist(storage_path('app/private/data-portability/imports/'.$preview['token']));
+
+        $maximumRestoredGameId = (int) Game::query()->max('id');
+        $createdAfterRestore = Game::create([
+            'title' => 'Created After Restore',
+            'normalized_title' => 'created after restore',
+        ]);
+
+        $this->assertGreaterThan($maximumRestoredGameId, $createdAfterRestore->id);
     }
 
     public function test_failed_restore_rolls_back_database_and_keeps_existing_media(): void
