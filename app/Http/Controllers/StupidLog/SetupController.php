@@ -34,13 +34,11 @@ class SetupController extends Controller
             'username' => ['required', 'string', 'max:255'],
             'igdb_client_id' => ['nullable', 'string'],
             'igdb_client_secret' => ['nullable', 'string'],
-            'steam_api_key' => ['nullable', 'string'],
         ]);
 
         $user = User::updateOrCreate(['id' => $users->get()->id], ['username' => $validated['username']]);
         AppSetting::updateOrCreate(['user_id' => $user->id], ['currency_code' => 'USD']);
         $credentials->store($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null);
-        $credentials->store($user, 'steam', null, null, $validated['steam_api_key'] ?? null);
 
         return redirect()->route('home');
     }
@@ -56,20 +54,6 @@ class SetupController extends Controller
             $validated['igdb_client_id'] ?? null,
             $validated['igdb_client_secret'] ?? null,
         );
-
-        return response()->json([
-            'ok' => $result->ok,
-            'message' => $result->message,
-        ], $result->ok ? 200 : 422);
-    }
-
-    public function testSteamCredentials(Request $request, ProviderCredentialTestService $credentialTests): JsonResponse
-    {
-        $validated = $request->validate([
-            'steam_api_key' => ['nullable', 'string'],
-        ]);
-
-        $result = $credentialTests->testSteam($validated['steam_api_key'] ?? null);
 
         return response()->json([
             'ok' => $result->ok,
@@ -114,12 +98,10 @@ class SetupController extends Controller
         $validated = $request->validate([
             'igdb_client_id' => ['nullable', 'string'],
             'igdb_client_secret' => ['nullable', 'string'],
-            'steam_api_key' => ['nullable', 'string'],
         ]);
 
         $user = $users->get();
         $credentials->store($user, 'igdb', $validated['igdb_client_id'] ?? null, $validated['igdb_client_secret'] ?? null, null, true);
-        $credentials->store($user, 'steam', null, null, $validated['steam_api_key'] ?? null, true);
 
         return response()->json(['saved' => true]);
     }

@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Database, Gamepad2, KeyRound, Loader2, Save, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Database, Gamepad2, Globe2, Loader2, Save, ShieldCheck } from 'lucide-react';
 import { Dispatch, KeyboardEvent, SetStateAction } from 'react';
 import { steps } from '../constants';
 import { Provider, ProviderTestResults, SetupForm, TestResult } from '../types';
@@ -31,7 +31,6 @@ export default function SetupWizard({
 }) {
     const StepIcon = steps[step].icon;
     const igdbConfigured = Boolean(form.igdb_client_id.trim() || form.igdb_client_secret.trim());
-    const steamConfigured = Boolean(form.steam_api_key.trim());
     const providerStatus = (provider: Provider, configured: boolean) => {
         if (!configured) return 'Later';
 
@@ -138,13 +137,14 @@ export default function SetupWizard({
                                             <div className="text-xs font-black uppercase text-[#b7ff63]">Store</div>
                                             <h3 className="mt-1 text-2xl font-black">Steam</h3>
                                         </div>
-                                        <KeyRound size={26} strokeWidth={3} />
+                                        <Globe2 size={26} strokeWidth={3} />
                                     </div>
-                                    <TextField label="API Key" type="password" value={form.steam_api_key} onChange={(value) => updateField('steam_api_key', value)} placeholder="Optional Steam API key" />
-                                    <ControlButton tone="ghost" disabled={testing !== null} onClick={() => void testProvider('steam')}>
-                                        {testing === 'steam' ? <Loader2 className="animate-spin" size={17} strokeWidth={3} /> : <ShieldCheck size={17} strokeWidth={3} />}
-                                        {testing === 'steam' ? 'Testing Steam' : 'Test Steam'}
-                                    </ControlButton>
+                                    <p className="text-sm font-bold leading-relaxed text-white/48">
+                                        Search, store metadata, DLC, prices, and achievement totals use public Steam endpoints.
+                                    </p>
+                                    <div className="rounded-[16px] bg-[#b7ff63]/10 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#b7ff63]">
+                                        No API key required
+                                    </div>
                                 </div>
                             </div>
                             <TestMessage result={testResult} />
@@ -156,13 +156,13 @@ export default function SetupWizard({
                             <div className="grid gap-3 md:grid-cols-[0.8fr_1fr_1fr]">
                                 <OverviewCard label="Player" value={form.username || 'Missing'} detail="Local library profile" />
                                 <ProviderResultRow label="IGDB" configured={igdbConfigured} result={providerResults.igdb} />
-                                <ProviderResultRow label="Steam" configured={steamConfigured} result={providerResults.steam} />
+                                <OverviewCard label="Steam" value="Public" detail="No API key required" />
                             </div>
                             <div className="overflow-hidden rounded-[26px] border border-[#b7ff63]/30 bg-[#b7ff63] p-6 text-black shadow-[0_22px_70px_rgb(183_255_99/0.16)]" data-wizard-item>
                                 <div className="text-xs font-black uppercase text-black/52">Ready</div>
                                 <h3 className="mt-2 text-4xl font-black leading-none">Open Stupid Log.</h3>
                                 <p className="mt-3 max-w-[560px] text-sm font-black leading-relaxed text-black/58">
-                                    {providerStatus('igdb', igdbConfigured) === 'Failed' || providerStatus('steam', steamConfigured) === 'Failed'
+                                    {providerStatus('igdb', igdbConfigured) === 'Failed'
                                         ? 'Some provider checks need review, but setup can continue and credentials can be updated later.'
                                         : 'Setup is ready. Finish to enter your library.'}
                                 </p>
@@ -181,7 +181,7 @@ export default function SetupWizard({
                             {testing ? (
                                 <>
                                     <Loader2 className="animate-spin" size={17} strokeWidth={3} />
-                                    {testing === 'igdb' ? 'Testing IGDB' : 'Testing Steam'}
+                                    Testing IGDB
                                 </>
                             ) : (
                                 <>

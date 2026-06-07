@@ -11,4 +11,4 @@ export type TestResult = {
     message: string;
 };
 
-export type RequestState = 'idle' | 'saving-profile' | 'saving-integrations' | 'testing-igdb' | 'testing-steam' | 'resetting';
+export type RequestState = 'idle' | 'saving-profile' | 'saving-integrations' | 'testing-igdb' | 'resetting';

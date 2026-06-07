@@ -50,9 +50,7 @@ class RuntimeFoundationsTest extends TestCase
         $this->get('/library')->assertRedirect('/setup');
         $this->get('/settings')->assertRedirect('/setup');
         $this->post('/settings/reset')->assertRedirect('/setup');
-        $this->postJson('/settings/steam/test', [
-            'steam_api_key' => 'key',
-        ])->assertRedirect('/setup');
+        $this->postJson('/settings/igdb/test')->assertRedirect('/setup');
     }
 
     public function test_setup_igdb_credentials_can_be_tested_without_persisting_them(): void
@@ -75,25 +73,7 @@ class RuntimeFoundationsTest extends TestCase
         $this->assertSame(0, ProviderCredential::count());
     }
 
-    public function test_setup_steam_credentials_can_be_tested_without_persisting_them(): void
-    {
-        $this->seed(StupidLogReferenceSeeder::class);
-        Http::fake([
-            'api.steampowered.com/*' => Http::response(['apilist' => ['interfaces' => []]]),
-        ]);
-
-        $this->postJson('/setup/steam/test', [
-            'steam_api_key' => 'steam-key',
-        ])->assertOk()->assertJson([
-            'ok' => true,
-            'message' => 'Steam API key works.',
-        ]);
-
-        $this->assertSame(0, User::count());
-        $this->assertSame(0, ProviderCredential::count());
-    }
-
-    public function test_setup_credential_tests_validate_missing_values(): void
+    public function test_setup_igdb_test_validates_missing_and_invalid_values(): void
     {
         $this->seed(StupidLogReferenceSeeder::class);
 
@@ -101,75 +81,63 @@ class RuntimeFoundationsTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonPath('message', 'Add both IGDB Client ID and Client Secret before testing.');
 
-        $this->postJson('/setup/steam/test')
-            ->assertUnprocessable()
-            ->assertJsonPath('message', 'Add a Steam API key before testing.');
-
         $this->postJson('/setup/igdb/test', [
             'igdb_client_id' => ['invalid'],
             'igdb_client_secret' => ['invalid'],
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['igdb_client_id', 'igdb_client_secret']);
-
-        $this->postJson('/setup/steam/test', [
-            'steam_api_key' => ['invalid'],
-        ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['steam_api_key']);
     }
 
-    public function test_setup_credential_tests_translate_invalid_credentials_into_human_messages(): void
+    public function test_setup_igdb_test_translates_provider_failures_into_human_messages(): void
     {
         $this->seed(StupidLogReferenceSeeder::class);
 
         Http::fake([
             'id.twitch.tv/*' => Http::sequence()
                 ->push(['status' => 400, 'message' => 'invalid client'], 400)
-                ->push(['status' => 403, 'message' => 'invalid client secret'], 403),
-            'api.steampowered.com/*' => Http::response(['apilist' => ['interfaces' => []]], 403),
+                ->push(['status' => 403, 'message' => 'invalid client secret'], 403)
+                ->push(['internal' => 'sensitive detail'], 503),
         ]);
 
         $this->postJson('/setup/igdb/test', [
             'igdb_client_id' => 'bad-client',
             'igdb_client_secret' => 'bad-secret',
-        ])->assertUnprocessable()
-            ->assertJsonPath('ok', false)
-            ->assertJsonPath('message', 'The IGDB Client ID is invalid.');
+        ])->assertUnprocessable()->assertJsonPath('message', 'The IGDB Client ID is invalid.');
 
         $this->postJson('/setup/igdb/test', [
             'igdb_client_id' => 'client-id',
             'igdb_client_secret' => 'bad-secret',
-        ])->assertUnprocessable()
-            ->assertJsonPath('ok', false)
-            ->assertJsonPath('message', 'The IGDB Client Secret is invalid.');
-
-        $this->postJson('/setup/steam/test', [
-            'steam_api_key' => 'bad-key',
-        ])->assertUnprocessable()
-            ->assertJsonPath('ok', false)
-            ->assertJsonPath('message', 'The Steam API key is invalid.');
-    }
-
-    public function test_setup_credential_tests_hide_unexpected_provider_responses(): void
-    {
-        $this->seed(StupidLogReferenceSeeder::class);
-
-        Http::fake([
-            'id.twitch.tv/*' => Http::response(['internal' => 'sensitive IGDB detail'], 503),
-            'api.steampowered.com/*' => Http::response(['internal' => 'sensitive Steam detail'], 503),
-        ]);
+        ])->assertUnprocessable()->assertJsonPath('message', 'The IGDB Client Secret is invalid.');
 
         $this->postJson('/setup/igdb/test', [
             'igdb_client_id' => 'client-id',
             'igdb_client_secret' => 'client-secret',
         ])->assertUnprocessable()
             ->assertJsonPath('message', 'IGDB is unavailable right now. Try again later.')
-            ->assertJsonMissing(['internal' => 'sensitive IGDB detail']);
+            ->assertJsonMissing(['internal' => 'sensitive detail']);
+    }
 
-        $this->postJson('/setup/steam/test', [
-            'steam_api_key' => 'steam-key',
-        ])->assertUnprocessable()
-            ->assertJsonPath('message', 'Steam is unavailable right now. Try again later.')
-            ->assertJsonMissing(['internal' => 'sensitive Steam detail']);
+    public function test_steam_credential_test_routes_and_frontend_references_are_removed(): void
+    {
+        $this->seed(StupidLogReferenceSeeder::class);
+
+        $this->postJson('/setup/steam/test')->assertNotFound();
+
+        $this->seed(DatabaseSeeder::class);
+        $this->postJson('/settings/steam/test')->assertNotFound();
+
+        foreach ([
+            resource_path('js/Pages/Setup/index.tsx'),
+            resource_path('js/Pages/Setup/types.ts'),
+            resource_path('js/Pages/Setup/components/SetupWizard.tsx'),
+            resource_path('js/Pages/Setup/components/SetupImportedProviders.tsx'),
+            resource_path('js/Pages/Settings.tsx'),
+            resource_path('js/Pages/Settings/IntegrationsPanel.tsx'),
+        ] as $path) {
+            $source = file_get_contents($path);
+            $this->assertStringNotContainsString('steam_api_key', $source);
+            $this->assertStringNotContainsString('/steam/test', $source);
+        }
     }
 
     public function test_provider_import_cleanup_is_scheduled_daily(): void

@@ -5,18 +5,16 @@ namespace App\Services;
 use App\Models\StupidLog\Dlc;
 use App\Models\StupidLog\Game;
 use App\Models\StupidLog\Provider;
-use App\Models\StupidLog\ProviderCredential;
-use App\Models\User;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 class SteamEnrichmentService
 {
-    public function enrich(Game $game, ?string $steamAppId, ?User $user = null): array
+    public function enrich(Game $game, ?string $steamAppId): array
     {
         if (! $steamAppId) {
             return [];
@@ -41,7 +39,7 @@ class SteamEnrichmentService
         }
 
         try {
-            $this->enrichAchievements($game, $steamAppId, $user);
+            $this->enrichAchievements($game, $steamAppId);
         } catch (Throwable $exception) {
             $warnings[] = 'Steam achievement enrichment unavailable: '.$exception->getMessage();
             Log::warning('Steam achievement enrichment failed.', ['game_id' => $game->id, 'steam_app_id' => $steamAppId, 'exception' => $exception]);
@@ -135,24 +133,21 @@ class SteamEnrichmentService
         }
     }
 
-    private function enrichAchievements(Game $game, string $steamAppId, ?User $user): void
+    private function enrichAchievements(Game $game, string $steamAppId): void
     {
-        $query = ['appid' => $steamAppId];
-
-        if ($apiKey = $user ? $this->steamApiKey($user) : null) {
-            $query['key'] = $apiKey;
-        }
-
-        $schema = Http::get('https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/', $query)
+        $achievements = Http::get(
+            'https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/',
+            ['gameid' => $steamAppId],
+        )
             ->throw()
-            ->json('game.availableGameStats.achievements', []);
+            ->json('achievementpercentages.achievements');
 
-        if (! is_array($schema)) {
-            return;
+        if (! is_array($achievements) || $achievements === []) {
+            throw new RuntimeException('No public achievement data was returned.');
         }
 
         $game->forceFill([
-            'total_achievements' => count($schema),
+            'total_achievements' => count($achievements),
             'total_achievements_source' => 'steam',
         ])->save();
     }
@@ -206,19 +201,4 @@ class SteamEnrichmentService
         return is_numeric($price) ? round(((float) $price) / 100, 2) : null;
     }
 
-    private function steamApiKey(User $user): ?string
-    {
-        $provider = Provider::where('key', 'steam')->first();
-
-        if (! $provider) {
-            return null;
-        }
-
-        $credential = ProviderCredential::where('user_id', $user->id)
-            ->where('provider_id', $provider->id)
-            ->where('is_enabled', true)
-            ->first();
-
-        return $credential?->encrypted_api_key ? Crypt::decryptString($credential->encrypted_api_key) : null;
-    }
 }
