@@ -93,7 +93,7 @@ class RuntimeFoundationsTest extends TestCase
         $this->assertSame(0, ProviderCredential::count());
     }
 
-    public function test_setup_credential_tests_validate_missing_values_and_report_upstream_failures(): void
+    public function test_setup_credential_tests_validate_missing_values(): void
     {
         $this->seed(StupidLogReferenceSeeder::class);
 
@@ -115,10 +115,17 @@ class RuntimeFoundationsTest extends TestCase
             'steam_api_key' => ['invalid'],
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['steam_api_key']);
+    }
+
+    public function test_setup_credential_tests_translate_invalid_credentials_into_human_messages(): void
+    {
+        $this->seed(StupidLogReferenceSeeder::class);
 
         Http::fake([
-            'id.twitch.tv/*' => Http::response(['message' => 'Unauthorized'], 401),
-            'api.steampowered.com/*' => Http::response(['error' => 'Unavailable'], 503),
+            'id.twitch.tv/*' => Http::sequence()
+                ->push(['status' => 400, 'message' => 'invalid client'], 400)
+                ->push(['status' => 403, 'message' => 'invalid client secret'], 403),
+            'api.steampowered.com/*' => Http::response(['apilist' => ['interfaces' => []]], 403),
         ]);
 
         $this->postJson('/setup/igdb/test', [
@@ -126,13 +133,43 @@ class RuntimeFoundationsTest extends TestCase
             'igdb_client_secret' => 'bad-secret',
         ])->assertUnprocessable()
             ->assertJsonPath('ok', false)
-            ->assertJsonPath('message', fn (string $message) => str_starts_with($message, 'IGDB test failed:'));
+            ->assertJsonPath('message', 'The IGDB Client ID is invalid.');
+
+        $this->postJson('/setup/igdb/test', [
+            'igdb_client_id' => 'client-id',
+            'igdb_client_secret' => 'bad-secret',
+        ])->assertUnprocessable()
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('message', 'The IGDB Client Secret is invalid.');
 
         $this->postJson('/setup/steam/test', [
             'steam_api_key' => 'bad-key',
         ])->assertUnprocessable()
             ->assertJsonPath('ok', false)
-            ->assertJsonPath('message', fn (string $message) => str_starts_with($message, 'Steam test failed:'));
+            ->assertJsonPath('message', 'The Steam API key is invalid.');
+    }
+
+    public function test_setup_credential_tests_hide_unexpected_provider_responses(): void
+    {
+        $this->seed(StupidLogReferenceSeeder::class);
+
+        Http::fake([
+            'id.twitch.tv/*' => Http::response(['internal' => 'sensitive IGDB detail'], 503),
+            'api.steampowered.com/*' => Http::response(['internal' => 'sensitive Steam detail'], 503),
+        ]);
+
+        $this->postJson('/setup/igdb/test', [
+            'igdb_client_id' => 'client-id',
+            'igdb_client_secret' => 'client-secret',
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'IGDB is unavailable right now. Try again later.')
+            ->assertJsonMissing(['internal' => 'sensitive IGDB detail']);
+
+        $this->postJson('/setup/steam/test', [
+            'steam_api_key' => 'steam-key',
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'Steam is unavailable right now. Try again later.')
+            ->assertJsonMissing(['internal' => 'sensitive Steam detail']);
     }
 
     public function test_provider_import_cleanup_is_scheduled_daily(): void
