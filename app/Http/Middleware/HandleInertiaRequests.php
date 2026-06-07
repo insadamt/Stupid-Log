@@ -14,6 +14,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'appName' => 'Stupid Log',
+            'appVersion' => config('app.version'),
         ];
     }
 }

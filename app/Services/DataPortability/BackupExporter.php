@@ -40,7 +40,7 @@ final class BackupExporter
                 'format' => 'stupid-log-backup',
                 'format_version' => 1,
                 'created_at' => now()->toIso8601String(),
-                'app_version' => '1.0.0',
+                'app_version' => config('app.version'),
                 'currency_code' => AppSetting::where('user_id', $user->id)->value('currency_code') ?? 'USD',
                 'tables' => $tableMetadata,
                 'media' => $mediaMetadata,

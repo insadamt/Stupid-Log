@@ -9,6 +9,7 @@ use App\Services\DataPortability\BackupPreviewStore;
 use App\Services\DataPortability\BackupRestorer;
 use App\Services\LocalUserService;
 use App\Services\ProviderCredentialService;
+use App\Services\ProviderCredentialTestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,6 +43,38 @@ class SetupController extends Controller
         $credentials->store($user, 'steam', null, null, $validated['steam_api_key'] ?? null);
 
         return redirect()->route('home');
+    }
+
+    public function testIgdbCredentials(Request $request, ProviderCredentialTestService $credentialTests): JsonResponse
+    {
+        $validated = $request->validate([
+            'igdb_client_id' => ['nullable', 'string'],
+            'igdb_client_secret' => ['nullable', 'string'],
+        ]);
+
+        $result = $credentialTests->testIgdb(
+            $validated['igdb_client_id'] ?? null,
+            $validated['igdb_client_secret'] ?? null,
+        );
+
+        return response()->json([
+            'ok' => $result->ok,
+            'message' => $result->message,
+        ], $result->ok ? 200 : 422);
+    }
+
+    public function testSteamCredentials(Request $request, ProviderCredentialTestService $credentialTests): JsonResponse
+    {
+        $validated = $request->validate([
+            'steam_api_key' => ['nullable', 'string'],
+        ]);
+
+        $result = $credentialTests->testSteam($validated['steam_api_key'] ?? null);
+
+        return response()->json([
+            'ok' => $result->ok,
+            'message' => $result->message,
+        ], $result->ok ? 200 : 422);
     }
 
     public function restoreBackup(

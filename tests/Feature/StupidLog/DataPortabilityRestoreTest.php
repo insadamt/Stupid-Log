@@ -180,9 +180,8 @@ class DataPortabilityRestoreTest extends TestCase
 
         $preview = $this->preview($artifact);
 
-        $this->postJson('/settings/data-portability/restore', [
+        $this->postJson('/setup/import/restore', [
             'token' => $preview['token'],
-            'confirmation' => 'RESTORE',
         ])->assertOk();
 
         $restoredUser = User::firstOrFail();
@@ -235,7 +234,7 @@ class DataPortabilityRestoreTest extends TestCase
 
         $this->postJson('/setup/import/restore', [
             'token' => $preview['token'],
-        ])->assertConflict();
+        ])->assertRedirect('/');
     }
 
     private function createPortableGraph(User $user): array

@@ -120,7 +120,7 @@ export default function Setup() {
         Object.entries(form).forEach(([key, value]) => formData.append(key, value));
 
         try {
-            const response = await fetch(`/settings/${provider}/test`, {
+            const response = await fetch(`/setup/${provider}/test`, {
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN': csrf,

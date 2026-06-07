@@ -79,6 +79,7 @@ class DataPortabilityExportTest extends TestCase
 
         $this->assertSame('stupid-log-backup', $manifest['format']);
         $this->assertSame(1, $manifest['format_version']);
+        $this->assertSame(config('app.version'), $manifest['app_version']);
         $this->assertSame(1, $manifest['tables']['games']['count']);
         $this->assertSame(1, $manifest['tables']['library_games']['count']);
         $this->assertSame(1, $manifest['media']['count']);
