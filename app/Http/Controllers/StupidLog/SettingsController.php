@@ -29,7 +29,6 @@ class SettingsController extends Controller
     {
         $user = $users->get();
         $igdb = $this->credential($user, 'igdb');
-        $steam = $this->credential($user, 'steam');
 
         return Inertia::render('Settings', [
             'user' => $user->load('settings'),
@@ -39,11 +38,6 @@ class SettingsController extends Controller
                 'has_client_secret' => (bool) $igdb?->encrypted_client_secret,
                 'last_tested_at' => $igdb?->last_tested_at?->toIso8601String(),
                 'last_test_status' => $igdb?->last_test_status,
-            ],
-            'steamCredential' => [
-                'has_api_key' => (bool) $steam?->encrypted_api_key,
-                'last_tested_at' => $steam?->last_tested_at?->toIso8601String(),
-                'last_test_status' => $steam?->last_test_status,
             ],
         ]);
     }
@@ -69,15 +63,6 @@ class SettingsController extends Controller
             $validated['igdb_client_id'] ?? null,
             $validated['igdb_client_secret'] ?? null,
             null,
-            preserveBlankFields: true,
-        );
-
-        $credentials->store(
-            $user,
-            'steam',
-            null,
-            null,
-            $validated['steam_api_key'] ?? null,
             preserveBlankFields: true,
         );
 
@@ -126,28 +111,6 @@ class SettingsController extends Controller
         $clientSecret = ($validated['igdb_client_secret'] ?? null) ?: ($credential?->encrypted_client_secret ? Crypt::decryptString($credential->encrypted_client_secret) : null);
 
         $result = $credentialTests->testIgdb($clientId, $clientSecret);
-        $this->markCredentialTest($credential, $result->ok ? 'ok' : 'failed');
-
-        return response()->json([
-            'ok' => $result->ok,
-            'message' => $result->message,
-        ], $result->ok ? 200 : 422);
-    }
-
-    public function testSteamCredentials(
-        Request $request,
-        LocalUserService $users,
-        ProviderCredentialTestService $credentialTests,
-    ): JsonResponse {
-        $validated = $request->validate([
-            'steam_api_key' => ['nullable', 'string'],
-        ]);
-
-        $user = $users->get();
-        $credential = $this->credential($user, 'steam');
-        $apiKey = ($validated['steam_api_key'] ?? null) ?: ($credential?->encrypted_api_key ? Crypt::decryptString($credential->encrypted_api_key) : null);
-
-        $result = $credentialTests->testSteam($apiKey);
         $this->markCredentialTest($credential, $result->ok ? 'ok' : 'failed');
 
         return response()->json([

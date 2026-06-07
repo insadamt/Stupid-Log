@@ -16,20 +16,12 @@ type IgdbCredential = {
     last_test_status?: string | null;
 };
 
-type SteamCredential = {
-    has_api_key: boolean;
-    last_tested_at?: string | null;
-    last_test_status?: string | null;
-};
-
 export default function Settings({
     user,
     igdbCredential,
-    steamCredential,
 }: {
     user: { username: string };
     igdbCredential: IgdbCredential;
-    steamCredential: SteamCredential;
 }) {
     const [section, setSection] = useState<SettingsSection>(initialSection);
     const [requestState, setRequestState] = useState<RequestState>('idle');
@@ -38,10 +30,8 @@ export default function Settings({
     const [profileFeedback, setProfileFeedback] = useState<TestResult | null>(null);
     const [integrationFeedback, setIntegrationFeedback] = useState<TestResult | null>(null);
     const [igdbTest, setIgdbTest] = useState<TestResult | null>(null);
-    const [steamTest, setSteamTest] = useState<TestResult | null>(null);
 
     const igdbSaved = igdbCredential.has_client_id && igdbCredential.has_client_secret;
-    const steamSaved = steamCredential.has_api_key;
     const navigationLocked = restoreBusy || requestState === 'resetting';
 
     function changeSection(next: SettingsSection) {
@@ -140,7 +130,6 @@ export default function Settings({
                             </div>
                             <div className="flex items-center gap-2 rounded-[24px] bg-white/8 p-2">
                                 <StatusBadge active={igdbSaved} label="IGDB" dark />
-                                <StatusBadge active={steamSaved} label="Steam" dark />
                             </div>
                         </div>
                     </header>
@@ -167,21 +156,12 @@ export default function Settings({
                                         lastTestedAt: igdbCredential.last_tested_at,
                                         lastTestStatus: igdbCredential.last_test_status,
                                     }}
-                                    steam={{
-                                        saved: steamSaved,
-                                        hasApiKey: steamCredential.has_api_key,
-                                        lastTestedAt: steamCredential.last_tested_at,
-                                        lastTestStatus: steamCredential.last_test_status,
-                                    }}
                                     saving={requestState === 'saving-integrations'}
                                     testingIgdb={requestState === 'testing-igdb'}
-                                    testingSteam={requestState === 'testing-steam'}
                                     feedback={integrationFeedback}
                                     igdbTest={igdbTest}
-                                    steamTest={steamTest}
                                     onSubmit={saveIntegrations}
                                     onTestIgdb={(event) => testProvider(event, '/settings/igdb/test', 'testing-igdb', setIgdbTest, 'IGDB test failed.')}
-                                    onTestSteam={(event) => testProvider(event, '/settings/steam/test', 'testing-steam', setSteamTest, 'Steam test failed.')}
                                 />
                             </div>
 

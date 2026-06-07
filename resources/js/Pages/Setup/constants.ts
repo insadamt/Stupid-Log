@@ -10,7 +10,7 @@ export const steps = [
     {
         eyebrow: 'Signals',
         title: 'Connect scanners.',
-        detail: 'Add optional provider keys now, or leave them blank and add them later.',
+        detail: 'Add optional IGDB credentials. Steam metadata uses public endpoints and needs no API key.',
         icon: Database,
     },
     {

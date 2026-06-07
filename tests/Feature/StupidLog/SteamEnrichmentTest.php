@@ -43,8 +43,8 @@ class SteamEnrichmentTest extends TestCase
         ]);
 
         $service = app(SteamEnrichmentService::class);
-        $this->assertSame([], $service->enrich($game, '100', $this->user));
-        $this->assertSame([], $service->enrich($game->refresh(), '100', $this->user));
+        $this->assertSame([], $service->enrich($game, '100'));
+        $this->assertSame([], $service->enrich($game->refresh(), '100'));
 
         $game->refresh();
 
@@ -93,7 +93,9 @@ class SteamEnrichmentTest extends TestCase
                     ])
                     ->all());
             },
-            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response(['game' => ['availableGameStats' => ['achievements' => []]]]),
+            'api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/*' => Http::response([
+                'achievementpercentages' => ['achievements' => [['name' => 'A', 'percent' => 50]]],
+            ]),
         ]);
 
         $game = Game::create([
@@ -101,8 +103,32 @@ class SteamEnrichmentTest extends TestCase
             'normalized_title' => 'steam game',
         ]);
 
-        $this->assertSame([], app(SteamEnrichmentService::class)->enrich($game, '100', $this->user));
+        $this->assertSame([], app(SteamEnrichmentService::class)->enrich($game, '100'));
         $this->assertSame(count($dlcIds), Dlc::where('game_id', $game->id)->count());
+    }
+
+    public function test_invalid_public_achievement_data_is_a_non_blocking_warning(): void
+    {
+        Http::fake([
+            'store.steampowered.com/api/appdetails*' => Http::response([
+                '100' => ['success' => true, 'data' => ['name' => 'Steam Game']],
+            ]),
+            'api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/*' => Http::response([
+                'achievementpercentages' => ['achievements' => 'invalid'],
+            ]),
+        ]);
+
+        $game = Game::create([
+            'title' => 'Steam Game',
+            'normalized_title' => 'steam game',
+        ]);
+
+        $warnings = app(SteamEnrichmentService::class)->enrich($game, '100');
+
+        $this->assertCount(1, $warnings);
+        $this->assertNull($game->refresh()->total_achievements);
+        $this->assertStringContainsString('No public achievement data was returned.', $warnings[0]);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'GetSchemaForGame'));
     }
 
     public function test_steam_enrichment_failures_do_not_block_manual_game_creation(): void
@@ -255,14 +281,12 @@ class SteamEnrichmentTest extends TestCase
                     ],
                 ]);
             },
-            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response([
-                'game' => [
-                    'availableGameStats' => [
-                        'achievements' => [
-                            ['name' => 'A'],
-                            ['name' => 'B'],
-                            ['name' => 'C'],
-                        ],
+            'api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/*' => Http::response([
+                'achievementpercentages' => [
+                    'achievements' => [
+                        ['name' => 'A', 'percent' => 80],
+                        ['name' => 'B', 'percent' => 40],
+                        ['name' => 'C', 'percent' => 10],
                     ],
                 ],
             ]),

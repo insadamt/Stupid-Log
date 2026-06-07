@@ -200,7 +200,7 @@ class DataPortabilityRestoreTest extends TestCase
         $this->get('/')->assertOk();
     }
 
-    public function test_setup_import_restores_without_destructive_confirmation_and_accepts_new_credentials(): void
+    public function test_setup_import_restores_without_destructive_confirmation_and_accepts_new_igdb_credentials(): void
     {
         $sourceUser = User::firstOrFail();
         AppSetting::where('user_id', $sourceUser->id)->update(['currency_code' => 'MAD']);
@@ -218,21 +218,20 @@ class DataPortabilityRestoreTest extends TestCase
         $this->postJson('/setup/import/providers', [
             'igdb_client_id' => 'restored-client',
             'igdb_client_secret' => 'restored-secret',
-            'steam_api_key' => 'restored-steam',
         ])->assertOk()->assertJson(['saved' => true]);
 
         $user = User::firstOrFail();
         $igdb = ProviderCredential::where('user_id', $user->id)
             ->where('provider_id', Provider::where('key', 'igdb')->value('id'))
             ->firstOrFail();
-        $steam = ProviderCredential::where('user_id', $user->id)
-            ->where('provider_id', Provider::where('key', 'steam')->value('id'))
-            ->firstOrFail();
 
         $this->assertSame('MAD', AppSetting::where('user_id', $user->id)->value('currency_code'));
         $this->assertSame('restored-client', Crypt::decryptString($igdb->encrypted_client_id));
         $this->assertSame('restored-secret', Crypt::decryptString($igdb->encrypted_client_secret));
-        $this->assertSame('restored-steam', Crypt::decryptString($steam->encrypted_api_key));
+        $this->assertSame(
+            0,
+            ProviderCredential::where('provider_id', Provider::where('key', 'steam')->value('id'))->count(),
+        );
     }
 
     public function test_setup_import_bypass_is_rejected_after_setup_is_complete(): void

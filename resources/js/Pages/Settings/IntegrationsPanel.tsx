@@ -6,37 +6,29 @@ import { ProviderCredentialStatus, TestResult } from './types';
 export default function IntegrationsPanel({
     username,
     igdb,
-    steam,
     saving,
     testingIgdb,
-    testingSteam,
     feedback,
     igdbTest,
-    steamTest,
     onSubmit,
     onTestIgdb,
-    onTestSteam,
 }: {
     username: string;
     igdb: ProviderCredentialStatus & { hasClientId: boolean; hasClientSecret: boolean };
-    steam: ProviderCredentialStatus & { hasApiKey: boolean };
     saving: boolean;
     testingIgdb: boolean;
-    testingSteam: boolean;
     feedback: TestResult | null;
     igdbTest: TestResult | null;
-    steamTest: TestResult | null;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
     onTestIgdb: (event: MouseEvent<HTMLButtonElement>) => void;
-    onTestSteam: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
-    const busy = saving || testingIgdb || testingSteam;
+    const busy = saving || testingIgdb;
 
     return (
         <section id="settings-panel-integrations" role="tabpanel" aria-labelledby="settings-tab-integrations">
             <div className="text-[10px] font-black uppercase tracking-[0.24em] text-black/35">Provider access</div>
             <h2 className="mt-1 text-4xl font-black tracking-[-0.05em]">Integrations</h2>
-            <p className="mt-2 text-sm font-bold text-black/45">Manage credentials for external game providers.</p>
+            <p className="mt-2 text-sm font-bold text-black/45">Manage IGDB credentials. Steam uses public endpoints and needs no API key.</p>
 
             <form onSubmit={onSubmit} className="mt-6">
                 <input type="hidden" name="username" value={username} />
@@ -66,25 +58,15 @@ export default function IntegrationsPanel({
                     </div>
                 </ProviderSection>
 
-                <ProviderSection
-                    title="Steam"
-                    description="Search, achievements, DLC, and prices"
-                    saved={steam.saved}
-                    lastTestedAt={steam.lastTestedAt}
-                    testing={testingSteam}
-                    testResult={steamTest}
-                    actionsDisabled={busy && !testingSteam}
-                    onTest={onTestSteam}
-                >
-                    <div className="max-w-xl">
-                        <SettingsField
-                            label="API Key"
-                            name="steam_api_key"
-                            type="password"
-                            placeholder={steam.hasApiKey ? 'Saved · enter a new key to replace' : 'Steam API key'}
-                        />
+                <section className="grid grid-cols-[180px_minmax(0,1fr)] gap-6 border-t border-black/10 py-6">
+                    <div>
+                        <h3 className="text-lg font-black">Steam</h3>
+                        <p className="mt-1 text-xs font-bold text-black/40">Search, achievements, DLC, and prices</p>
                     </div>
-                </ProviderSection>
+                    <div className="rounded-[18px] bg-[#eef9df] px-4 py-3 text-sm font-black text-[#315d14]">
+                        Public access enabled. No API key is required.
+                    </div>
+                </section>
 
                 <div className="flex items-center gap-4 border-t border-black/10 pt-5">
                     <SettingsButton type="submit" tone="green" busy={saving} disabled={busy && !saving}>

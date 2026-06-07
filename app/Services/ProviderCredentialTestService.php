@@ -39,23 +39,6 @@ final class ProviderCredentialTestService
         }
     }
 
-    public function testSteam(?string $apiKey): ProviderCredentialTestResult
-    {
-        if (! $apiKey) {
-            return new ProviderCredentialTestResult(false, 'Add a Steam API key before testing.');
-        }
-
-        try {
-            Http::get('https://api.steampowered.com/ISteamWebAPIUtil/GetSupportedAPIList/v1/', [
-                'key' => $apiKey,
-            ])->throw();
-
-            return new ProviderCredentialTestResult(true, 'Steam API key works.');
-        } catch (Throwable $exception) {
-            return new ProviderCredentialTestResult(false, $this->steamFailureMessage($exception));
-        }
-    }
-
     private function igdbFailureMessage(Throwable $exception): string
     {
         if ($exception instanceof ConnectionException) {
@@ -81,18 +64,4 @@ final class ProviderCredentialTestService
         return 'IGDB is unavailable right now. Try again later.';
     }
 
-    private function steamFailureMessage(Throwable $exception): string
-    {
-        if ($exception instanceof ConnectionException) {
-            return 'Could not reach Steam. Check your connection and try again.';
-        }
-
-        if ($exception instanceof RequestException) {
-            if (in_array($exception->response->status(), [400, 401, 403], true)) {
-                return 'The Steam API key is invalid.';
-            }
-        }
-
-        return 'Steam is unavailable right now. Try again later.';
-    }
 }

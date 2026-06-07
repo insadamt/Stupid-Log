@@ -22,7 +22,6 @@ Route::middleware('installation.needs-setup')->group(function (): void {
     Route::get('/setup', [SetupController::class, 'setup'])->name('setup');
     Route::post('/setup', [SetupController::class, 'storeSetup'])->name('setup.store');
     Route::post('/setup/igdb/test', [SetupController::class, 'testIgdbCredentials'])->name('setup.igdb.test');
-    Route::post('/setup/steam/test', [SetupController::class, 'testSteamCredentials'])->name('setup.steam.test');
     Route::post('/setup/import/restore', [SetupController::class, 'restoreBackup'])->name('setup.import.restore');
     Route::post('/setup/import/providers', [SetupController::class, 'storeImportedCredentials'])->name('setup.import.providers');
 });
@@ -72,7 +71,6 @@ Route::middleware('installation.complete')->group(function (): void {
     Route::patch('/settings', [SettingsController::class, 'updateSettings'])->name('settings.update');
     Route::post('/settings/reset', [SettingsController::class, 'resetApp'])->name('settings.reset');
     Route::post('/settings/igdb/test', [SettingsController::class, 'testIgdbCredentials'])->name('settings.igdb.test');
-    Route::post('/settings/steam/test', [SettingsController::class, 'testSteamCredentials'])->name('settings.steam.test');
     Route::get('/settings/data-portability/export', [DataPortabilityController::class, 'export'])->name('settings.data-portability.export');
     Route::post('/settings/data-portability/restore', [DataPortabilityController::class, 'restore'])->name('settings.data-portability.restore');
 });

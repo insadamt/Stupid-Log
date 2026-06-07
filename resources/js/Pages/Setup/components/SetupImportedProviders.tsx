@@ -33,10 +33,10 @@ export default function SetupImportedProviders({
                 <header>
                     <div className="text-xs font-black uppercase text-[#b7ff63]">Backup imported</div>
                     <h1 className="mt-2 text-5xl font-black leading-none">Connect providers?</h1>
-                    <p className="mt-3 text-sm font-bold text-white/48">Provider secrets are never included in backups. Add them now or skip and open your restored library.</p>
+                    <p className="mt-3 text-sm font-bold text-white/48">IGDB secrets are never included in backups. Add them now or skip and open your restored library. Steam needs no API key.</p>
                 </header>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="max-w-xl">
                     <div className="grid gap-4 rounded-[24px] bg-white/[0.06] p-5 ring-1 ring-white/10">
                         <div className="flex items-center justify-between">
                             <h2 className="text-2xl font-black">IGDB</h2>
@@ -47,18 +47,6 @@ export default function SetupImportedProviders({
                         <ControlButton tone="ghost" disabled={busy} onClick={() => void testProvider('igdb')}>
                             {testing === 'igdb' ? <Loader2 className="animate-spin" size={17} /> : <ShieldCheck size={17} />}
                             Test IGDB
-                        </ControlButton>
-                    </div>
-
-                    <div className="grid content-start gap-4 rounded-[24px] bg-white/[0.06] p-5 ring-1 ring-white/10">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-2xl font-black">Steam</h2>
-                            <KeyRound size={25} strokeWidth={3} />
-                        </div>
-                        <TextField label="API Key" type="password" value={form.steam_api_key} onChange={(value) => updateField('steam_api_key', value)} />
-                        <ControlButton tone="ghost" disabled={busy} onClick={() => void testProvider('steam')}>
-                            {testing === 'steam' ? <Loader2 className="animate-spin" size={17} /> : <ShieldCheck size={17} />}
-                            Test Steam
                         </ControlButton>
                     </div>
                 </div>

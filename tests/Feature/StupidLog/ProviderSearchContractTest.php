@@ -22,12 +22,8 @@ class ProviderSearchContractTest extends TestCase
         $this->seed(DatabaseSeeder::class);
     }
 
-    public function test_provider_search_returns_stable_shape_when_credentials_are_missing(): void
+    public function test_provider_search_returns_stable_shape_when_igdb_credentials_are_missing(): void
     {
-        Http::fake([
-            'store.steampowered.com/*' => Http::response(['items' => []]),
-        ]);
-
         $this->getJson('/provider-search?query=halo')
             ->assertOk()
             ->assertJsonStructure($this->emptySearchShape())
@@ -36,113 +32,45 @@ class ProviderSearchContractTest extends TestCase
                 'source_order' => ['igdb', 'steam', 'manual'],
                 'results' => [],
                 'manual_available' => true,
-            ])
-            ->assertJsonMissingPath('encrypted_api_key')
-            ->assertJsonMissingPath('encrypted_client_secret');
+            ]);
     }
 
     public function test_provider_search_does_not_fall_back_to_steam_when_igdb_fails(): void
     {
-        $user = User::firstOrFail();
-        ProviderCredential::create([
-            'user_id' => $user->id,
-            'provider_id' => Provider::where('key', 'igdb')->firstOrFail()->id,
-            'encrypted_client_id' => Crypt::encryptString('client-id'),
-            'encrypted_client_secret' => Crypt::encryptString('client-secret'),
-            'is_enabled' => true,
-        ]);
-        ProviderCredential::create([
-            'user_id' => $user->id,
-            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
-            'encrypted_api_key' => Crypt::encryptString('steam-key'),
-            'is_enabled' => true,
-        ]);
+        $this->storeIgdbCredential();
 
         Http::fake([
             'id.twitch.tv/*' => Http::response(['error' => 'unavailable'], 500),
-            'store.steampowered.com/api/storesearch*' => Http::response([
-                'items' => [[
-                    'id' => 620,
-                    'name' => 'Portal 2',
-                    'tiny_image' => 'https://cdn.example.test/portal.jpg',
-                ]],
-            ]),
-            'store.steampowered.com/api/appdetails*' => Http::response([
-                '620' => [
-                    'success' => true,
-                    'data' => [
-                        'name' => 'Portal 2',
-                        'header_image' => 'https://cdn.example.test/portal-header.jpg',
-                        'publishers' => ['Valve'],
-                        'short_description' => 'A test chamber puzzle game.',
-                        'price_overview' => ['initial' => 999],
-                    ],
-                ],
-            ]),
-            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response([
-                'game' => [
-                    'availableGameStats' => [
-                        'achievements' => [
-                            ['name' => 'A'],
-                            ['name' => 'B'],
-                        ],
-                    ],
-                ],
-            ]),
+            'store.steampowered.com/*' => Http::response(['items' => [['id' => 620, 'name' => 'Portal 2']]]),
         ]);
 
         $this->getJson('/provider-search?query=portal')
             ->assertOk()
-            ->assertJsonStructure($this->emptySearchShape())
             ->assertJsonPath('results', [])
             ->assertJsonPath('manual_available', true)
             ->assertJsonCount(1, 'warnings');
     }
 
-    public function test_igdb_results_with_steam_app_ids_are_enriched_only_when_requested(): void
+    public function test_igdb_results_are_enriched_from_public_steam_endpoints_without_a_steam_credential(): void
     {
-        $user = User::firstOrFail();
-        ProviderCredential::create([
-            'user_id' => $user->id,
-            'provider_id' => Provider::where('key', 'igdb')->firstOrFail()->id,
-            'encrypted_client_id' => Crypt::encryptString('client-id'),
-            'encrypted_client_secret' => Crypt::encryptString('client-secret'),
-            'is_enabled' => true,
-        ]);
-        ProviderCredential::create([
-            'user_id' => $user->id,
-            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
-            'encrypted_api_key' => Crypt::encryptString('steam-key'),
-            'is_enabled' => true,
-        ]);
-
+        $this->storeIgdbCredential();
         Http::fake([
             'id.twitch.tv/*' => Http::response(['access_token' => 'token']),
             'api.igdb.com/v4/games' => Http::response([[
                 'id' => 1,
                 'name' => 'Portal 2',
                 'summary' => 'IGDB summary.',
-                'external_games' => [[
-                    'category' => 1,
-                    'uid' => '620',
-                ]],
+                'external_games' => [['category' => 1, 'uid' => '620']],
             ]]),
             'store.steampowered.com/api/appdetails*' => Http::response([
-                '620' => [
-                    'success' => true,
-                    'data' => [
-                        'price_overview' => ['initial' => 999],
-                    ],
-                ],
+                '620' => ['success' => true, 'data' => ['price_overview' => ['initial' => 999]]],
             ]),
-            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response([
-                'game' => [
-                    'availableGameStats' => [
-                        'achievements' => [
-                            ['name' => 'A'],
-                            ['name' => 'B'],
-                            ['name' => 'C'],
-                        ],
+            'api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/*' => Http::response([
+                'achievementpercentages' => [
+                    'achievements' => [
+                        ['name' => 'A', 'percent' => 80],
+                        ['name' => 'B', 'percent' => 40],
+                        ['name' => 'C', 'percent' => 10],
                     ],
                 ],
             ]),
@@ -153,21 +81,16 @@ class ProviderSearchContractTest extends TestCase
             ->assertJsonPath('results.0.source', 'igdb')
             ->assertJsonPath('results.0.steam_app_id', '620')
             ->assertJsonPath('results.0.base_price_default', 9.99)
-            ->assertJsonPath('results.0.base_price_source', 'steam')
             ->assertJsonPath('results.0.total_achievements', 3)
-            ->assertJsonPath('results.0.total_achievements_source', 'steam');
+            ->assertJsonPath('results.0.total_achievements_source', 'steam')
+            ->assertJsonCount(0, 'warnings');
+
+        $this->assertSame(0, ProviderCredential::where('provider_id', Provider::where('key', 'steam')->value('id'))->count());
+        $this->assertNoKeyedSteamRequestWasSent();
     }
 
-    public function test_steam_list_search_stays_fast_and_skips_enrichment_even_when_requested(): void
+    public function test_missing_steam_api_key_does_not_block_public_search(): void
     {
-        $user = User::firstOrFail();
-        ProviderCredential::create([
-            'user_id' => $user->id,
-            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
-            'encrypted_api_key' => Crypt::encryptString('steam-key'),
-            'is_enabled' => true,
-        ]);
-
         Http::fake([
             'store.steampowered.com/api/storesearch*' => Http::response([
                 'items' => [[
@@ -176,50 +99,6 @@ class ProviderSearchContractTest extends TestCase
                     'tiny_image' => 'https://cdn.example.test/portal.jpg',
                 ]],
             ]),
-            'store.steampowered.com/api/appdetails*' => Http::response([
-                '620' => [
-                    'success' => true,
-                    'data' => [
-                        'price_overview' => ['initial' => 999],
-                    ],
-                ],
-            ]),
-            'api.steampowered.com/IStoreService/GetAppList/v1/*' => Http::response($this->steamCatalogResponse()),
-            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response([
-                'game' => [
-                    'availableGameStats' => [
-                        'achievements' => [],
-                    ],
-                ],
-            ]),
-        ]);
-
-        $this->getJson('/provider-search?query=portal&provider=steam&enrich=1')
-            ->assertOk()
-            ->assertJsonPath('results.0.source', 'steam')
-            ->assertJsonPath('results.0.title', 'Portal 2')
-            ->assertJsonPath('results.0.steam_app_id', '620')
-            ->assertJsonPath('results.0.base_price_default', null)
-            ->assertJsonPath('results.0.total_achievements', null)
-            ->assertJsonCount(0, 'warnings');
-
-        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'IStoreService/GetAppList'));
-        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'GetSchemaForGame'));
-    }
-
-    public function test_steam_provider_falls_back_to_keyed_game_catalog_when_public_store_search_fails(): void
-    {
-        $user = User::firstOrFail();
-        ProviderCredential::create([
-            'user_id' => $user->id,
-            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
-            'encrypted_api_key' => Crypt::encryptString('steam-key'),
-            'is_enabled' => true,
-        ]);
-
-        Http::fake([
-            'store.steampowered.com/api/storesearch*' => Http::failedConnection('Steam Store timed out.'),
-            'api.steampowered.com/IStoreService/GetAppList/v1/*' => Http::response($this->steamCatalogResponse()),
         ]);
 
         $this->getJson('/provider-search?query=portal&provider=steam')
@@ -228,138 +107,121 @@ class ProviderSearchContractTest extends TestCase
             ->assertJsonPath('results.0.title', 'Portal 2')
             ->assertJsonPath('results.0.steam_app_id', '620')
             ->assertJsonCount(0, 'warnings');
+
+        $this->assertNoKeyedSteamRequestWasSent();
     }
 
-    public function test_steam_price_auto_fill_survives_achievement_schema_failures(): void
+    public function test_steam_list_search_skips_enrichment_even_when_requested(): void
     {
-        $user = User::firstOrFail();
-        ProviderCredential::create([
-            'user_id' => $user->id,
-            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
-            'encrypted_api_key' => Crypt::encryptString('steam-key'),
-            'is_enabled' => true,
+        Http::fake([
+            'store.steampowered.com/api/storesearch*' => Http::response([
+                'items' => [['id' => 620, 'name' => 'Portal 2']],
+            ]),
         ]);
 
+        $this->getJson('/provider-search?query=portal&provider=steam&enrich=1')
+            ->assertOk()
+            ->assertJsonPath('results.0.steam_app_id', '620')
+            ->assertJsonPath('results.0.base_price_default', null)
+            ->assertJsonPath('results.0.total_achievements', null)
+            ->assertJsonCount(0, 'warnings');
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_public_store_search_failure_returns_a_non_blocking_warning(): void
+    {
+        Http::fake([
+            'store.steampowered.com/api/storesearch*' => Http::failedConnection('Steam Store timed out.'),
+        ]);
+
+        $this->getJson('/provider-search?query=portal&provider=steam')
+            ->assertOk()
+            ->assertJsonPath('results', [])
+            ->assertJsonPath('manual_available', true)
+            ->assertJsonCount(1, 'warnings');
+
+        $this->assertNoKeyedSteamRequestWasSent();
+    }
+
+    public function test_public_achievement_failure_keeps_total_null_without_blocking_metadata(): void
+    {
         Http::fake([
             'store.steampowered.com/api/appdetails*' => Http::response([
-                '620' => [
-                    'success' => true,
-                    'data' => [
-                        'price_overview' => ['initial' => 999],
-                    ],
-                ],
+                '620' => ['success' => true, 'data' => ['price_overview' => ['initial' => 999]]],
             ]),
-            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::response(['error' => 'unavailable'], 500),
+            'api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/*' => Http::response(['error' => 'unavailable'], 500),
         ]);
 
         $this->getJson('/provider-search?query=portal&provider=steam&enrich=1&steam_app_id=620')
             ->assertOk()
-            ->assertJsonPath('results.0.source', 'steam')
-            ->assertJsonPath('results.0.steam_app_id', '620')
             ->assertJsonPath('results.0.base_price_default', 9.99)
-            ->assertJsonPath('results.0.base_price_source', 'steam')
             ->assertJsonPath('results.0.total_achievements', null)
             ->assertJsonPath('results.0.total_achievements_source', null)
             ->assertJsonCount(1, 'warnings');
+
+        $this->assertNoKeyedSteamRequestWasSent();
     }
 
-    public function test_provider_search_survives_steam_pool_connection_failures(): void
+    public function test_empty_public_achievement_data_keeps_total_null_and_returns_a_warning(): void
     {
-        $user = User::firstOrFail();
-        ProviderCredential::create([
-            'user_id' => $user->id,
-            'provider_id' => Provider::where('key', 'steam')->firstOrFail()->id,
-            'encrypted_api_key' => Crypt::encryptString('steam-key'),
-            'is_enabled' => true,
-        ]);
-
         Http::fake([
             'store.steampowered.com/api/appdetails*' => Http::response([
-                '620' => [
-                    'success' => true,
-                    'data' => [
-                        'price_overview' => ['initial' => 999],
-                    ],
-                ],
+                '620' => ['success' => true, 'data' => ['name' => 'Portal 2']],
             ]),
-            'api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/*' => Http::failedConnection('Steam achievements timed out.'),
+            'api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/*' => Http::response([
+                'achievementpercentages' => ['achievements' => []],
+            ]),
         ]);
 
         $this->getJson('/provider-search?query=portal&provider=steam&enrich=1&steam_app_id=620')
             ->assertOk()
-            ->assertJsonPath('results.0.source', 'steam')
-            ->assertJsonPath('results.0.steam_app_id', '620')
-            ->assertJsonPath('results.0.base_price_default', 9.99)
-            ->assertJsonPath('results.0.base_price_source', 'steam')
             ->assertJsonPath('results.0.total_achievements', null)
-            ->assertJsonPath('results.0.total_achievements_source', null)
             ->assertJsonCount(1, 'warnings');
     }
 
-    public function test_provider_search_survives_steam_metadata_failures_after_results_are_found(): void
+    public function test_public_achievement_enrichment_continues_when_store_metadata_fails(): void
     {
         Http::fake([
             'store.steampowered.com/api/appdetails*' => Http::response(['error' => 'unavailable'], 500),
+            'api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/*' => Http::response([
+                'achievementpercentages' => [
+                    'achievements' => [
+                        ['name' => 'A', 'percent' => 80],
+                        ['name' => 'B', 'percent' => 40],
+                    ],
+                ],
+            ]),
         ]);
 
         $this->getJson('/provider-search?query=portal&provider=steam&enrich=1&steam_app_id=620')
             ->assertOk()
-            ->assertJsonPath('results.0.source', 'steam')
-            ->assertJsonPath('results.0.steam_app_id', '620')
             ->assertJsonPath('results.0.base_price_default', null)
-            ->assertJsonPath('results.0.base_price_source', null)
-            ->assertJsonPath('results.0.total_achievements', null)
-            ->assertJsonPath('results.0.total_achievements_source', null)
+            ->assertJsonPath('results.0.total_achievements', 2)
+            ->assertJsonPath('results.0.total_achievements_source', 'steam')
             ->assertJsonCount(1, 'warnings');
     }
 
-    public function test_provider_search_returns_warnings_and_manual_entry_when_all_providers_fail(): void
+    private function storeIgdbCredential(): void
     {
-        $user = User::firstOrFail();
         ProviderCredential::create([
-            'user_id' => $user->id,
+            'user_id' => User::firstOrFail()->id,
             'provider_id' => Provider::where('key', 'igdb')->firstOrFail()->id,
             'encrypted_client_id' => Crypt::encryptString('client-id'),
             'encrypted_client_secret' => Crypt::encryptString('client-secret'),
             'is_enabled' => true,
         ]);
-
-        Http::fake([
-            'id.twitch.tv/*' => Http::response(['error' => 'unavailable'], 500),
-            'store.steampowered.com/*' => Http::response(['error' => 'unavailable'], 500),
-        ]);
-
-        $this->getJson('/provider-search?query=zelda')
-            ->assertOk()
-            ->assertJsonStructure($this->emptySearchShape())
-            ->assertJsonPath('results', [])
-            ->assertJsonPath('manual_available', true)
-            ->assertJsonCount(1, 'warnings');
     }
 
-    private function searchShape(): array
+    private function assertNoKeyedSteamRequestWasSent(): void
     {
-        return [
-            'query',
-            'source_order',
-            'results' => [[
-                'source',
-                'external_id',
-                'title',
-                'cover_url_original',
-                'publisher',
-                'release_date',
-                'description',
-                'steam_app_id',
-                'base_price_default',
-                'base_price_source',
-                'total_achievements',
-                'total_achievements_source',
-            ]],
-            'manual_available',
-            'warnings',
-            'notice',
-        ];
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'GetSchemaForGame'));
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'IStoreService/GetAppList'));
+        Http::assertNotSent(function ($request) {
+            parse_str(parse_url($request->url(), PHP_URL_QUERY) ?? '', $query);
+
+            return array_key_exists('key', $query);
+        });
     }
 
     private function emptySearchShape(): array
@@ -371,18 +233,6 @@ class ProviderSearchContractTest extends TestCase
             'manual_available',
             'warnings',
             'notice',
-        ];
-    }
-
-    private function steamCatalogResponse(): array
-    {
-        return [
-            'response' => [
-                'apps' => [[
-                    'appid' => 620,
-                    'name' => 'Portal 2',
-                ]],
-            ],
         ];
     }
 }

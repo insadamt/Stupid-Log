@@ -17,7 +17,6 @@ class UpdateSettingsRequest extends FormRequest
             'username' => ['required', 'string', 'max:255'],
             'igdb_client_id' => ['nullable', 'string'],
             'igdb_client_secret' => ['nullable', 'string'],
-            'steam_api_key' => ['nullable', 'string'],
         ];
     }
 }

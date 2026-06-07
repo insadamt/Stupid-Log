@@ -33,7 +33,6 @@ export default function Setup() {
         username: 'Player One',
         igdb_client_id: '',
         igdb_client_secret: '',
-        steam_api_key: '',
     });
 
     useSetupAnimations({
@@ -51,9 +50,6 @@ export default function Setup() {
         setForm((current) => ({ ...current, [key]: value }));
         if (key === 'igdb_client_id' || key === 'igdb_client_secret') {
             setProviderResults((current) => ({ ...current, igdb: undefined }));
-        }
-        if (key === 'steam_api_key') {
-            setProviderResults((current) => ({ ...current, steam: undefined }));
         }
     }
 
@@ -155,10 +151,6 @@ export default function Setup() {
         if (form.igdb_client_id.trim() || form.igdb_client_secret.trim()) {
             providers.push('igdb');
         }
-        if (form.steam_api_key.trim()) {
-            providers.push('steam');
-        }
-
         return providers;
     }
 
@@ -254,7 +246,6 @@ export default function Setup() {
                 body: JSON.stringify({
                     igdb_client_id: form.igdb_client_id,
                     igdb_client_secret: form.igdb_client_secret,
-                    steam_api_key: form.steam_api_key,
                 }),
             });
             const payload = await response.json();
