@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/stupid-log-logo.svg" alt="Stupid Log logo" width="150">
+  <img src="public/images/stupid-log/stupid-log.png" alt="Stupid Log logo" width="150">
 </p>
 
 <h1 align="center">Stupid Log</h1>
