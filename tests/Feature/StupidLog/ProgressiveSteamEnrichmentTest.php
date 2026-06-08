@@ -335,9 +335,10 @@ class ProgressiveSteamEnrichmentTest extends TestCase
     {
         Http::fake([
             'api.steampowered.com/*' => Http::failedConnection('timed out'),
+            'store.steampowered.com/api/appdetails*' => Http::response(['error' => 'unavailable'], 503),
         ]);
 
-        $this->getJson('/steam-enrichment/620/achievements')
+        $this->getJson('/steam-enrichment/621/achievements')
             ->assertOk()
             ->assertJsonPath('data.total_achievements', null)
             ->assertJsonCount(1, 'warnings');
@@ -347,9 +348,10 @@ class ProgressiveSteamEnrichmentTest extends TestCase
             'api.steampowered.com/*' => Http::response([
                 'achievementpercentages' => ['achievements' => 'invalid'],
             ]),
+            'store.steampowered.com/api/appdetails*' => Http::response(['error' => 'unavailable'], 503),
         ]);
 
-        $this->getJson('/steam-enrichment/620/achievements')
+        $this->getJson('/steam-enrichment/622/achievements')
             ->assertOk()
             ->assertJsonPath('data.total_achievements', null)
             ->assertJsonCount(1, 'warnings');

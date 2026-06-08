@@ -27,12 +27,6 @@ jobs:
           extensions: bcmath, intl, mbstring, pdo_sqlite, zip
           coverage: none
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-
       - name: Cache Composer packages
         uses: actions/cache@v4
         with:
@@ -43,11 +37,26 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      - name: Run test suite
+        run: composer test
+
+  npm-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build frontend assets
+      - name: Build frontend
         run: npm run build
-
-      - name: Run test suite
-        run: composer test
