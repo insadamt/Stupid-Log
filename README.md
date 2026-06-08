@@ -1,35 +1,66 @@
-# Stupid Log
+<p align="center">
+  <img src="docs/assets/stupid-log-logo.svg" alt="Stupid Log logo" width="150">
+</p>
 
-Stupid Log is a self-hosted game library and play-history tracker. It records ownership, progress, achievements, DLCs, subscriptions, in-app purchases, yearly snapshots, and financial totals without requiring a cloud account.
+<h1 align="center">Stupid Log</h1>
 
-## v1 Scope
+<p align="center">
+  A self-hosted game library, backlog, achievement, DLC, subscription, and financial tracker.
+</p>
 
-- Local single-user setup
-- Manual, IGDB, and public Steam metadata workflows
-- Game ownership, devices, progress, achievements, DLCs, and purchases
-- Subscription tracking and yearly snapshots
-- Portable backup export and restore, including uploaded cover media
-- PostgreSQL-backed production Docker deployment
+<p align="center">
+  <img src="https://img.shields.io/badge/release-1.0.1-B7FF63?style=for-the-badge&labelColor=000000" alt="Release 1.0.1">
+  <img src="https://img.shields.io/badge/self--hosted-Docker-B7FF63?style=for-the-badge&labelColor=000000" alt="Self-hosted Docker">
+  <img src="https://img.shields.io/badge/license-GPL--3.0--only-B7FF63?style=for-the-badge&labelColor=000000" alt="GPL-3.0-only license">
+</p>
+
+## What is Stupid Log?
+
+Stupid Log is a local-first game tracking app for players who want to own their library data. It records what you own, where you own it, how far you progressed, what you completed, what you spent, and how your library changes year by year.
+
+It is built as a single-user, self-hosted application. No cloud account is required.
+
+## Features
+
+| Area | What it tracks |
+| --- | --- |
+| Library | Games, covers, publishers, release dates, descriptions, platforms, and devices |
+| Ownership | Digital, physical, subscription, free, and edition-based ownership copies |
+| Progress | Status, playtime, first played date, last played date, completion date, and achievement progress |
+| DLCs | Steam DLC import, owned DLCs, and paid DLC value |
+| Money | Base value, paid value, subscriptions, in-app purchases, and yearly/all-time totals |
+| Snapshots | Manual yearly snapshots, historical stats, and best-of-year selection |
+| Providers | Manual entry, IGDB metadata search, and public Steam enrichment |
+| Portability | Portable backup export and destructive restore with uploaded cover media |
 
 Steam search and enrichment use public endpoints and do not require a Steam API key. IGDB credentials are optional and remain stored locally in encrypted form.
 
-## Security Boundary
+## Security boundary
 
-Stupid Log v1 is intended for trusted LAN or VPN access only. Do not expose it directly to the public internet. See [SECURITY.md](SECURITY.md) for the supported deployment boundary and vulnerability reporting process.
+Stupid Log v1 is intended for trusted LAN or private VPN access only.
 
-## Install
+Do not expose it directly to the public internet. v1 does not provide a public-internet authentication boundary. Use private networking, firewall rules, or a VPN.
 
-### One-command install
+See [SECURITY.md](SECURITY.md) for the supported deployment boundary and vulnerability reporting process.
 
-With Docker Engine and Docker Compose v2 already installed:
+## Quick install
+
+Requirements:
+
+- Docker Engine
+- Docker Compose v2
+- `curl`
+- trusted LAN, localhost, or private VPN access
+
+Install the published release:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh | bash
 ```
 
-The installer creates `~/stupid-log`, generates the application key and database password, starts the published `ghcr.io/insadamt/stupid-log:1.0.1` image, waits for the health check, and opens `http://127.0.0.1:8080`.
+By default, the installer creates `~/stupid-log`, binds the app to `127.0.0.1:8080`, starts the published Docker image, waits for the health check, and opens the app.
 
-To review the installer before running it:
+Review the installer before running it:
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh
@@ -37,25 +68,42 @@ less install.sh
 bash install.sh
 ```
 
-See [docs/install.md](docs/install.md) for custom ports, LAN binding, lifecycle commands, updates, and uninstall precautions.
-
-### Manual Docker Compose install
-
-The repository's `compose.production.yml` is the transparent source-build fallback. The existing `docker-compose.yml` remains the development Compose path.
+Custom port example:
 
 ```bash
-cp .env.production.example .env.production
-docker build -t stupid-log:1.0.1 .
-docker run --rm --entrypoint php stupid-log:1.0.1 artisan key:generate --show
+bash install.sh --port 8081
 ```
 
-Put the generated key in `.env.production`, replace both database password placeholders with the same strong value, then start the stack:
+See [docs/install.md](docs/install.md) for custom directories, LAN binding, lifecycle commands, auto-start behavior, and persistent data notes.
+
+## Update
+
+Export a portable backup from **Settings > Data & Recovery** before updating.
 
 ```bash
-docker compose --env-file .env.production -f compose.production.yml up -d --build
+cd ~/stupid-log
+curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh
+bash install.sh --dir "$HOME/stupid-log" --version 1.0.1
 ```
 
-Open `http://localhost:8080` unless `APP_PORT` was changed.
+Do not delete or regenerate `.env.production` during an update. See [docs/upgrade.md](docs/upgrade.md) for the full upgrade checklist.
+
+## Backup and restore
+
+Portable backups are exported from **Settings > Data & Recovery** as `.stupidlog.zip` archives. They include application data, snapshots, financial history, and uploaded cover media. Provider credentials are intentionally excluded and must be re-entered after restoring into a fresh installation.
+
+See [docs/backup-and-restore.md](docs/backup-and-restore.md).
+
+## Uninstall
+
+Stopping the app is different from deleting its data.
+
+```bash
+cd ~/stupid-log
+docker compose --env-file .env.production -f compose.production.yml down
+```
+
+The command above removes containers and the network while preserving Docker volumes. To permanently delete the database and uploaded media, read [docs/uninstall.md](docs/uninstall.md) first.
 
 ## Operations
 
@@ -63,10 +111,9 @@ Open `http://localhost:8080` unless `APP_PORT` was changed.
 - [Upgrade](docs/upgrade.md)
 - [Rollback](docs/rollback.md)
 - [Backup and restore](docs/backup-and-restore.md)
+- [Uninstall](docs/uninstall.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
-
-Before each release, verify a fresh install, upgrade, backup export, backup restore, restart persistence, and creation of new data after restore.
 
 ## Development
 
@@ -79,6 +126,10 @@ npm run build
 ```
 
 The development Compose stack bind-mounts the repository and exposes the application on port `8080`.
+
+## Release discipline
+
+Major or risky releases should be published as a pre-release or release candidate first, then promoted to stable only after fresh install, upgrade, backup, restore, restart persistence, and side-by-side install checks pass.
 
 ## License
 
