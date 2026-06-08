@@ -2,7 +2,7 @@
 
 All notable changes to Stupid Log are documented here. The project follows semantic versioning.
 
-## [1.0.0] - Unreleased
+## [1.0.0] - 2026-06-08
 
 ### Added
 

@@ -66,7 +66,7 @@ Open `http://localhost:8080` unless `APP_PORT` was changed.
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 
-Before tagging `v1.0.0`, manually verify a fresh install, upgrade, backup export, backup restore, restart persistence, and creation of new data after restore.
+Before each release, verify a fresh install, upgrade, backup export, backup restore, restart persistence, and creation of new data after restore.
 
 ## Development
 
