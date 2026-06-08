@@ -1,25 +1,35 @@
 # Production Install
 
+Stupid Log is designed for a self-hosted Docker deployment on a trusted machine. The production path uses PostgreSQL, persistent Docker volumes, a scheduler container, startup migrations, and health checks.
+
 ## Requirements
 
 - Docker Engine with Docker Compose v2
 - `curl`
-- A trusted LAN or private VPN
 - Persistent local storage for PostgreSQL and uploaded media
+- Localhost, trusted LAN, or private VPN access
 
 Stupid Log v1 must not be exposed directly to the public internet.
 
-## One-command Install
+## One-command install
 
-The installer uses the published container image and does not require Git, a local image build, or manual environment-file creation:
+The installer uses the published container image. It does not require Git, local image building, or manual environment-file creation.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh | bash
 ```
 
-By default, it installs into `~/stupid-log`, binds only to `127.0.0.1`, and opens `http://127.0.0.1:8080` after the health check succeeds.
+By default, it:
 
-Review the script first when installing on a machine you administer:
+- installs into `~/stupid-log`;
+- binds the app to `127.0.0.1`;
+- exposes the app on port `8080`;
+- generates the application key and database password;
+- starts the app, scheduler, and PostgreSQL containers;
+- waits for the health check;
+- opens `http://127.0.0.1:8080`.
+
+Review the installer first when installing on a machine you administer:
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh
@@ -27,9 +37,9 @@ less install.sh
 bash install.sh
 ```
 
-The installer is idempotent. Running it again reuses the installation directory and preserves the existing `APP_KEY` and database password.
+The installer is idempotent. Running it again reuses the installation directory and preserves the existing `APP_KEY`, database password, data volumes, and Compose project identity.
 
-### Installer Options
+## Installer options
 
 Use another port:
 
@@ -53,24 +63,71 @@ Binding to `0.0.0.0` or a LAN address makes the application reachable by other d
 
 Use `--no-open` to suppress browser opening and `--yes` to skip the interactive confirmation.
 
-## Manage the Installation
+## Manage the installation
 
-Run commands from the installation directory:
+Run lifecycle commands from the installation directory:
 
 ```bash
 cd ~/stupid-log
+```
+
+Show containers:
+
+```bash
 docker compose --env-file .env.production -f compose.production.yml ps
+```
+
+Follow app logs:
+
+```bash
 docker compose --env-file .env.production -f compose.production.yml logs -f app
+```
+
+Stop containers without deleting them:
+
+```bash
 docker compose --env-file .env.production -f compose.production.yml stop
+```
+
+Start stopped containers:
+
+```bash
 docker compose --env-file .env.production -f compose.production.yml start
+```
+
+Remove containers and the network while preserving data volumes:
+
+```bash
 docker compose --env-file .env.production -f compose.production.yml down
 ```
 
-`down` removes containers and the network, but preserves the named data volumes.
+## Auto-start after reboot
+
+The production containers use Docker restart policies. If Docker starts on boot and the containers were not removed with `docker compose down`, Stupid Log should start automatically after the device powers on.
+
+Check Docker boot status:
+
+```bash
+systemctl is-enabled docker
+```
+
+Enable Docker auto-start:
+
+```bash
+sudo systemctl enable docker
+sudo systemctl start docker
+```
+
+If you ran `docker compose down`, start the stack again with:
+
+```bash
+cd ~/stupid-log
+docker compose --env-file .env.production -f compose.production.yml up -d
+```
 
 ## Update
 
-Export a portable backup from **Settings > Data & Recovery** before updating. Then download the installer for the intended release and run it with the new version:
+Export a portable backup from **Settings > Data & Recovery** before updating. Then download the installer for the intended release and run it with the target version:
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh
@@ -80,24 +137,15 @@ bash install.sh --dir "$HOME/stupid-log" --version 1.0.1
 
 The installer preserves existing secrets, data, and Compose project identity while updating the image version. A v1.0.0 installation keeps the legacy `stupid-log` project name so its existing volumes remain attached. Do not replace or regenerate `.env.production` during an update.
 
+See [upgrade.md](upgrade.md) for the full checklist.
+
 ## Uninstall
 
-Create and verify a portable backup before uninstalling. Uploaded media and PostgreSQL data are stored in Docker volumes, not only in `~/stupid-log`.
+Read [uninstall.md](uninstall.md) before deleting an installation.
 
-Stop the installation without deleting data:
+`docker compose down` removes containers and the network, but preserves named data volumes. `docker compose down --volumes` permanently deletes the database and uploaded media.
 
-```bash
-cd ~/stupid-log
-docker compose --env-file .env.production -f compose.production.yml down
-```
-
-Deleting the install directory does not delete the Docker volumes. The following command permanently deletes the database and uploaded media and must only be used after verifying a backup:
-
-```bash
-docker compose --env-file .env.production -f compose.production.yml down --volumes
-```
-
-## Manual Docker Compose Install
+## Manual Docker Compose install
 
 The repository's production Compose file provides a source-build fallback.
 
@@ -143,7 +191,9 @@ Manually create a game, restart the stack, and confirm the game and any uploaded
 docker compose --env-file .env.production -f compose.production.yml restart
 ```
 
-### Persistent Data
+## Persistent data
+
+Persistent data is stored in Docker volumes, not only in the installation directory.
 
 - `<project>_postgres-data`: PostgreSQL data
 - `<project>_app-storage`: uploaded covers and application media
