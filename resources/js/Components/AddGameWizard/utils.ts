@@ -1,4 +1,4 @@
-import { DlcCatalogItem, GameSource, WizardSearchResult } from "./types";
+import { DlcCatalogItem, Draft, GameSource, WizardSearchResult } from "./types";
 
 export function localId() {
     return Math.random().toString(36).slice(2, 10);
@@ -70,6 +70,28 @@ export function dlcCatalogFromResult(result: WizardSearchResult): DlcCatalogItem
             title: dlc.title,
             base_price: dlc.base_price ?? null,
         }));
+}
+
+export function importDraftResultFromDraft(draft: Draft): WizardSearchResult {
+    return {
+        source: draft.source === "manual" ? "steam" : draft.source,
+        external_id: draft.external_id || draft.steam_app_id,
+        title: draft.title.trim(),
+        cover_url_original: draft.cover_url_original || null,
+        publisher: draft.publisher || null,
+        release_date: draft.release_date || null,
+        description: draft.description || null,
+        steam_app_id: draft.steam_app_id || null,
+        base_price_default: numberOrNull(draft.base_price_default),
+        base_price_source: draft.base_price_default.trim() === "" ? null : "steam",
+        total_achievements: integerOrNull(draft.total_achievements),
+        total_achievements_source: draft.total_achievements.trim() === "" ? null : "steam",
+        dlcs: draft.dlcs.map((dlc) => ({
+            steam_app_id: dlc.steam_app_id,
+            title: dlc.title,
+            base_price: dlc.base_price ?? null,
+        })),
+    };
 }
 
 export function uploadErrorMessage(payload: unknown) {

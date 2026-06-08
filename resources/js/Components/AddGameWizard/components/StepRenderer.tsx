@@ -9,7 +9,7 @@ import ProgressStep from "../steps/ProgressStep";
 import ReviewStep from "../steps/ReviewStep";
 import SearchStep from "../steps/SearchStep";
 import SteamStep from "../steps/SteamStep";
-import { DlcCatalogItem, Draft, OwnedDlcDraft, OwnershipCopyDraft, ProviderMode, StepKey, WizardSearchResult } from "../types";
+import { DlcCatalogItem, Draft, OwnedDlcDraft, OwnershipCopyDraft, ProviderMode, SteamDlcData, SteamEnrichmentState, StepKey, WizardSearchResult } from "../types";
 import ServerErrors from "./ServerErrors";
 
 export default function StepRenderer({
@@ -27,7 +27,12 @@ export default function StepRenderer({
     manualEntry,
     resultKey,
     selectResult,
-    enriching,
+    enrichmentState,
+    dlcSummary,
+    retryMetadata,
+    retryAchievements,
+    loadLargeDlcCatalog,
+    deferDlcCatalog,
     coverPreview,
     coverInputRef,
     uploadCover,
@@ -83,7 +88,12 @@ export default function StepRenderer({
     manualEntry: () => void;
     resultKey: (result: WizardSearchResult) => string;
     selectResult: (result: WizardSearchResult) => Promise<void>;
-    enriching: boolean;
+    enrichmentState: SteamEnrichmentState;
+    dlcSummary: SteamDlcData | null;
+    retryMetadata: () => Promise<void>;
+    retryAchievements: () => Promise<void>;
+    loadLargeDlcCatalog: () => Promise<void>;
+    deferDlcCatalog: () => void;
     coverPreview: string;
     coverInputRef: RefObject<HTMLInputElement | null>;
     uploadCover: (file: File) => Promise<void>;
@@ -132,11 +142,11 @@ export default function StepRenderer({
                                 )}
 
                                     {step.key === "basics" && (
-                                        <BasicsStep enriching={enriching} coverPreview={coverPreview} coverInputRef={coverInputRef} uploadCover={uploadCover} uploadingCover={uploadingCover} providerCoverUrl={providerCoverUrl} draft={draft} localCoverPreview={localCoverPreview} setLocalCoverPreview={setLocalCoverPreview} setDraft={setDraft} coverError={coverError} update={update} />
+                                        <BasicsStep enrichmentStatus={enrichmentState.metadata} retryMetadata={retryMetadata} coverPreview={coverPreview} coverInputRef={coverInputRef} uploadCover={uploadCover} uploadingCover={uploadingCover} providerCoverUrl={providerCoverUrl} draft={draft} localCoverPreview={localCoverPreview} setLocalCoverPreview={setLocalCoverPreview} setDraft={setDraft} coverError={coverError} update={update} />
                                     )}
 
                                     {step.key === "steam" && (
-                                        <SteamStep draft={draft} update={update} resetButtons={resetButtons} />
+                                        <SteamStep enrichmentStatus={enrichmentState.achievements} retryAchievements={retryAchievements} draft={draft} update={update} resetButtons={resetButtons} />
                                     )}
 
                                     {step.key === "platform" && (
@@ -152,7 +162,7 @@ export default function StepRenderer({
                                     )}
 
                                     {step.key === "dlcs" && (
-                                        <DlcsStep enriching={enriching} draft={draft} dlcQuery={dlcQuery} setDlcQuery={setDlcQuery} ownedDlcCount={ownedDlcCount} filteredDlcs={filteredDlcs} ownedDlcFor={ownedDlcFor} removeOwnedDlc={removeOwnedDlc} updateOwnedDlc={updateOwnedDlc} />
+                                        <DlcsStep enrichmentStatus={enrichmentState.dlcs} dlcSummary={dlcSummary} loadLargeDlcCatalog={loadLargeDlcCatalog} deferDlcCatalog={deferDlcCatalog} draft={draft} dlcQuery={dlcQuery} setDlcQuery={setDlcQuery} ownedDlcCount={ownedDlcCount} filteredDlcs={filteredDlcs} ownedDlcFor={ownedDlcFor} removeOwnedDlc={removeOwnedDlc} updateOwnedDlc={updateOwnedDlc} />
                                     )}
 
                                     {step.key === "progress" && (

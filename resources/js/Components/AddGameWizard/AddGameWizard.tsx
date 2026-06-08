@@ -15,7 +15,8 @@ import WizardSidebar from "./components/WizardSidebar";
 import CompletionDateModal from "./modals/CompletionDateModal";
 import DuplicateCandidatesModal from "./modals/DuplicateCandidatesModal";
 import { Draft, ManualDuplicate, OwnedDlcDraft, OwnershipCopyDraft, ProviderMode, SteamOriginal, StepKey, WizardSearchResult } from "./types";
-import { dlcCatalogFromResult, firstByName, integerOrNull, localId, numberOrNull, preferredResultCover, toDateInput, today } from "./utils";
+import { useProgressiveSteamEnrichment } from "./useProgressiveSteamEnrichment";
+import { dlcCatalogFromResult, firstByName, importDraftResultFromDraft, integerOrNull, localId, numberOrNull, preferredResultCover, toDateInput, today } from "./utils";
 
 export default function AddGameWizard({
     references,
@@ -78,7 +79,6 @@ export default function AddGameWizard({
     const [warnings, setWarnings] = useState<string[]>([]);
     const [notice, setNotice] = useState("");
     const [searching, setSearching] = useState(false);
-    const [enriching, setEnriching] = useState(false);
     const [creatingImportDraft, setCreatingImportDraft] = useState(false);
     const [uploadingCover, setUploadingCover] = useState(false);
     const [coverError, setCoverError] = useState("");
@@ -99,6 +99,13 @@ export default function AddGameWizard({
     const stepContentRef = useRef<HTMLElement | null>(null);
     const stepExitClone = useRef<HTMLElement | null>(null);
     const stepDirection = useRef(1);
+    const steamEnrichment = useProgressiveSteamEnrichment({
+        draft,
+        setDraft,
+        setSteamOriginal,
+        setWarnings,
+        setCreatingImportDraft,
+    });
 
     const step = steps[stepIndex];
     const platform = useMemo(() => references.platforms.find((item) => item.id === draft.platform_id), [draft.platform_id, references.platforms]);
@@ -237,6 +244,7 @@ export default function AddGameWizard({
     }, { scope: stepContentRef, dependencies: [open, step.key] });
 
     function closeWizard() {
+        steamEnrichment.cancel();
         const backdrop = backdropRef.current;
         const panel = panelRef.current;
 
@@ -289,10 +297,12 @@ export default function AddGameWizard({
     }
 
     function update<K extends keyof Draft>(key: K, value: Draft[K]) {
+        steamEnrichment.markFieldEdited(key);
         setDraft((current) => ({ ...current, [key]: value }));
     }
 
     function resetAndOpen() {
+        steamEnrichment.cancel();
         setDraft(makeDraft());
         setStepIndex(0);
         setProviderMode("igdb");
@@ -310,33 +320,11 @@ export default function AddGameWizard({
         setOpen(true);
     }
 
-    function importDraftResultFromCurrentDraft(): WizardSearchResult {
-        return {
-            source: draft.source === "manual" ? "steam" : draft.source,
-            external_id: draft.external_id || draft.steam_app_id,
-            title: draft.title.trim(),
-            cover_url_original: draft.cover_url_original || null,
-            publisher: draft.publisher || null,
-            release_date: draft.release_date || null,
-            description: draft.description || null,
-            steam_app_id: draft.steam_app_id || null,
-            base_price_default: numberOrNull(draft.base_price_default),
-            base_price_source: draft.base_price_default.trim() === "" ? null : "steam",
-            total_achievements: integerOrNull(draft.total_achievements),
-            total_achievements_source: draft.total_achievements.trim() === "" ? null : "steam",
-            dlcs: draft.dlcs.map((dlc) => ({
-                steam_app_id: dlc.steam_app_id,
-                title: dlc.title,
-                base_price: dlc.base_price ?? null,
-            })),
-        };
-    }
-
     async function ensureImportDraft(): Promise<number | null> {
         if (draft.source === "manual") return null;
         if (draft.import_draft_id) return draft.import_draft_id;
 
-        const result = importDraftResultFromCurrentDraft();
+        const result = importDraftResultFromDraft(draft);
         if (!result.external_id || !result.title) {
             throw new Error("Provider import is missing the selected game identity.");
         }
@@ -367,7 +355,7 @@ export default function AddGameWizard({
         setServerErrors({});
 
         try {
-            const data = await providerSearch(query, provider, provider === "steam");
+            const data = await providerSearch(query, provider);
             if (requestId !== searchId.current) return;
             setResults(data.results);
             setWarnings(data.warnings);
@@ -393,6 +381,9 @@ export default function AddGameWizard({
 
         setSteamOriginal({
             steam_app_id: result.steam_app_id ?? "",
+            publisher: result.publisher ?? "",
+            release_date: toDateInput(result.release_date),
+            description: result.description ?? "",
             base_price_default: basePrice,
             total_achievements: totalAchievements,
         });
@@ -429,35 +420,8 @@ export default function AddGameWizard({
         }));
     }
 
-    function mergeSteamEnrichment(result: WizardSearchResult) {
-        const basePrice = result.base_price_default === null || result.base_price_default === undefined ? "" : String(result.base_price_default);
-        const totalAchievements = result.total_achievements === null || result.total_achievements === undefined ? "" : String(result.total_achievements);
-        const cover = preferredResultCover(result);
-        const dlcs = dlcCatalogFromResult(result);
-    
-        if (cover) {
-            setProviderCoverUrl(cover);
-        }
-    
-        setOriginalFromResult(result);
-        setDraft((current) => ({
-            ...current,
-            steam_app_id: current.steam_app_id || result.steam_app_id || "",
-            cover_url_original: cover || current.cover_url_original,
-            publisher: result.publisher ?? current.publisher,
-            release_date: toDateInput(result.release_date) || current.release_date,
-            description: result.description ?? current.description,
-            base_price_default: basePrice || current.base_price_default,
-            total_achievements: totalAchievements || current.total_achievements,
-            ownership_copies: current.ownership_copies.map((copy) => ({ ...copy, base_price: copy.base_price || basePrice })),
-            dlcs: dlcs.length ? dlcs : current.dlcs,
-            owned_dlcs: dlcs.length
-                ? current.owned_dlcs.filter((ownedDlc) => dlcs.some((dlc) => dlc.steam_app_id === ownedDlc.steam_app_id))
-                : current.owned_dlcs,
-        }));
-    }
-
     async function selectResult(result: WizardSearchResult) {
+        steamEnrichment.cancel();
         applyResult(result);
         setSelectedResultKey(resultKey(result));
         setStepIndex(1);
@@ -475,45 +439,11 @@ export default function AddGameWizard({
             return;
         }
 
-        const resultAlreadyEnriched = result.source === "steam" && (result.dlcs?.length ?? 0) > 0;
-
-        if (resultAlreadyEnriched) {
-            setCreatingImportDraft(true);
-            try {
-                const importDraft = await createImportDraft(result);
-                setDraft((current) => ({ ...current, import_draft_id: importDraft.id }));
-            } catch {
-                setWarnings((current) => [...current, "Provider import draft failed. Select the result again before saving."]);
-            } finally {
-                setCreatingImportDraft(false);
-            }
-            return;
-        }
-
-        setEnriching(true);
-        setCreatingImportDraft(true);
-        try {
-            const enriched = await providerSearch(result.title, "steam", true, result.steam_app_id);
-            setWarnings(enriched.warnings);
-            const enrichedResult = enriched.results[0] ?? result;
-            if (enriched.results[0]) mergeSteamEnrichment(enrichedResult);
-            const importDraft = await createImportDraft(enrichedResult);
-            setDraft((current) => ({ ...current, import_draft_id: importDraft.id }));
-        } catch {
-            try {
-                const importDraft = await createImportDraft(result);
-                setDraft((current) => ({ ...current, import_draft_id: importDraft.id }));
-                setWarnings((current) => [...current, "Steam enrichment failed. The game can be saved with the provider data already loaded."]);
-            } catch {
-                setWarnings((current) => [...current, "Steam enrichment or import draft creation failed. Select the result again before saving."]);
-            }
-        } finally {
-            setEnriching(false);
-            setCreatingImportDraft(false);
-        }
+        await steamEnrichment.start(result);
     }
 
     function manualEntry() {
+        steamEnrichment.cancel();
         const title = (draft.title || searchQuery).trim();
     
         setDraft((current) => ({
@@ -864,6 +794,9 @@ export default function AddGameWizard({
 
     const resetButtons = steamOriginal && (
         <div className="flex flex-wrap gap-2">
+            {draft.publisher !== steamOriginal.publisher && steamOriginal.publisher && <button type="button" onClick={() => update("publisher", steamOriginal.publisher)} className="rounded-full bg-black/5 px-4 py-2 text-xs font-black text-black/55">Reset Publisher</button>}
+            {draft.release_date !== steamOriginal.release_date && steamOriginal.release_date && <button type="button" onClick={() => update("release_date", steamOriginal.release_date)} className="rounded-full bg-black/5 px-4 py-2 text-xs font-black text-black/55">Reset Release Date</button>}
+            {draft.description !== steamOriginal.description && steamOriginal.description && <button type="button" onClick={() => update("description", steamOriginal.description)} className="rounded-full bg-black/5 px-4 py-2 text-xs font-black text-black/55">Reset Description</button>}
             {draft.base_price_default !== steamOriginal.base_price_default && steamOriginal.base_price_default && <button type="button" onClick={() => update("base_price_default", steamOriginal.base_price_default)} className="rounded-full bg-black/5 px-4 py-2 text-xs font-black text-black/55">Reset Price</button>}
             {draft.total_achievements !== steamOriginal.total_achievements && steamOriginal.total_achievements && <button type="button" onClick={() => update("total_achievements", steamOriginal.total_achievements)} className="rounded-full bg-black/5 px-4 py-2 text-xs font-black text-black/55">Reset Achievements</button>}
         </div>
@@ -892,7 +825,7 @@ export default function AddGameWizard({
                                 <div className="min-w-0 p-5 md:p-7">
                                     <div ref={stepShellRef} className="sl-wizard-step-shell relative min-w-0 overflow-hidden">
                                     <section ref={stepContentRef} className="sl-wizard-step-content relative z-10 min-w-0">
-                                        <StepRenderer step={step} providerMode={providerMode} setProviderMode={setProviderMode} searchQuery={searchQuery} setSearchQuery={setSearchQuery} selectedResultKey={selectedResultKey} update={update} runSearch={runSearch} searching={searching} warnings={warnings} results={results} manualEntry={manualEntry} resultKey={resultKey} selectResult={selectResult} enriching={enriching} coverPreview={coverPreview} coverInputRef={coverInputRef} uploadCover={uploadCover} uploadingCover={uploadingCover} providerCoverUrl={providerCoverUrl} draft={draft} localCoverPreview={localCoverPreview} setLocalCoverPreview={setLocalCoverPreview} setDraft={setDraft} coverError={coverError} resetButtons={resetButtons} platformQuery={platformQuery} setPlatformQuery={setPlatformQuery} filteredPlatforms={filteredPlatforms} choosePlatform={choosePlatform} selectedDevices={selectedDevices} deviceQuery={deviceQuery} setDeviceQuery={setDeviceQuery} filteredDevices={filteredDevices} toggleDevice={toggleDevice} platform={platform} addCopy={addCopy} removeCopy={removeCopy} ownershipById={ownershipById} updateCopy={updateCopy} references={references} dlcQuery={dlcQuery} setDlcQuery={setDlcQuery} ownedDlcCount={ownedDlcCount} filteredDlcs={filteredDlcs} ownedDlcFor={ownedDlcFor} removeOwnedDlc={removeOwnedDlc} updateOwnedDlc={updateOwnedDlc} availableStatuses={availableStatuses} chooseStatus={chooseStatus} statusPillStyle={statusPillStyle} hasAchievements={hasAchievements} status={status} selectedOwnerships={selectedOwnerships} serverErrors={serverErrors} />
+                                        <StepRenderer step={step} providerMode={providerMode} setProviderMode={setProviderMode} searchQuery={searchQuery} setSearchQuery={setSearchQuery} selectedResultKey={selectedResultKey} update={update} runSearch={runSearch} searching={searching} warnings={warnings} results={results} manualEntry={manualEntry} resultKey={resultKey} selectResult={selectResult} enrichmentState={steamEnrichment.state} dlcSummary={steamEnrichment.dlcSummary} retryMetadata={steamEnrichment.retryMetadata} retryAchievements={steamEnrichment.retryAchievements} loadLargeDlcCatalog={steamEnrichment.loadLargeDlcCatalog} deferDlcCatalog={steamEnrichment.deferDlcCatalog} coverPreview={coverPreview} coverInputRef={coverInputRef} uploadCover={uploadCover} uploadingCover={uploadingCover} providerCoverUrl={providerCoverUrl} draft={draft} localCoverPreview={localCoverPreview} setLocalCoverPreview={setLocalCoverPreview} setDraft={setDraft} coverError={coverError} resetButtons={resetButtons} platformQuery={platformQuery} setPlatformQuery={setPlatformQuery} filteredPlatforms={filteredPlatforms} choosePlatform={choosePlatform} selectedDevices={selectedDevices} deviceQuery={deviceQuery} setDeviceQuery={setDeviceQuery} filteredDevices={filteredDevices} toggleDevice={toggleDevice} platform={platform} addCopy={addCopy} removeCopy={removeCopy} ownershipById={ownershipById} updateCopy={updateCopy} references={references} dlcQuery={dlcQuery} setDlcQuery={setDlcQuery} ownedDlcCount={ownedDlcCount} filteredDlcs={filteredDlcs} ownedDlcFor={ownedDlcFor} removeOwnedDlc={removeOwnedDlc} updateOwnedDlc={updateOwnedDlc} availableStatuses={availableStatuses} chooseStatus={chooseStatus} statusPillStyle={statusPillStyle} hasAchievements={hasAchievements} status={status} selectedOwnerships={selectedOwnerships} serverErrors={serverErrors} />
                                 </section>
                                 </div>
                                 </div>

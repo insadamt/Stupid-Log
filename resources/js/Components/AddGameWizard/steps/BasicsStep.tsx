@@ -5,10 +5,11 @@ import Field from "../components/Field";
 import Notice from "../components/Notice";
 import TextArea from "../components/TextArea";
 import TextInput from "../components/TextInput";
-import { Draft } from "../types";
+import { Draft, SteamEnrichmentStatus } from "../types";
 
 export default function BasicsStep({
-    enriching,
+    enrichmentStatus,
+    retryMetadata,
     coverPreview,
     coverInputRef,
     uploadCover,
@@ -21,7 +22,8 @@ export default function BasicsStep({
     coverError,
     update,
 }: {
-    enriching: boolean;
+    enrichmentStatus: SteamEnrichmentStatus;
+    retryMetadata: () => Promise<void>;
     coverPreview: string;
     coverInputRef: RefObject<HTMLInputElement | null>;
     uploadCover: (file: File) => Promise<void>;
@@ -37,7 +39,8 @@ export default function BasicsStep({
     return (
                                         <div className="grid gap-6">
                                             <div><div className="text-xs font-black uppercase tracking-[0.28em] text-black/35">Game Basics</div><h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Clean the record.</h3></div>
-                                            {enriching && <Notice><span className="inline-flex items-center gap-3"><Loader2 className="size-5 animate-spin" /> Steam data is being attached in the background.</span></Notice>}
+                                            {enrichmentStatus === "loading" && <Notice><span className="inline-flex items-center gap-3"><Loader2 className="size-5 animate-spin" /> Loading Steam store details.</span></Notice>}
+                                            {enrichmentStatus === "warning" && <Notice tone="danger"><div className="flex flex-wrap items-center justify-between gap-3"><span>Steam store details are still unavailable.</span><button type="button" onClick={() => void retryMetadata()} className="rounded-xl bg-black px-4 py-2 text-xs font-black text-white">Retry metadata</button></div></Notice>}
                                             <div className="grid gap-6 rounded-[28px] border border-black/10 bg-white/70 p-5 xl:grid-cols-[280px_1fr]">
                                                 <div>
                                                     <div className="rounded-[24px] bg-black p-2">

@@ -158,7 +158,7 @@ class ProviderSearchContractTest extends TestCase
             ->assertJsonPath('results.0.base_price_default', 9.99)
             ->assertJsonPath('results.0.total_achievements', null)
             ->assertJsonPath('results.0.total_achievements_source', null)
-            ->assertJsonCount(1, 'warnings');
+            ->assertJsonCount(0, 'warnings');
 
         $this->assertNoKeyedSteamRequestWasSent();
     }
@@ -177,7 +177,7 @@ class ProviderSearchContractTest extends TestCase
         $this->getJson('/provider-search?query=portal&provider=steam&enrich=1&steam_app_id=620')
             ->assertOk()
             ->assertJsonPath('results.0.total_achievements', null)
-            ->assertJsonCount(1, 'warnings');
+            ->assertJsonCount(0, 'warnings');
     }
 
     public function test_public_achievement_enrichment_continues_when_store_metadata_fails(): void
@@ -199,7 +199,7 @@ class ProviderSearchContractTest extends TestCase
             ->assertJsonPath('results.0.base_price_default', null)
             ->assertJsonPath('results.0.total_achievements', 2)
             ->assertJsonPath('results.0.total_achievements_source', 'steam')
-            ->assertJsonCount(1, 'warnings');
+            ->assertJsonCount(2, 'warnings');
     }
 
     private function storeIgdbCredential(): void

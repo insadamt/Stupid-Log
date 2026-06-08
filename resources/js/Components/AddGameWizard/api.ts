@@ -1,4 +1,13 @@
-import { ManualDuplicate, ProviderMode, WizardSearchResponse, WizardSearchResult } from "./types";
+import {
+    ManualDuplicate,
+    ProviderMode,
+    SteamAchievementData,
+    SteamDlcData,
+    SteamEnrichmentResponse,
+    SteamMetadataData,
+    WizardSearchResponse,
+    WizardSearchResult,
+} from "./types";
 import { requestErrorMessage, uploadErrorMessage } from "./utils";
 
 function csrfToken() {
@@ -12,6 +21,30 @@ export async function providerSearch(query: string, provider: ProviderMode, enri
     const response = await fetch(`/provider-search?${params.toString()}`);
     if (!response.ok) throw new Error(provider === "igdb" ? "IGDB search failed." : "Steam search failed.");
     return await response.json() as WizardSearchResponse;
+}
+
+async function steamEnrichmentRequest<Data>(appId: string, channel: string, signal: AbortSignal): Promise<SteamEnrichmentResponse<Data>> {
+    const response = await fetch(`/steam-enrichment/${encodeURIComponent(appId)}/${channel}`, {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+        signal,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(requestErrorMessage(data, `Steam ${channel} enrichment failed.`));
+    return data as SteamEnrichmentResponse<Data>;
+}
+
+export function fetchSteamMetadata(appId: string, signal: AbortSignal) {
+    return steamEnrichmentRequest<SteamMetadataData>(appId, "metadata", signal);
+}
+
+export function fetchSteamAchievements(appId: string, signal: AbortSignal) {
+    return steamEnrichmentRequest<SteamAchievementData>(appId, "achievements", signal);
+}
+
+export function fetchSteamDlcs(appId: string, signal: AbortSignal, load = false) {
+    const channel = load ? "dlcs?load=1" : "dlcs";
+    return steamEnrichmentRequest<SteamDlcData>(appId, channel, signal);
 }
 
 export async function createImportDraft(result: WizardSearchResult) {

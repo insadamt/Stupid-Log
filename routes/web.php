@@ -34,6 +34,9 @@ Route::middleware('installation.complete')->group(function (): void {
     Route::post('/library-games/cover', [LibraryGameMutationController::class, 'uploadGameCover'])->name('library-games.cover.store');
     Route::get('/library-games/manual-duplicates', [LibraryGameMutationController::class, 'manualDuplicates'])->name('library-games.manual-duplicates');
     Route::get('/provider-search', [ProviderController::class, 'providerSearch'])->name('provider-search');
+    Route::get('/steam-enrichment/{appId}/metadata', [ProviderController::class, 'steamMetadata'])->name('steam-enrichment.metadata');
+    Route::get('/steam-enrichment/{appId}/achievements', [ProviderController::class, 'steamAchievements'])->name('steam-enrichment.achievements');
+    Route::get('/steam-enrichment/{appId}/dlcs', [ProviderController::class, 'steamDlcs'])->name('steam-enrichment.dlcs');
     Route::post('/provider-import-drafts', [ProviderController::class, 'storeProviderImportDraft'])->name('provider-import-drafts.store');
     Route::delete('/provider-import-drafts/{providerImportDraft}', [ProviderController::class, 'cancelProviderImportDraft'])->name('provider-import-drafts.destroy');
     Route::get('/games/{libraryGame}', [GameDetailsController::class, 'gameDetails'])->name('games.show');

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\StupidLog;
 
 use App\Http\Controllers\Controller;
 use App\Services\LocalUserService;
+use App\Services\PublicSteamEnrichmentService;
 use App\Services\ProviderImportDraftService;
 use App\Services\ProviderSearchService;
 use Illuminate\Http\JsonResponse;
@@ -12,6 +13,26 @@ use Illuminate\Validation\Rule;
 
 class ProviderController extends Controller
 {
+    public function steamMetadata(string $appId, PublicSteamEnrichmentService $steam): JsonResponse
+    {
+        return response()->json($steam->metadata($this->validatedSteamAppId($appId)));
+    }
+
+    public function steamAchievements(string $appId, PublicSteamEnrichmentService $steam): JsonResponse
+    {
+        return response()->json($steam->achievements($this->validatedSteamAppId($appId)));
+    }
+
+    public function steamDlcs(Request $request, string $appId, PublicSteamEnrichmentService $steam): JsonResponse
+    {
+        $validated = $request->validate(['load' => ['nullable', 'boolean']]);
+
+        return response()->json($steam->dlcs(
+            $this->validatedSteamAppId($appId),
+            (bool) ($validated['load'] ?? false),
+        ));
+    }
+
     public function providerSearch(Request $request, ProviderSearchService $providers, LocalUserService $users): JsonResponse
     {
         $validated = $request->validate([
@@ -66,5 +87,13 @@ class ProviderController extends Controller
         $drafts->cancel($users->get(), $providerImportDraft);
 
         return response()->json(['ok' => true]);
+    }
+
+    private function validatedSteamAppId(string $appId): string
+    {
+        return validator(
+            ['app_id' => $appId],
+            ['app_id' => ['required', 'regex:/^[1-9][0-9]*$/', 'max:20']],
+        )->validate()['app_id'];
     }
 }

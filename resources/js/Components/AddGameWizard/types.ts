@@ -19,8 +19,43 @@ export type WizardSearchResponse = Omit<ProviderSearchResponse, "results"> & {
 
 export type SteamOriginal = {
     steam_app_id: string;
+    publisher: string;
+    release_date: string;
+    description: string;
     base_price_default: string;
     total_achievements: string;
+};
+
+export type SteamEnrichmentChannel = "metadata" | "achievements" | "dlcs";
+export type SteamEnrichmentStatus = "idle" | "loading" | "complete" | "warning" | "choice";
+
+export type SteamEnrichmentState = Record<SteamEnrichmentChannel, SteamEnrichmentStatus>;
+
+export type SteamMetadataData = {
+    publisher: string | null;
+    release_date: string | null;
+    description: string | null;
+    base_price_default: number | null;
+    base_price_source: "steam" | null;
+};
+
+export type SteamAchievementData = {
+    total_achievements: number | null;
+    total_achievements_source: "steam" | null;
+    source: "global_percentages" | "store_details" | null;
+};
+
+export type SteamDlcData = {
+    dlcs: DlcCatalogItem[];
+    total: number;
+    loaded: number;
+    missing_app_ids: string[];
+    requires_confirmation: boolean;
+};
+
+export type SteamEnrichmentResponse<Data> = {
+    data: Data;
+    warnings: string[];
 };
 
 export type OwnershipCopyDraft = {

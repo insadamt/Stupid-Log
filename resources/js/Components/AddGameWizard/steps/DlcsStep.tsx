@@ -6,11 +6,14 @@ import Pill from "../components/Pill";
 import Select from "../components/Select";
 import TextInput from "../components/TextInput";
 import { dlcAcquisitionTypes } from "../constants";
-import { DlcCatalogItem, Draft, OwnedDlcDraft } from "../types";
+import { DlcCatalogItem, Draft, OwnedDlcDraft, SteamDlcData, SteamEnrichmentStatus } from "../types";
 import { money } from "../utils";
 
 export default function DlcsStep({
-    enriching,
+    enrichmentStatus,
+    dlcSummary,
+    loadLargeDlcCatalog,
+    deferDlcCatalog,
     draft,
     dlcQuery,
     setDlcQuery,
@@ -20,7 +23,10 @@ export default function DlcsStep({
     removeOwnedDlc,
     updateOwnedDlc,
 }: {
-    enriching: boolean;
+    enrichmentStatus: SteamEnrichmentStatus;
+    dlcSummary: SteamDlcData | null;
+    loadLargeDlcCatalog: () => Promise<void>;
+    deferDlcCatalog: () => void;
     draft: Draft;
     dlcQuery: string;
     setDlcQuery: (value: string) => void;
@@ -37,14 +43,29 @@ export default function DlcsStep({
                                                 <h3 className="mt-1 text-4xl font-black tracking-[-0.06em]">Mark expansions.</h3>
                                             </div>
 
-                                            {enriching && <Notice><span className="inline-flex items-center gap-3"><Loader2 className="size-5 animate-spin" /> Steam DLC catalog is loading.</span></Notice>}
+                                            {enrichmentStatus === "loading" && <Notice><span className="inline-flex items-center gap-3"><Loader2 className="size-5 animate-spin" /> Steam DLC catalog is loading.</span></Notice>}
+                                            {enrichmentStatus === "warning" && <Notice tone="danger"><div className="flex flex-wrap items-center justify-between gap-3"><span>{dlcSummary ? `${dlcSummary.loaded} of ${dlcSummary.total} DLCs loaded. ${dlcSummary.missing_app_ids.length} are unavailable from Steam.` : "Steam DLC details are unavailable."}</span><button type="button" onClick={() => void loadLargeDlcCatalog()} className="rounded-xl bg-black px-4 py-2 text-xs font-black text-white">Retry missing DLCs</button></div></Notice>}
+                                            {enrichmentStatus === "choice" && dlcSummary && (
+                                                <Notice>
+                                                    <div className="grid gap-4">
+                                                        <div><strong>{dlcSummary.total} DLCs found.</strong> Loading a large catalog can take a while.</div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <button type="button" onClick={() => void loadLargeDlcCatalog()} className="rounded-xl bg-black px-4 py-2 text-xs font-black text-white">Load DLCs now</button>
+                                                            <button type="button" onClick={deferDlcCatalog} className="rounded-xl bg-black/10 px-4 py-2 text-xs font-black text-black">Add later in Game Details</button>
+                                                        </div>
+                                                    </div>
+                                                </Notice>
+                                            )}
+                                            {enrichmentStatus === "complete" && dlcSummary && dlcSummary.total > 0 && dlcSummary.loaded === 0 && (
+                                                <Notice>DLC import was deferred. After saving, open Game Details → DLCs and choose Refresh.</Notice>
+                                            )}
 
                                             {!draft.steam_app_id && (
                                                 <EmptyCard title="No Steam App ID." body="DLC catalog import needs a Steam App ID. Continue now and refresh DLCs from the details page after adding one." />
                                             )}
 
-                                            {draft.steam_app_id && !draft.dlcs.length && !enriching && (
-                                                <EmptyCard title="No DLC catalog loaded." body="Steam did not return DLCs for this game yet. The full catalog will still be imported locally when the game is saved." />
+                                            {draft.steam_app_id && !draft.dlcs.length && enrichmentStatus !== "loading" && (!dlcSummary || dlcSummary.total === 0) && (
+                                                <EmptyCard title="No DLC catalog loaded." body="Steam did not list any public DLCs for this game." />
                                             )}
 
                                             {draft.dlcs.length > 0 && (

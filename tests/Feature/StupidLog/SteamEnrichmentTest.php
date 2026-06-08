@@ -107,7 +107,7 @@ class SteamEnrichmentTest extends TestCase
         $this->assertSame(count($dlcIds), Dlc::where('game_id', $game->id)->count());
     }
 
-    public function test_invalid_public_achievement_data_is_a_non_blocking_warning(): void
+    public function test_invalid_public_achievement_data_uses_store_details_to_confirm_no_total(): void
     {
         Http::fake([
             'store.steampowered.com/api/appdetails*' => Http::response([
@@ -125,9 +125,8 @@ class SteamEnrichmentTest extends TestCase
 
         $warnings = app(SteamEnrichmentService::class)->enrich($game, '100');
 
-        $this->assertCount(1, $warnings);
+        $this->assertCount(0, $warnings);
         $this->assertNull($game->refresh()->total_achievements);
-        $this->assertStringContainsString('No public achievement data was returned.', $warnings[0]);
         Http::assertNotSent(fn ($request) => str_contains($request->url(), 'GetSchemaForGame'));
     }
 

@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Models\StupidLog\Provider;
 use App\Models\StupidLog\ProviderCredential;
 use App\Models\User;
-use Illuminate\Http\Client\Pool;
-use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
@@ -18,6 +16,8 @@ class ProviderSearchService
     private const SOURCE_ORDER = ['igdb', 'steam', 'manual'];
     private const RESULT_LIMIT = 10;
     private const SEARCH_CACHE_SECONDS = 300;
+
+    public function __construct(private readonly PublicSteamEnrichmentService $steam) {}
 
     public function search(User $user, string $query, string $provider = 'igdb', bool $enrich = false, ?string $steamAppId = null): array
     {
@@ -203,173 +203,38 @@ class ProviderSearchService
 
     private function withSteamMetadata(array $results, array &$warnings, bool $includeDlcCatalog = false): array
     {
-        $steamAppIds = collect($results)
-            ->pluck('steam_app_id')
-            ->filter(fn ($appId) => is_scalar($appId) && (string) $appId !== '')
-            ->map(fn ($appId) => (string) $appId)
-            ->unique()
-            ->values()
-            ->all();
-
-        if ($steamAppIds === []) {
-            return $results;
-        }
-
-        $details = $this->steamAppDetails($steamAppIds, $warnings);
-        $achievementCounts = $this->steamAchievementCounts($steamAppIds, $warnings);
-        $dlcCatalogs = $includeDlcCatalog
-            ? collect($steamAppIds)
-                ->mapWithKeys(fn (string $steamAppId) => [$steamAppId => $this->steamDlcCatalog($details[$steamAppId]['dlc'] ?? [], $warnings)])
-                ->all()
-            : [];
-
-        return collect($results)->map(function (array $result) use ($details, $achievementCounts, $dlcCatalogs, $includeDlcCatalog) {
+        return collect($results)->map(function (array $result) use (&$warnings, $includeDlcCatalog) {
             $steamAppId = isset($result['steam_app_id'])
                 ? (string) $result['steam_app_id']
                 : null;
 
-            $data = $steamAppId ? ($details[$steamAppId] ?? null) : null;
-            $price = is_array($data) ? $this->price($data) : null;
-            $totalAchievements = $steamAppId
-                ? ($achievementCounts[$steamAppId] ?? null)
-                : null;
+            if (! $steamAppId) {
+                return $result;
+            }
+
+            $metadata = $this->steam->metadata($steamAppId);
+            $achievements = $this->steam->achievements($steamAppId);
+            $dlcs = $includeDlcCatalog
+                ? $this->steam->dlcs($steamAppId, true)
+                : ['data' => ['dlcs' => []], 'warnings' => []];
+            $warnings = array_merge($warnings, $metadata['warnings'], $achievements['warnings'], $dlcs['warnings']);
             $source = $result['source'] ?? null;
 
             return array_merge($result, [
-                'title' => $result['title'] ?: ($data['name'] ?? 'Untitled'),
+                'title' => $result['title'] ?: 'Untitled',
                 'cover_url_original' => $source === 'steam'
                     ? ($this->steamPortraitCoverUrl($steamAppId) ?? $result['cover_url_original'] ?? null)
-                    : ($result['cover_url_original'] ?? ($data['header_image'] ?? null)),
-                'publisher' => $result['publisher'] ?? ($data['publishers'][0] ?? null),
-                'release_date' => $result['release_date'] ?? (is_array($data) ? $this->steamReleaseDate($data) : null),
-                'description' => $result['description'] ?? ($data['short_description'] ?? null),
-                'base_price_default' => $price,
-                'base_price_source' => $price === null ? null : 'steam',
-                'total_achievements' => $totalAchievements,
-                'total_achievements_source' => $totalAchievements === null ? null : 'steam',
-                'dlcs' => $includeDlcCatalog && $steamAppId ? ($dlcCatalogs[$steamAppId] ?? []) : [],
+                    : ($result['cover_url_original'] ?? null),
+                'publisher' => $result['publisher'] ?? $metadata['data']['publisher'],
+                'release_date' => $result['release_date'] ?? $metadata['data']['release_date'],
+                'description' => $result['description'] ?? $metadata['data']['description'],
+                'base_price_default' => $metadata['data']['base_price_default'],
+                'base_price_source' => $metadata['data']['base_price_source'],
+                'total_achievements' => $achievements['data']['total_achievements'],
+                'total_achievements_source' => $achievements['data']['total_achievements_source'],
+                'dlcs' => $dlcs['data']['dlcs'],
             ]);
         })->all();
-    }
-
-    private function steamAppDetails(array $steamAppIds, array &$warnings): array
-    {
-        $responses = Http::pool(function (Pool $pool) use ($steamAppIds) {
-            return collect($steamAppIds)->map(function (string $steamAppId) use ($pool) {
-                return $pool->as($steamAppId)->connectTimeout(1)->timeout(4)->get('https://store.steampowered.com/api/appdetails', [
-                    'appids' => $steamAppId,
-                    'cc' => 'US',
-                    'l' => 'english',
-                ]);
-            })->all();
-        });
-
-        $details = [];
-        $failed = 0;
-
-        foreach ($steamAppIds as $steamAppId) {
-            $response = $responses[$steamAppId] ?? null;
-
-            if (! $response instanceof Response || ! $response->successful()) {
-                $failed++;
-                continue;
-            }
-
-            $data = $response->json($steamAppId.'.data');
-
-            if (is_array($data)) {
-                $details[$steamAppId] = $data;
-            }
-        }
-
-        if ($failed > 0) {
-            $warnings[] = 'Steam metadata auto-fill unavailable for '.$failed.' result(s).';
-        }
-
-        return $details;
-    }
-
-    private function steamAchievementCounts(array $steamAppIds, array &$warnings): array
-    {
-        $responses = Http::pool(function (Pool $pool) use ($steamAppIds) {
-            return collect($steamAppIds)->map(function (string $steamAppId) use ($pool) {
-                return $pool->as($steamAppId)->connectTimeout(1)->timeout(4)->get(
-                    'https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/',
-                    ['gameid' => $steamAppId],
-                );
-            })->all();
-        });
-
-        $counts = [];
-        $failed = 0;
-
-        foreach ($steamAppIds as $steamAppId) {
-            $response = $responses[$steamAppId] ?? null;
-
-            if (! $response instanceof Response || ! $response->successful()) {
-                $counts[$steamAppId] = null;
-                $failed++;
-                continue;
-            }
-
-            $achievements = $response->json('achievementpercentages.achievements');
-
-            if (! is_array($achievements) || $achievements === []) {
-                $counts[$steamAppId] = null;
-                $failed++;
-                continue;
-            }
-
-            $counts[$steamAppId] = count($achievements);
-        }
-
-        if ($failed > 0) {
-            $warnings[] = 'Steam achievement auto-fill unavailable for '.$failed.' result(s).';
-        }
-
-        return $counts;
-    }
-
-    private function steamDlcCatalog(array $dlcIds, array &$warnings): array
-    {
-        $dlcIds = collect($dlcIds)
-            ->filter(fn ($id) => is_scalar($id))
-            ->map(fn ($id) => (string) $id)
-            ->unique()
-            ->values()
-            ->all();
-
-        if ($dlcIds === []) {
-            return [];
-        }
-
-        $catalog = [];
-        $failed = 0;
-
-        foreach (array_chunk($dlcIds, 25) as $chunk) {
-            $details = $this->steamAppDetails($chunk, $warnings);
-
-            foreach ($chunk as $dlcId) {
-                $data = $details[$dlcId] ?? null;
-
-                if (! is_array($data)) {
-                    $failed++;
-                    continue;
-                }
-
-                $catalog[] = [
-                    'steam_app_id' => $dlcId,
-                    'title' => $data['name'] ?? 'Untitled DLC',
-                    'base_price' => $this->price($data),
-                ];
-            }
-        }
-
-        if ($failed > 0) {
-            $warnings[] = 'Steam DLC auto-fill unavailable for '.$failed.' DLC(s).';
-        }
-
-        return $catalog;
     }
 
     private function result(array $result): array
@@ -395,32 +260,6 @@ class ProviderSearchService
             'total_achievements_source' => $result['total_achievements_source'] ?? null,
             'dlcs' => $result['dlcs'] ?? [],
         ];
-    }
-
-    private function price(array $data): ?float
-    {
-        if (($data['is_free'] ?? false) === true) {
-            return 0.0;
-        }
-
-        $price = $data['price_overview']['initial'] ?? null;
-
-        return is_numeric($price)
-            ? round(((float) $price) / 100, 2)
-            : null;
-    }
-
-    private function steamReleaseDate(array $data): ?string
-    {
-        $date = $data['release_date']['date'] ?? null;
-
-        if (! is_string($date) || trim($date) === '') {
-            return null;
-        }
-
-        $timestamp = strtotime($date);
-
-        return $timestamp === false ? null : date('Y-m-d', $timestamp);
     }
 
     private function steamPortraitCoverUrl(?string $steamAppId): ?string
