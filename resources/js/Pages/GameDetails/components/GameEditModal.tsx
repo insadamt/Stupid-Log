@@ -1,4 +1,6 @@
-import { HardDrive, Save, Search, X } from 'lucide-react';
+import { ImageUp, HardDrive, Save, Search, X } from 'lucide-react';
+import { ChangeEvent, useState } from 'react';
+import { uploadCover } from '../../../Components/AddGameWizard/api';
 import PlatformIcon from '../../../Components/PlatformIcon';
 import { statusPillStyle } from '../../../statusColors';
 import { GameCardData, ReferenceData } from '../../../types';
@@ -71,13 +73,37 @@ export default function GameEditModal({
     setPendingGameStatusId: (statusId: string | null) => void;
     applyGameCompletedStatus: () => void;
 }) {
+    const [uploadingCover, setUploadingCover] = useState(false);
+    const [coverError, setCoverError] = useState('');
+
+    async function changeCover(event: ChangeEvent<HTMLInputElement>) {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+
+        setUploadingCover(true);
+        setCoverError('');
+
+        try {
+            const uploadedCover = await uploadCover(file);
+            updateGameForm({
+                cover_path: uploadedCover.path,
+                cover_preview: uploadedCover.url,
+            });
+        } catch (error) {
+            setCoverError(error instanceof Error ? error.message : 'The cover failed to upload.');
+        } finally {
+            setUploadingCover(false);
+        }
+    }
+
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-5 backdrop-blur-sm">
             <section className="relative grid max-h-[90vh] w-full max-w-6xl grid-cols-[300px_minmax(0,1fr)] overflow-hidden rounded-[38px] border border-white/10 bg-black text-white shadow-[0_36px_120px_rgb(0_0_0/0.45)]">
                 <aside className="bg-[#b7ff63] p-5 text-black">
                     <div className="overflow-hidden rounded-[28px] bg-black shadow-[0_22px_48px_rgb(0_0_0/0.25)]">
-                        {libraryGame.cover_url ? (
-                            <img src={libraryGame.cover_url} alt={libraryGame.title} className="h-[390px] w-full object-cover" />
+                        {gameForm.cover_preview ? (
+                            <img src={gameForm.cover_preview} alt={gameForm.title} className="h-[390px] w-full object-cover" />
                         ) : (
                             <div className="grid h-[390px] place-items-center text-xl font-black text-[#b7ff63]">No Cover</div>
                         )}
@@ -135,6 +161,23 @@ export default function GameEditModal({
                                     <div className="mt-1 text-2xl font-black tracking-[-0.045em]">Main record fields</div>
                                 </div>
 
+                                <div className="md:col-span-2 rounded-[26px] border border-white/10 bg-white/[0.055] p-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-4">
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-[#b7ff63]/70">Cover</div>
+                                            <div className="mt-1 text-xl font-black tracking-[-0.035em]">Change game cover</div>
+                                        </div>
+                                        <label className="flex cursor-pointer items-center gap-2 rounded-2xl bg-[#b7ff63] px-5 py-3 text-sm font-black text-black">
+                                            <ImageUp size={18} />
+                                            {uploadingCover ? 'Uploading' : 'Change Cover'}
+                                            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={changeCover} disabled={uploadingCover} className="sr-only" />
+                                        </label>
+                                    </div>
+                                    {(coverError || gameErrors['game.cover_path']) && (
+                                        <div className="mt-3 text-xs font-black text-[#ff6068]">{coverError || gameErrors['game.cover_path']}</div>
+                                    )}
+                                </div>
+
                                 <Field label="Title" error={gameErrors['game.title']}>
                                     <TextInput value={gameForm.title} onChange={(event) => updateGameForm({ title: event.target.value })} />
                                 </Field>
@@ -179,6 +222,14 @@ export default function GameEditModal({
 
                                 <Field label="Earned Achievements" error={gameErrors['progress.earned_achievements']}>
                                     <TextInput type="number" value={gameForm.earned_achievements} onChange={(event) => updateGameForm({ earned_achievements: event.target.value })} />
+                                </Field>
+
+                                <Field label="First Played Date" error={gameErrors['progress.first_played_at']}>
+                                    <TextInput type="date" value={gameForm.first_played_at} onChange={(event) => updateGameForm({ first_played_at: event.target.value })} />
+                                </Field>
+
+                                <Field label="Last Played Date" error={gameErrors['progress.last_played_at']}>
+                                    <TextInput type="date" value={gameForm.last_played_at} onChange={(event) => updateGameForm({ last_played_at: event.target.value })} />
                                 </Field>
 
                                 {(selectedGameStatus?.name === 'Completed' || selectedGameStatus?.name === '100%') && (

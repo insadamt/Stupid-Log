@@ -297,12 +297,13 @@ class LibraryGameRulesTest extends TestCase
             ->assertSessionHasErrors('ownership_copy');
     }
 
-    public function test_library_game_can_be_updated_and_deleted_from_details_page(): void
+    public function test_library_game_details_update_saves_cover_and_played_dates(): void
     {
         $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload([
             'game' => [
                 'title' => 'Old Game',
                 'source' => 'manual',
+                'cover_path' => 'covers/games/old-cover.webp',
                 'total_achievements' => 10,
                 'create_duplicate_anyway' => true,
             ],
@@ -314,6 +315,7 @@ class LibraryGameRulesTest extends TestCase
                 'title' => 'New Game',
                 'publisher' => 'New Studio',
                 'description' => 'Updated details.',
+                'cover_path' => 'covers/games/new-cover.webp',
                 'base_price_default' => 25,
                 'total_achievements' => 12,
             ],
@@ -321,6 +323,8 @@ class LibraryGameRulesTest extends TestCase
                 'status_id' => $inProgress->id,
                 'playtime_hours' => 6.5,
                 'earned_achievements' => 5,
+                'first_played_at' => '2025-01-12',
+                'last_played_at' => '2025-03-24',
             ],
         ])->assertRedirect();
 
@@ -330,6 +334,7 @@ class LibraryGameRulesTest extends TestCase
             'normalized_title' => 'new game',
             'publisher' => 'New Studio',
             'description' => 'Updated details.',
+            'cover_path' => 'covers/games/new-cover.webp',
             'base_price_default' => 25,
             'total_achievements' => 12,
         ]);
@@ -338,8 +343,70 @@ class LibraryGameRulesTest extends TestCase
             'status_id' => $inProgress->id,
             'playtime_hours' => 6.5,
             'earned_achievements' => 5,
+            'first_played_at' => '2025-01-12 00:00:00',
+            'last_played_at' => '2025-03-24 00:00:00',
         ]);
+    }
 
+    public function test_library_game_details_update_preserves_cover_when_cover_path_is_omitted(): void
+    {
+        $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Covered Game',
+                'source' => 'manual',
+                'cover_path' => 'covers/games/existing-cover.webp',
+                'create_duplicate_anyway' => true,
+            ],
+        ]));
+        $inProgress = Status::where('name', 'In Progress')->firstOrFail();
+
+        $this->patch("/games/{$libraryGame->id}", [
+            'game' => [
+                'title' => 'Covered Game',
+                'publisher' => null,
+                'description' => null,
+                'base_price_default' => null,
+                'total_achievements' => null,
+            ],
+            'progress' => [
+                'status_id' => $inProgress->id,
+                'playtime_hours' => 1,
+                'earned_achievements' => 0,
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('games', [
+            'id' => $libraryGame->game_id,
+            'cover_path' => 'covers/games/existing-cover.webp',
+        ]);
+    }
+
+    public function test_library_game_details_update_rejects_last_played_before_first_played(): void
+    {
+        $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload());
+        $inProgress = Status::where('name', 'In Progress')->firstOrFail();
+
+        $this->patch("/games/{$libraryGame->id}", [
+            'game' => [
+                'title' => $libraryGame->game->title,
+                'publisher' => null,
+                'description' => null,
+                'base_price_default' => null,
+                'total_achievements' => null,
+            ],
+            'progress' => [
+                'status_id' => $inProgress->id,
+                'playtime_hours' => 1,
+                'earned_achievements' => 0,
+                'first_played_at' => '2025-03-24',
+                'last_played_at' => '2025-01-12',
+            ],
+        ])->assertSessionHasErrors('progress.last_played_at');
+    }
+
+    public function test_library_game_can_be_deleted_from_details_page(): void
+    {
+        $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload());
         $this->delete("/games/{$libraryGame->id}")->assertRedirect('/library');
         $this->assertDatabaseMissing('library_games', ['id' => $libraryGame->id]);
     }

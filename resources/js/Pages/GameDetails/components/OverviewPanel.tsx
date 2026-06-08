@@ -1,4 +1,4 @@
-import { Archive, Layers3, ShieldCheck } from 'lucide-react';
+import { Archive, CalendarDays, Layers3, ShieldCheck } from 'lucide-react';
 import { GameCardData } from '../../../types';
 import { Details } from '../types';
 import { BlackTile } from './SharedUi';
@@ -31,6 +31,8 @@ export default function OverviewPanel({
             <div className="grid gap-3 border-t border-white/10 p-5 md:grid-cols-2">
                 <BlackTile label="Publisher" value={libraryGame.publisher || 'Unknown'} icon={<Archive size={20} />} />
                 <BlackTile label="Copies" value={details.ownership_copies.length} icon={<Layers3 size={20} />} />
+                <BlackTile label="First Played" value={libraryGame.first_played_at || 'Not recorded'} icon={<CalendarDays size={20} />} />
+                <BlackTile label="Last Played" value={libraryGame.last_played_at || 'Not recorded'} icon={<CalendarDays size={20} />} />
             </div>
         </article>
     );

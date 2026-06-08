@@ -84,10 +84,14 @@ export type GameEditForm = {
     title: string;
     publisher: string;
     description: string;
+    cover_path: string;
+    cover_preview: string;
     base_price_default: string;
     total_achievements: string;
     status_id: string;
     playtime_hours: string;
     earned_achievements: string;
+    first_played_at: string;
+    last_played_at: string;
     completed_at: string;
 };

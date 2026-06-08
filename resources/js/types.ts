@@ -8,6 +8,7 @@ export type GameCardData = {
     title: string;
     publisher?: string | null;
     description?: string | null;
+    cover_path?: string | null;
     cover_url?: string | null;
     platform: string;
     status: string;
@@ -16,6 +17,8 @@ export type GameCardData = {
     playtime_hours: number;
     earned_achievements: number;
     total_achievements: number;
+    first_played_at?: string | null;
+    last_played_at?: string | null;
     completed_at?: string | null;
     progress: number;
     ownership: string[];

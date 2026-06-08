@@ -52,6 +52,7 @@ class LibraryGameMutationController extends Controller
             'game.title' => ['required', 'string', 'max:255'],
             'game.publisher' => ['nullable', 'string', 'max:255'],
             'game.description' => ['nullable', 'string'],
+            'game.cover_path' => ['nullable', 'string', 'max:2048'],
             'game.base_price_default' => ['nullable', 'numeric', 'min:0'],
             'game.total_achievements' => ['nullable', 'integer', 'min:0'],
 
@@ -59,6 +60,8 @@ class LibraryGameMutationController extends Controller
             'progress.status_id' => ['required', 'integer', 'exists:statuses,id'],
             'progress.playtime_hours' => ['nullable', 'numeric', 'min:0', 'max:999999.9'],
             'progress.earned_achievements' => ['nullable', 'integer', 'min:0'],
+            'progress.first_played_at' => ['nullable', 'date'],
+            'progress.last_played_at' => ['nullable', 'date', 'after_or_equal:progress.first_played_at'],
             'progress.completed_at' => ['nullable', 'date'],
         ]);
 
@@ -78,19 +81,27 @@ class LibraryGameMutationController extends Controller
             throw ValidationException::withMessages(['progress.completed_at' => 'Completed date is required for Completed and 100%.']);
         }
 
-        $libraryGame->game->update([
+        $gameUpdates = [
             'title' => $validated['game']['title'],
             'normalized_title' => $normalizer->normalize($validated['game']['title']),
             'publisher' => $validated['game']['publisher'] ?? null,
             'description' => $validated['game']['description'] ?? null,
             'base_price_default' => $validated['game']['base_price_default'] ?? null,
             'total_achievements' => $totalAchievements,
-        ]);
+        ];
+
+        if (array_key_exists('cover_path', $validated['game'])) {
+            $gameUpdates['cover_path'] = $validated['game']['cover_path'];
+        }
+
+        $libraryGame->game->update($gameUpdates);
 
         $libraryGame->update([
             'status_id' => $status->id,
             'playtime_hours' => $validated['progress']['playtime_hours'] ?? 0,
             'earned_achievements' => $earnedAchievements,
+            'first_played_at' => $validated['progress']['first_played_at'] ?? null,
+            'last_played_at' => $validated['progress']['last_played_at'] ?? null,
             'completed_at' => in_array($status->name, ['Completed', '100%'], true)
                 ? $validated['progress']['completed_at']
                 : null,

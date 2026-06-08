@@ -90,7 +90,7 @@ export async function uploadCover(file: File) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(uploadErrorMessage(data));
 
-    return data as { path: string };
+    return data as { path: string; url: string };
 }
 
 export async function checkManualDuplicates(title: string, releaseDate: string) {
