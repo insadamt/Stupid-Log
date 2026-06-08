@@ -19,7 +19,29 @@ Stupid Log v1.0.0 is intended for trusted LAN or VPN access only. Do not expose 
 
 ## Install
 
-The production deployment uses `compose.production.yml`. The existing `docker-compose.yml` remains the development Compose path.
+### One-command install
+
+With Docker Engine and Docker Compose v2 already installed:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.0/scripts/install.sh | bash
+```
+
+The installer creates `~/stupid-log`, generates the application key and database password, starts the published `ghcr.io/insadamt/stupid-log:1.0.0` image, waits for the health check, and opens `http://127.0.0.1:8080`.
+
+To review the installer before running it:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.0/scripts/install.sh
+less install.sh
+bash install.sh
+```
+
+See [docs/install.md](docs/install.md) for custom ports, LAN binding, lifecycle commands, updates, and uninstall precautions.
+
+### Manual Docker Compose install
+
+The repository's `compose.production.yml` is the transparent source-build fallback. The existing `docker-compose.yml` remains the development Compose path.
 
 ```bash
 cp .env.production.example .env.production
@@ -33,7 +55,7 @@ Put the generated key in `.env.production`, replace both database password place
 docker compose --env-file .env.production -f compose.production.yml up -d --build
 ```
 
-Open `http://localhost:8080` unless `APP_PORT` was changed. Full instructions are in [docs/install.md](docs/install.md).
+Open `http://localhost:8080` unless `APP_PORT` was changed.
 
 ## Operations
 
