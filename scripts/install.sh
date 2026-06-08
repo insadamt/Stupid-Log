@@ -2,7 +2,7 @@
 
 set -eu
 
-DEFAULT_VERSION="1.0.0"
+DEFAULT_VERSION="1.0.1"
 DEFAULT_PORT="8080"
 DEFAULT_BIND_ADDRESS="127.0.0.1"
 DEFAULT_INSTALL_DIR="${HOME}/stupid-log"
@@ -25,7 +25,7 @@ Usage:
 
 Options:
   --dir <path>       Install directory (default: $HOME/stupid-log)
-  --version <value>  Image and application version (default: 1.0.0)
+  --version <value>  Image and application version (default: 1.0.1)
   --port <port>      Host port (default: 8080)
   --bind <address>   Host bind address (default: 127.0.0.1)
   --no-open          Do not open a browser
@@ -149,7 +149,7 @@ print_security_warning()
     cat <<'EOF'
 
 WARNING:
-Stupid Log v1.0.0 is single-user and trusted LAN/VPN only.
+Stupid Log v1 is single-user and trusted LAN/VPN only.
 It must not be exposed directly to the public internet.
 EOF
 
@@ -272,6 +272,8 @@ resolve_database_password()
 write_environment_file()
 {
     ENV_FILE="${INSTALL_DIR}/.env.production"
+    existing_install=true
+    [ -f "$ENV_FILE" ] || [ -f "${INSTALL_DIR}/compose.production.yml" ] || existing_install=false
     umask 077
 
     if [ ! -f "$ENV_FILE" ]; then
@@ -286,10 +288,15 @@ write_environment_file()
     fi
 
     resolve_database_password
+    COMPOSE_PROJECT_NAME="$(read_environment_value COMPOSE_PROJECT_NAME)"
+    if [ -z "$COMPOSE_PROJECT_NAME" ]; then
+        [ "$existing_install" = true ] && COMPOSE_PROJECT_NAME=stupid-log || COMPOSE_PROJECT_NAME="stupid-log-${PORT}"
+    fi
 
     set_environment_value APP_NAME '"Stupid Log"'
     set_environment_value APP_VERSION "$VERSION"
     set_environment_value STUPID_LOG_IMAGE_VERSION "$VERSION"
+    set_environment_value COMPOSE_PROJECT_NAME "$COMPOSE_PROJECT_NAME"
     set_environment_value APP_KEY "$APP_KEY"
     set_environment_value APP_URL "$(application_url)"
     set_environment_value APP_PORT "$PORT"
@@ -321,10 +328,8 @@ write_compose_file()
     COMPOSE_FILE="${INSTALL_DIR}/compose.production.yml"
 
     cat >"$COMPOSE_FILE" <<'COMPOSE'
-name: stupid-log
-
 x-app: &app
-  image: ghcr.io/insadamt/stupid-log:${STUPID_LOG_IMAGE_VERSION:-1.0.0}
+  image: ghcr.io/insadamt/stupid-log:${STUPID_LOG_IMAGE_VERSION:-1.0.1}
   restart: unless-stopped
   env_file:
     - .env.production

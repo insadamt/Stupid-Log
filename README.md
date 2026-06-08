@@ -2,7 +2,7 @@
 
 Stupid Log is a self-hosted game library and play-history tracker. It records ownership, progress, achievements, DLCs, subscriptions, in-app purchases, yearly snapshots, and financial totals without requiring a cloud account.
 
-## v1.0.0 Scope
+## v1 Scope
 
 - Local single-user setup
 - Manual, IGDB, and public Steam metadata workflows
@@ -15,7 +15,7 @@ Steam search and enrichment use public endpoints and do not require a Steam API 
 
 ## Security Boundary
 
-Stupid Log v1.0.0 is intended for trusted LAN or VPN access only. Do not expose it directly to the public internet. See [SECURITY.md](SECURITY.md) for the supported deployment boundary and vulnerability reporting process.
+Stupid Log v1 is intended for trusted LAN or VPN access only. Do not expose it directly to the public internet. See [SECURITY.md](SECURITY.md) for the supported deployment boundary and vulnerability reporting process.
 
 ## Install
 
@@ -24,15 +24,15 @@ Stupid Log v1.0.0 is intended for trusted LAN or VPN access only. Do not expose 
 With Docker Engine and Docker Compose v2 already installed:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.0/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh | bash
 ```
 
-The installer creates `~/stupid-log`, generates the application key and database password, starts the published `ghcr.io/insadamt/stupid-log:1.0.0` image, waits for the health check, and opens `http://127.0.0.1:8080`.
+The installer creates `~/stupid-log`, generates the application key and database password, starts the published `ghcr.io/insadamt/stupid-log:1.0.1` image, waits for the health check, and opens `http://127.0.0.1:8080`.
 
 To review the installer before running it:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.0/scripts/install.sh
+curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh
 less install.sh
 bash install.sh
 ```
@@ -45,8 +45,8 @@ The repository's `compose.production.yml` is the transparent source-build fallba
 
 ```bash
 cp .env.production.example .env.production
-docker build -t stupid-log:1.0.0 .
-docker run --rm --entrypoint php stupid-log:1.0.0 artisan key:generate --show
+docker build -t stupid-log:1.0.1 .
+docker run --rm --entrypoint php stupid-log:1.0.1 artisan key:generate --show
 ```
 
 Put the generated key in `.env.production`, replace both database password placeholders with the same strong value, then start the stack:

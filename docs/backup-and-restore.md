@@ -47,11 +47,18 @@ docker compose --env-file .env.production -f compose.production.yml exec -T data
 
 ## Media Snapshot
 
+Read the installation's persisted Compose project name:
+
+```bash
+project_name="$(sed -n 's/^COMPOSE_PROJECT_NAME=//p' .env.production)"
+[ -n "$project_name" ] || project_name=stupid-log
+```
+
 Back up the named media volume:
 
 ```bash
 docker run --rm \
-  -v stupid-log_app-storage:/data:ro \
+  -v "${project_name}_app-storage:/data:ro" \
   -v "$PWD/backups":/backup \
   alpine tar -czf /backup/stupid-log-media.tar.gz -C /data .
 ```
@@ -61,7 +68,7 @@ Restore it only while the app and scheduler are stopped:
 ```bash
 docker compose --env-file .env.production -f compose.production.yml stop app scheduler
 docker run --rm \
-  -v stupid-log_app-storage:/data \
+  -v "${project_name}_app-storage:/data" \
   -v "$PWD/backups":/backup:ro \
   alpine sh -c 'find /data -mindepth 1 -delete && tar -xzf /backup/stupid-log-media.tar.gz -C /data'
 ```

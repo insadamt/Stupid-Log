@@ -48,6 +48,9 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      - name: Run installer tests
+        run: sh tests/Installer/InstallProjectIsolationTest.sh
+
       - name: Run backend test suite
         run: composer test
 

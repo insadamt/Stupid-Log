@@ -2,6 +2,13 @@
 
 All notable changes to Stupid Log are documented here. The project follows semantic versioning.
 
+## [1.0.1] - 2026-06-08
+
+### Fixed
+
+- Isolated new installer deployments with a persistent Compose project name derived from the selected port.
+- Preserved the legacy `stupid-log` project name when upgrading v1.0.0 installations so existing database and media volumes remain attached.
+
 ## [1.0.0] - 2026-06-08
 
 ### Added
@@ -23,4 +30,5 @@ All notable changes to Stupid Log are documented here. The project follows seman
 
 - Stupid Log v1.0.0 is licensed under GPL-3.0.
 
+[1.0.1]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.0.1
 [1.0.0]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.0.0

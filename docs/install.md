@@ -7,14 +7,14 @@
 - A trusted LAN or private VPN
 - Persistent local storage for PostgreSQL and uploaded media
 
-Stupid Log v1.0.0 must not be exposed directly to the public internet.
+Stupid Log v1 must not be exposed directly to the public internet.
 
 ## One-command Install
 
 The installer uses the published container image and does not require Git, a local image build, or manual environment-file creation:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.0/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh | bash
 ```
 
 By default, it installs into `~/stupid-log`, binds only to `127.0.0.1`, and opens `http://127.0.0.1:8080` after the health check succeeds.
@@ -22,7 +22,7 @@ By default, it installs into `~/stupid-log`, binds only to `127.0.0.1`, and open
 Review the script first when installing on a machine you administer:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.0/scripts/install.sh
+curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh
 less install.sh
 bash install.sh
 ```
@@ -40,7 +40,7 @@ bash install.sh --port 8081
 Use another directory or image version:
 
 ```bash
-bash install.sh --dir /srv/stupid-log --version 1.0.0
+bash install.sh --dir /srv/stupid-log --version 1.0.1
 ```
 
 Bind to a trusted LAN address:
@@ -73,12 +73,12 @@ docker compose --env-file .env.production -f compose.production.yml down
 Export a portable backup from **Settings > Data & Recovery** before updating. Then download the installer for the intended release and run it with the new version:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.0/scripts/install.sh
+curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh
 less install.sh
-bash install.sh --dir "$HOME/stupid-log" --version 1.0.0
+bash install.sh --dir "$HOME/stupid-log" --version 1.0.1
 ```
 
-The installer preserves existing secrets and data, updates the image version, and safely runs `docker compose up -d`. Do not replace or regenerate `.env.production` during an update.
+The installer preserves existing secrets, data, and Compose project identity while updating the image version. A v1.0.0 installation keeps the legacy `stupid-log` project name so its existing volumes remain attached. Do not replace or regenerate `.env.production` during an update.
 
 ## Uninstall
 
@@ -105,8 +105,8 @@ The repository's production Compose file provides a source-build fallback.
 
 ```bash
 cp .env.production.example .env.production
-docker build -t stupid-log:1.0.0 .
-docker run --rm --entrypoint php stupid-log:1.0.0 artisan key:generate --show
+docker build -t stupid-log:1.0.1 .
+docker run --rm --entrypoint php stupid-log:1.0.1 artisan key:generate --show
 ```
 
 Edit `.env.production`:
@@ -145,7 +145,9 @@ docker compose --env-file .env.production -f compose.production.yml restart
 
 ### Persistent Data
 
-- `stupid-log_postgres-data`: PostgreSQL data
-- `stupid-log_app-storage`: uploaded covers and application media
+- `<project>_postgres-data`: PostgreSQL data
+- `<project>_app-storage`: uploaded covers and application media
+
+New installer deployments use `stupid-log-<port>` as the project name. Upgraded v1.0.0 installations retain `stupid-log`.
 
 Do not run `docker compose down --volumes` on an installation containing data unless a verified backup exists and deletion is intentional.
