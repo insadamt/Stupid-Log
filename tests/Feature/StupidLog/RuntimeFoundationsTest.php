@@ -20,12 +20,12 @@ class RuntimeFoundationsTest extends TestCase
     {
         $this->seed(StupidLogReferenceSeeder::class);
 
-        $this->assertSame('1.0.0', config('app.version'));
+        $this->assertSame('1.0.2', config('app.version'));
         $this->get('/setup')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Setup', false)
-                ->where('appVersion', '1.0.0'));
+                ->where('appVersion', '1.0.2'));
     }
 
     public function test_completed_installation_cannot_reopen_or_submit_setup(): void

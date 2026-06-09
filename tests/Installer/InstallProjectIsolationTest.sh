@@ -35,7 +35,7 @@ run_installer()
     sh "${ROOT_DIR}/scripts/install.sh" \
         --dir "$install_dir" \
         --port "$port" \
-        --version 1.0.1 \
+        --version 1.0.2 \
         --no-open \
         --yes >/dev/null
 }

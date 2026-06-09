@@ -2,7 +2,7 @@
 
 set -eu
 
-DEFAULT_VERSION="1.0.1"
+DEFAULT_VERSION="1.0.2"
 DEFAULT_PORT="8080"
 DEFAULT_BIND_ADDRESS="127.0.0.1"
 DEFAULT_INSTALL_DIR="${HOME}/stupid-log"
@@ -25,7 +25,7 @@ Usage:
 
 Options:
   --dir <path>       Install directory (default: $HOME/stupid-log)
-  --version <value>  Image and application version (default: 1.0.1)
+  --version <value>  Image and application version (default: 1.0.2)
   --port <port>      Host port (default: 8080)
   --bind <address>   Host bind address (default: 127.0.0.1)
   --no-open          Do not open a browser
@@ -329,7 +329,7 @@ write_compose_file()
 
     cat >"$COMPOSE_FILE" <<'COMPOSE'
 x-app: &app
-  image: ghcr.io/insadamt/stupid-log:${STUPID_LOG_IMAGE_VERSION:-1.0.1}
+  image: ghcr.io/insadamt/stupid-log:${STUPID_LOG_IMAGE_VERSION:-1.0.2}
   restart: unless-stopped
   env_file:
     - .env.production
