@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-1.0.1-B7FF63?style=for-the-badge&labelColor=000000" alt="Release 1.0.1">
+  <img src="https://img.shields.io/badge/release-1.0.2-B7FF63?style=for-the-badge&labelColor=000000" alt="Release 1.0.2">
   <img src="https://img.shields.io/badge/self--hosted-Docker-B7FF63?style=for-the-badge&labelColor=000000" alt="Self-hosted Docker">
   <img src="https://img.shields.io/badge/license-GPL--3.0--only-B7FF63?style=for-the-badge&labelColor=000000" alt="GPL-3.0-only license">
 </p>
@@ -55,18 +55,12 @@ Requirements:
 Install the published release:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh | bash
-```
-
-By default, the installer creates `~/stupid-log`, binds the app to `127.0.0.1:8080`, starts the published Docker image, waits for the health check, and opens the app.
-
-Review the installer before running it:
-
-```bash
-curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh
+curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.2/scripts/install.sh
 less install.sh
 bash install.sh
 ```
+
+By default, the installer creates `~/stupid-log`, binds the app to `127.0.0.1:8080`, starts the published Docker image, waits for the health check, and opens the app.
 
 Custom port example:
 
@@ -82,8 +76,8 @@ Export a portable backup from **Settings > Data & Recovery** before updating.
 
 ```bash
 cd ~/stupid-log
-curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.1/scripts/install.sh
-bash install.sh --dir "$HOME/stupid-log" --version 1.0.1
+curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.2/scripts/install.sh
+bash install.sh --dir "$HOME/stupid-log" --version 1.0.2
 ```
 
 Do not delete or regenerate `.env.production` during an update. See [docs/upgrade.md](docs/upgrade.md) for the full upgrade checklist.
