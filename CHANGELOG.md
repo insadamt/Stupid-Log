@@ -2,6 +2,20 @@
 
 All notable changes to Stupid Log are documented here. The project follows semantic versioning.
 
+## [1.0.2] - 2026-06-09
+
+### Added
+
+- Added cover editing from the game details page.
+- Added first played date and last played date editing from the game details page.
+- Added first played and last played dates to the game details view.
+
+### Fixed
+
+- Fixed the missing edit path for game covers after library creation.
+- Fixed the missing edit path for first played and last played dates after library creation.
+- Added validation so the last played date cannot be earlier than the first played date.
+
 ## [1.0.1] - 2026-06-08
 
 ### Fixed
@@ -30,5 +44,6 @@ All notable changes to Stupid Log are documented here. The project follows seman
 
 - Stupid Log v1.0.0 is licensed under GPL-3.0.
 
+[1.0.2]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.0.2
 [1.0.1]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.0.1
 [1.0.0]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.0.0
