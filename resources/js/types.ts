@@ -56,6 +56,8 @@ export type StatsData = {
 export type PlatformBreakdown = {
     platform_id: number | null;
     label: string;
+    color_key?: string | null;
+    color_hex?: string | null;
     library_games: number;
     completed: number;
     playtime_hours: number;
@@ -145,6 +147,8 @@ export type ReferenceData = {
     platforms: Array<{
         id: number;
         name: string;
+        color_key?: string | null;
+        color_hex?: string | null;
         devices: Array<{ id: number; name: string }>;
         ownership_types: Array<{ id: number; name: string; is_subscription?: boolean }>;
     }>;

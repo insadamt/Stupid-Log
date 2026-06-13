@@ -4,6 +4,8 @@ import { useStatsRevealDelay } from '../revealDelay';
 import { DonutArcLayout, DonutTweenSlice, Slice } from '../types';
 import { animationKey, clampPercent } from '../utils';
 
+const arcSeamOverlapDegrees = 0.35;
+
 function donutLayout(data: Slice[], order?: string[]): DonutArcLayout[] {
     const orderRank = new Map(order?.map((label, index) => [label, index]) ?? []);
     const orderedData = order
@@ -61,7 +63,7 @@ function donutArcPath(arc: DonutArcLayout, cx: number, cy: number, radius: numbe
     const span = Math.max(0, arc.end - arc.start);
     if (span <= 0.01) return '';
 
-    const endAngle = span >= 359.99 ? arc.start + 359.99 : arc.end;
+    const endAngle = span >= 359.99 ? arc.start + 359.99 : arc.end + arcSeamOverlapDegrees;
     const start = pointOnCircle(cx, cy, radius, arc.start);
     const end = pointOnCircle(cx, cy, radius, endAngle);
     const largeArcFlag = endAngle - arc.start > 180 ? 1 : 0;

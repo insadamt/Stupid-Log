@@ -3,6 +3,7 @@
 namespace Tests\Feature\StupidLog;
 
 use App\Models\StupidLog\ProviderCredential;
+use App\Models\StupidLog\Platform;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\StupidLogReferenceSeeder;
@@ -26,6 +27,29 @@ class RuntimeFoundationsTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Setup', false)
                 ->where('appVersion', '1.0.2'));
+    }
+
+    public function test_reference_seeder_assigns_stable_platform_colors_without_duplicates(): void
+    {
+        $this->seed(StupidLogReferenceSeeder::class);
+        $this->seed(StupidLogReferenceSeeder::class);
+
+        $this->assertSame(14, Platform::count());
+        $this->assertDatabaseHas('platforms', [
+            'name' => 'Steam',
+            'color_key' => 'steam_blue',
+            'color_hex' => '#61C7DF',
+        ]);
+        $this->assertDatabaseHas('platforms', [
+            'name' => 'Xbox',
+            'color_key' => 'xbox_green',
+            'color_hex' => '#9BE44D',
+        ]);
+        $this->assertDatabaseHas('platforms', [
+            'name' => 'Google Play Games',
+            'color_key' => 'google_play_green',
+            'color_hex' => '#B7D85C',
+        ]);
     }
 
     public function test_completed_installation_cannot_reopen_or_submit_setup(): void

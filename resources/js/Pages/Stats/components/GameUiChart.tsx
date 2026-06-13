@@ -118,7 +118,14 @@ export default function GameUiChart({ config }: { config: ChartConfig }) {
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <span className="flex min-w-0 items-center gap-3 text-sm font-black text-white/75">
-                                        {config.showPlatformIcons ? <PlatformIcon platform={slice.label} surface="dark" size="sm" /> : <span className="size-3 rounded-full" style={{ backgroundColor: slice.color }} />}
+                                        {config.showPlatformIcons ? (
+                                            <span className="flex shrink-0 items-center gap-2">
+                                                <PlatformIcon platform={slice.label} surface="dark" size="sm" />
+                                                <span className="size-3 rounded-full ring-2 ring-white/12" style={{ backgroundColor: slice.color }} />
+                                            </span>
+                                        ) : (
+                                            <span className="size-3 rounded-full" style={{ backgroundColor: slice.color }} />
+                                        )}
                                         <span className="truncate">{slice.label}</span>
                                     </span>
                                     <span className="text-sm font-black text-white/80">{percentLabel(percent)}</span>

@@ -31,8 +31,8 @@ class StupidLogReferenceSeeder extends Seeder
             Currency::updateOrCreate(['code' => $code], []);
         }
 
-        foreach ($this->platforms() as $name) {
-            Platform::updateOrCreate(['name' => $name], []);
+        foreach ($this->platforms() as $name => $colors) {
+            Platform::updateOrCreate(['name' => $name], $colors);
         }
 
         foreach ($this->ownershipTypes() as $name) {
@@ -60,7 +60,22 @@ class StupidLogReferenceSeeder extends Seeder
 
     private function platforms(): array
     {
-        return ['Steam', 'Epic Games', 'GOG', 'PS Network', 'Xbox', 'EA App', 'Ubisoft Connect', 'Google Play Games', 'Game Center', 'RetroAchievements', 'Itch.io', 'Nintendo', 'Own Launcher', 'Other'];
+        return [
+            'Steam' => ['color_key' => 'steam_blue', 'color_hex' => '#61C7DF'],
+            'Epic Games' => ['color_key' => 'epic_gray', 'color_hex' => '#DFC96B'],
+            'GOG' => ['color_key' => 'gog_purple', 'color_hex' => '#B28BCF'],
+            'PS Network' => ['color_key' => 'ps_blue', 'color_hex' => '#E86D78'],
+            'Xbox' => ['color_key' => 'xbox_green', 'color_hex' => '#9BE44D'],
+            'EA App' => ['color_key' => 'ea_red', 'color_hex' => '#A382DB'],
+            'Ubisoft Connect' => ['color_key' => 'ubisoft_cyan', 'color_hex' => '#5CC193'],
+            'Google Play Games' => ['color_key' => 'google_play_green', 'color_hex' => '#B7D85C'],
+            'Game Center' => ['color_key' => 'game_center_pink', 'color_hex' => '#D98DB8'],
+            'RetroAchievements' => ['color_key' => 'retro_gold', 'color_hex' => '#E7B75C'],
+            'Itch.io' => ['color_key' => 'itch_red', 'color_hex' => '#E98672'],
+            'Nintendo' => ['color_key' => 'nintendo_red', 'color_hex' => '#D95F67'],
+            'Own Launcher' => ['color_key' => 'own_lime', 'color_hex' => '#B7FF63'],
+            'Other' => ['color_key' => 'other_slate', 'color_hex' => '#CED8D2'],
+        ];
     }
 
     private function statuses(): array

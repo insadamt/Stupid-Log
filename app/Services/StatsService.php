@@ -524,8 +524,8 @@ class StatsService
             ->join('platforms', 'platforms.id', '=', 'library_games.platform_id')
             ->join('statuses', 'statuses.id', '=', 'library_games.status_id')
             ->where('library_games.user_id', $user->id)
-            ->groupBy('platforms.id', 'platforms.name')
-            ->selectRaw('platforms.id, platforms.name as label, count(*) as library_games, sum(library_games.playtime_hours) as playtime_hours, sum(coalesce(library_games.earned_achievements, 0)) as earned_achievements, sum(coalesce(games.total_achievements, 0)) as total_achievements')
+            ->groupBy('platforms.id', 'platforms.name', 'platforms.color_key', 'platforms.color_hex')
+            ->selectRaw('platforms.id, platforms.name as label, platforms.color_key, platforms.color_hex, count(*) as library_games, sum(library_games.playtime_hours) as playtime_hours, sum(coalesce(library_games.earned_achievements, 0)) as earned_achievements, sum(coalesce(games.total_achievements, 0)) as total_achievements')
             ->selectRaw("sum(case when statuses.name in ('Completed', '100%') then 1 else 0 end) as completed")
             ->get()
             ->keyBy('id');
@@ -572,6 +572,8 @@ class StatsService
                 return [
                     'platform_id' => (int) $row->id,
                     'label' => $row->label,
+                    'color_key' => $row->color_key,
+                    'color_hex' => $row->color_hex,
                     'library_games' => (int) $row->library_games,
                     'completed' => (int) $row->completed,
                     'playtime_hours' => round((float) $row->playtime_hours, 1),
@@ -691,8 +693,8 @@ class StatsService
             ->join('platforms', 'platforms.id', '=', 'library_game_snapshots.platform_id')
             ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
             ->where('snapshot_run_id', $snapshot->id)
-            ->groupBy('platforms.id', 'platforms.name')
-            ->selectRaw('platforms.id, platforms.name as label, count(*) as library_games, sum(playtime_hours) as playtime_hours, sum(earned_achievements) as earned_achievements, sum(total_achievements) as total_achievements')
+            ->groupBy('platforms.id', 'platforms.name', 'platforms.color_key', 'platforms.color_hex')
+            ->selectRaw('platforms.id, platforms.name as label, platforms.color_key, platforms.color_hex, count(*) as library_games, sum(playtime_hours) as playtime_hours, sum(earned_achievements) as earned_achievements, sum(total_achievements) as total_achievements')
             ->selectRaw("sum(case when statuses.name in ('Completed', '100%') then 1 else 0 end) as completed")
             ->get()
             ->keyBy('id');
@@ -744,6 +746,8 @@ class StatsService
                 return [
                     'platform_id' => (int) $row->id,
                     'label' => $row->label,
+                    'color_key' => $row->color_key,
+                    'color_hex' => $row->color_hex,
                     'library_games' => (int) $row->library_games,
                     'completed' => (int) $row->completed,
                     'playtime_hours' => round((float) $row->playtime_hours, 1),
