@@ -145,7 +145,6 @@ function injectAddGameWizardUxStyles() {
         }
 
         .sl-card-hover .sl-card-panel {
-            border-radius: 26px !important;
             border: 1px solid rgb(255 255 255 / 0.08) !important;
             background:
                 radial-gradient(circle at 18% 0%, rgb(183 255 99 / 0.12), transparent 28%),
@@ -154,6 +153,14 @@ function injectAddGameWizardUxStyles() {
                 0 26px 56px rgb(0 0 0 / 0.34),
                 inset 0 0 0 1px rgb(255 255 255 / 0.06) !important;
             transition-delay: 120ms !important;
+        }
+
+        .sl-card-hover.sl-panel-right .sl-card-panel {
+            border-radius: 0 26px 26px 0 !important;
+        }
+
+        .sl-card-hover.sl-panel-left .sl-card-panel {
+            border-radius: 26px 0 0 26px !important;
         }
 
         .sl-card-hover:hover .sl-card-panel,

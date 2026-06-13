@@ -3,6 +3,8 @@ import { useStaggerRefresh } from '../../../animation';
 import GameCard from '../../../Components/GameCard';
 import { GameCardData } from '../../../types';
 
+const cardPanelExitDuration = 300;
+
 export default function VirtualCardGrid({
     items,
     columns,
@@ -22,8 +24,10 @@ export default function VirtualCardGrid({
 }) {
     const ref = useRef<HTMLDivElement>(null);
     const gridRef = useRef<HTMLDivElement>(null);
+    const clearActiveGameTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [scrollTop, setScrollTop] = useState(0);
     const [viewportHeight, setViewportHeight] = useState(0);
+    const [activeGameId, setActiveGameId] = useState<number | null>(null);
     const cardWidth = 200;
     const rowHeight = 355;
     const gapX = 24;
@@ -47,6 +51,34 @@ export default function VirtualCardGrid({
 
         return () => resizeObserver.disconnect();
     }, []);
+
+    useEffect(() => {
+        return () => {
+            if (clearActiveGameTimeoutRef.current) {
+                clearTimeout(clearActiveGameTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    function activateGame(gameId: number) {
+        if (clearActiveGameTimeoutRef.current) {
+            clearTimeout(clearActiveGameTimeoutRef.current);
+            clearActiveGameTimeoutRef.current = null;
+        }
+
+        setActiveGameId(gameId);
+    }
+
+    function scheduleActiveGameClear(gameId: number) {
+        if (clearActiveGameTimeoutRef.current) {
+            clearTimeout(clearActiveGameTimeoutRef.current);
+        }
+
+        clearActiveGameTimeoutRef.current = setTimeout(() => {
+            setActiveGameId((currentGameId) => (currentGameId === gameId ? null : currentGameId));
+            clearActiveGameTimeoutRef.current = null;
+        }, cardPanelExitDuration);
+    }
 
     function handleScroll(event: UIEvent<HTMLDivElement>) {
         const node = event.currentTarget;
@@ -73,12 +105,21 @@ export default function VirtualCardGrid({
                         <div
                             key={game.id}
                             data-refresh-item={game.id}
-                            className="absolute"
+                            className="absolute overflow-visible"
+                            onMouseEnter={() => activateGame(game.id)}
+                            onMouseLeave={() => scheduleActiveGameClear(game.id)}
+                            onFocusCapture={() => activateGame(game.id)}
+                            onBlurCapture={(event) => {
+                                if (!event.currentTarget.contains(event.relatedTarget)) {
+                                    scheduleActiveGameClear(game.id);
+                                }
+                            }}
                             style={{
                                 left: column * (cardWidth + gapX),
                                 top: row * rowHeight,
                                 width: cardWidth,
                                 height: 335,
+                                zIndex: activeGameId === game.id ? 50 : undefined,
                             }}
                         >
                             <GameCard game={game} compact panelSide={column === columns - 1 ? 'left' : 'right'} />
