@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { PlatformBreakdown, StatusBreakdown } from '../../../types';
 import { Switch } from '../components/Controls';
 import GameUiChart from '../components/GameUiChart';
-import { ChartConfig, StatView } from '../types';
+import { ChartConfig, StatsComparison, StatView } from '../types';
 import { growth, hours, metricGrowth, money, n, num, slices } from '../utils';
 
-export default function Breakdowns({ stats, previous }: { stats: StatView; previous?: StatView | null }) {
+export default function Breakdowns({ stats, previous, comparison }: { stats: StatView; previous?: StatView | null; comparison: StatsComparison }) {
     const [chart, setChart] = useState<'games' | 'playtime' | 'achievements' | 'value'>('achievements');
     const [gamesMode, setGamesMode] = useState<'platform' | 'status'>('platform');
     const [achievementMode, setAchievementMode] = useState<'earned' | 'total'>('earned');
@@ -14,10 +14,11 @@ export default function Breakdowns({ stats, previous }: { stats: StatView; previ
     const [includeSubscriptions, setIncludeSubscriptions] = useState(true);
     const [includeInAppPurchases, setIncludeInAppPurchases] = useState(true);
 
+    const baseline = comparison.hasPrevious ? previous : null;
     const platforms = stats.breakdowns.platforms;
-    const prevPlatforms = previous?.breakdowns.platforms ?? [];
+    const prevPlatforms = baseline?.breakdowns.platforms ?? [];
     const statuses = stats.breakdowns.statuses;
-    const prevStatuses = previous?.breakdowns.statuses ?? [];
+    const prevStatuses = baseline?.breakdowns.statuses ?? [];
 
     const platformBaseValue = (item: PlatformBreakdown) => {
         if (item.copy_base_value !== undefined || item.dlc_base_value !== undefined) {
@@ -67,19 +68,19 @@ export default function Breakdowns({ stats, previous }: { stats: StatView; previ
     const chartConfig: ChartConfig = (() => {
         if (chart === 'games') {
             const data = gamesMode === 'platform' ? slices<PlatformBreakdown>(platforms, (item) => item.library_games, prevPlatforms) : slices<StatusBreakdown>(statuses, (item) => item.library_games, prevStatuses);
-            return { title: 'Total Games', eyebrow: gamesMode === 'platform' ? 'By platform' : 'By status', data, total: num(stats.library_games), center: 'games', delta: metricGrowth('library_games', stats, previous), format: (value: number) => num(value), showPlatformIcons: gamesMode === 'platform' };
+            return { title: 'Total Games', eyebrow: gamesMode === 'platform' ? 'By platform' : 'By status', data, total: num(stats.library_games), center: 'games', delta: metricGrowth('library_games', stats, baseline), format: (value: number) => num(value), showPlatformIcons: gamesMode === 'platform' };
         }
         if (chart === 'playtime') {
-            return { title: 'Playtime Pool', eyebrow: 'Only by platform', data: slices<PlatformBreakdown>(platforms, (item) => item.playtime_hours, prevPlatforms), total: hours(stats.playtime_hours), center: 'hours played', delta: metricGrowth('playtime_hours', stats, previous), format: hours, showPlatformIcons: true };
+            return { title: 'Playtime Pool', eyebrow: 'Only by platform', data: slices<PlatformBreakdown>(platforms, (item) => item.playtime_hours, prevPlatforms), total: hours(stats.playtime_hours), center: 'hours played', delta: metricGrowth('playtime_hours', stats, baseline), format: hours, showPlatformIcons: true };
         }
         if (chart === 'achievements') {
             const key = achievementMode === 'total' ? 'total_achievements' : 'earned_achievements';
-            return { title: 'Achievement Pool', eyebrow: `Only by platform · ${achievementMode}`, data: slices<PlatformBreakdown>(platforms, (item) => n(item[key]), prevPlatforms), total: num(achievementMode === 'total' ? stats.total_achievements : stats.earned_achievements), center: achievementMode === 'total' ? 'available achievements' : 'earned achievements', delta: metricGrowth(achievementMode === 'total' ? 'total_achievements' : 'earned_achievements', stats, previous), format: (value: number) => num(value), showPlatformIcons: true };
+            return { title: 'Achievement Pool', eyebrow: `Only by platform · ${achievementMode}`, data: slices<PlatformBreakdown>(platforms, (item) => n(item[key]), prevPlatforms), total: num(achievementMode === 'total' ? stats.total_achievements : stats.earned_achievements), center: achievementMode === 'total' ? 'available achievements' : 'earned achievements', delta: metricGrowth(achievementMode === 'total' ? 'total_achievements' : 'earned_achievements', stats, baseline), format: (value: number) => num(value), showPlatformIcons: true };
         }
         const data = slices<PlatformBreakdown>(platforms, valueGetter, prevPlatforms);
         const total = data.reduce((sum, item) => sum + item.value, 0);
         const prevTotal = prevPlatforms.reduce((sum, item) => sum + valueGetter(item), 0);
-        return { title: 'Library Value', eyebrow: `Only by platform · ${valueMode}`, data, total: money(total), center: valueCenterLabel(), delta: previous ? growth(total, prevTotal) : null, format: money, showPlatformIcons: true };
+        return { title: 'Library Value', eyebrow: `Only by platform · ${valueMode}`, data, total: money(total), center: valueCenterLabel(), delta: baseline ? growth(total, prevTotal) : null, format: money, showPlatformIcons: true };
     })();
 
     return (

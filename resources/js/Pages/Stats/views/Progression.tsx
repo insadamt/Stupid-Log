@@ -4,7 +4,7 @@ import { PlatformBreakdown } from '../../../types';
 import { DeltaBadge, PercentDeltaBadge } from '../components/Badges';
 import { Empty } from '../components/Controls';
 import { ProgressBar, StackedProgressBar } from '../components/Progress';
-import { StatView } from '../types';
+import { StatsComparison, StatView } from '../types';
 import { growth, metricGrowth, num } from '../utils';
 
 function StatusStack({ platform, previous }: { platform: PlatformBreakdown; previous?: PlatformBreakdown }) {
@@ -46,13 +46,14 @@ function StatusStack({ platform, previous }: { platform: PlatformBreakdown; prev
     );
 }
 
-export default function Progression({ stats, previous }: { stats: StatView; previous?: StatView | null }) {
+export default function Progression({ stats, previous, comparison }: { stats: StatView; previous?: StatView | null; comparison: StatsComparison }) {
+    const baseline = comparison.hasPrevious ? previous : null;
     const platforms = [...stats.breakdowns.platforms];
     const achievementPlatforms = [...platforms]
         .filter((platform) => platform.total_achievements > 0)
         .sort((a, b) => b.achievement_progress - a.achievement_progress || b.earned_achievements - a.earned_achievements);
     const statusPlatforms = [...platforms].sort((a, b) => b.library_games - a.library_games);
-    const prevPlatforms = previous?.breakdowns.platforms ?? [];
+    const prevPlatforms = baseline?.breakdowns.platforms ?? [];
 
     return (
         <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[0.9fr_1.1fr]">
@@ -63,7 +64,7 @@ export default function Progression({ stats, previous }: { stats: StatView; prev
                         <h2 className="text-4xl font-black leading-none">Platform Progress</h2>
                         <div className="text-right">
                             <div className="text-4xl font-black text-[#b7ff63]">{num(stats.achievement_progress, 1)}%</div>
-                            <PercentDeltaBadge value={metricGrowth('achievement_progress', stats, previous)} compact />
+                            <PercentDeltaBadge value={metricGrowth('achievement_progress', stats, baseline)} compact />
                         </div>
                     </div>
                     <div className="mt-4"><ProgressBar value={stats.achievement_progress} large tone="dark" /></div>

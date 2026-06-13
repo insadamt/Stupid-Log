@@ -6,7 +6,7 @@ import { ConfirmedYearStats, StatsData } from '../../types';
 import { SlideNav } from './components/Controls';
 import { statsRevealAfterTabDelay, statsTabTransitionDuration, tabs } from './constants';
 import { StatsRevealDelayContext } from './revealDelay';
-import { StatView, TabKey } from './types';
+import { StatsComparison, StatView, TabKey } from './types';
 import ArchivePanel from './views/ArchivePanel';
 import BestGames from './views/BestGames';
 import Breakdowns from './views/Breakdowns';
@@ -30,6 +30,25 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
     const headerSnapshot = bestGamesMode ? selectedBestGamesYear : selectedYear;
     const current: StatView = selectedYear ?? stats;
     const previous: StatView | null = selectedYear ? previousYear : latestYear;
+    const comparison: StatsComparison = selectedYear
+        ? {
+            currentLabel: `${selectedYear.year} confirmed snapshot`,
+            previousLabel: previousYear ? `${previousYear.year} confirmed snapshot` : null,
+            mode: 'year',
+            hasPrevious: previousYear !== null,
+            contextLabel: previousYear
+                ? `Compared with ${previousYear.year} confirmed snapshot`
+                : 'No previous snapshot available for comparison',
+        }
+        : {
+            currentLabel: 'All-Time live stats',
+            previousLabel: latestYear ? `${latestYear.year} confirmed snapshot` : null,
+            mode: 'all-time',
+            hasPrevious: latestYear !== null,
+            contextLabel: latestYear
+                ? `Compared with latest confirmed snapshot: ${latestYear.year}`
+                : 'No previous snapshot available for comparison',
+        };
     const displayedYear = bestGamesMode ? selectedBestGamesYear?.year ?? null : selectedYear?.year ?? latestYear?.year ?? null;
     const yearIndex = displayedYear ? yearsAsc.findIndex((year) => year.year === displayedYear) : -1;
 
@@ -124,14 +143,14 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
     };
 
     const panel = active === 'overview'
-        ? <Overview stats={current} previous={previous} selectedYear={selectedYear} />
+        ? <Overview stats={current} previous={previous} selectedYear={selectedYear} comparison={comparison} />
         : active === 'breakdowns'
-            ? <Breakdowns stats={current} previous={previous} />
+            ? <Breakdowns stats={current} previous={previous} comparison={comparison} />
             : active === 'progression'
-                ? <Progression stats={current} previous={previous} />
+                ? <Progression stats={current} previous={previous} comparison={comparison} />
                 : active === 'best-games'
                     ? <BestGames year={selectedBestGamesYear} />
-                    : <ArchivePanel stats={current} />;
+                    : <ArchivePanel stats={current} comparison={comparison} />;
     const panelRevealDelay = pendingTabTransition.current ? statsRevealAfterTabDelay : 0;
     const panelKey = [
         active,
@@ -147,7 +166,10 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                     <header className="rounded-[34px] bg-black px-6 py-5 text-white shadow-[0_24px_80px_rgb(0_0_0/0.20)]">
                         <div className="grid h-full gap-5 xl:grid-cols-[1fr_auto] xl:items-center">
                             <div className="min-w-0">
-                                <div className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]/70">{headerSnapshot ? `${headerSnapshot.year} confirmed snapshot` : 'All-time live profile'}</div>
+                                <div className="truncate text-[11px] font-black uppercase tracking-[0.2em] text-[#b7ff63]/70">
+                                    {bestGamesMode ? (headerSnapshot ? `${headerSnapshot.year} confirmed snapshot` : 'No confirmed snapshots') : comparison.currentLabel}
+                                    {!bestGamesMode && <span className="text-white/45"> · {comparison.contextLabel}</span>}
+                                </div>
                                 <div className="mt-1 flex items-end gap-4">
                                     <h1 className="text-6xl font-black leading-none tracking-[-0.06em]">Stats</h1>
                                     <p className="mb-2 hidden max-w-2xl truncate text-sm font-bold text-white/38 xl:block">Fixed screen modules. Data overflow stays inside game-style containers.</p>

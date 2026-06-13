@@ -2,7 +2,7 @@ import PlatformIcon from '../../../Components/PlatformIcon';
 import { statusPillStyle } from '../../../statusColors';
 import { StatsArchiveGame } from '../../../types';
 import { Empty } from '../components/Controls';
-import { StatView } from '../types';
+import { StatsComparison, StatView } from '../types';
 import { hours, money } from '../utils';
 
 function ArchiveList({ title, sub, games, metric }: { title: string; sub: string; games: StatsArchiveGame[]; metric: 'playtime' | 'base' | 'paid' }) {
@@ -41,9 +41,9 @@ function ArchiveList({ title, sub, games, metric }: { title: string; sub: string
     );
 }
 
-export default function ArchivePanel({ stats }: { stats: StatView }) {
+export default function ArchivePanel({ stats, comparison }: { stats: StatView; comparison: StatsComparison }) {
     return (
-        <div className="grid h-full min-h-0 gap-4 xl:grid-cols-3">
+        <div className="grid h-full min-h-0 gap-4 xl:grid-cols-3" role="region" aria-label={`Game archive. ${comparison.contextLabel}`}>
             <ArchiveList title="Most Played" sub="Playtime record" games={stats.archive?.most_played ?? []} metric="playtime" />
             <ArchiveList title="Biggest Base Price" sub="Base value record" games={stats.archive?.biggest_base_price ?? []} metric="base" />
             <ArchiveList title="Biggest Paid Price" sub="Paid value record" games={stats.archive?.biggest_paid_price ?? []} metric="paid" />

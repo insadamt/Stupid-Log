@@ -35,7 +35,9 @@ export function growth(current: number, previous: number): GrowthMetric {
 }
 
 export function metricGrowth(key: MetricKey, current: StatView, previous?: StatView | null) {
-    return current.growth?.[key] ?? (previous ? growth(n(current[key]), n(previous[key])) : null);
+    if (!previous) return null;
+
+    return current.growth?.[key] ?? growth(n(current[key]), n(previous[key]));
 }
 
 export function slices<T extends { label: string; color_hex?: string | null }>(items: T[], getter: (item: T) => number, previousItems: T[] = []): Slice[] {
