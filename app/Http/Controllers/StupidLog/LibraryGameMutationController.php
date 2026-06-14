@@ -47,15 +47,7 @@ class LibraryGameMutationController extends Controller
     {
         $libraryGame->load('game');
 
-        $validated = $request->validate([
-            'game' => ['required', 'array'],
-            'game.title' => ['required', 'string', 'max:255'],
-            'game.publisher' => ['nullable', 'string', 'max:255'],
-            'game.description' => ['nullable', 'string'],
-            'game.cover_path' => ['nullable', 'string', 'max:2048'],
-            'game.base_price_default' => ['nullable', 'numeric', 'min:0'],
-            'game.total_achievements' => ['nullable', 'integer', 'min:0'],
-
+        $rules = [
             'progress' => ['required', 'array'],
             'progress.status_id' => ['required', 'integer', 'exists:statuses,id'],
             'progress.playtime_hours' => ['nullable', 'numeric', 'min:0', 'max:999999.9'],
@@ -63,10 +55,28 @@ class LibraryGameMutationController extends Controller
             'progress.first_played_at' => ['nullable', 'date'],
             'progress.last_played_at' => ['nullable', 'date', 'after_or_equal:progress.first_played_at'],
             'progress.completed_at' => ['nullable', 'date'],
-        ]);
+        ];
+
+        if ($request->has('game')) {
+            $rules = [
+                'game' => ['required', 'array'],
+                'game.title' => ['required', 'string', 'max:255'],
+                'game.publisher' => ['nullable', 'string', 'max:255'],
+                'game.description' => ['nullable', 'string'],
+                'game.cover_path' => ['nullable', 'string', 'max:2048'],
+                'game.base_price_default' => ['nullable', 'numeric', 'min:0'],
+                'game.total_achievements' => ['nullable', 'integer', 'min:0'],
+                ...$rules,
+            ];
+        }
+
+        $validated = $request->validate($rules);
 
         $status = Status::findOrFail($validated['progress']['status_id']);
-        $totalAchievements = $validated['game']['total_achievements'] ?? null;
+        $gameData = $validated['game'] ?? null;
+        $totalAchievements = $gameData === null
+            ? $libraryGame->game->total_achievements
+            : ($gameData['total_achievements'] ?? null);
         $earnedAchievements = $validated['progress']['earned_achievements'] ?? null;
 
         if ($totalAchievements !== null && $earnedAchievements !== null && $earnedAchievements > $totalAchievements) {
@@ -81,20 +91,22 @@ class LibraryGameMutationController extends Controller
             throw ValidationException::withMessages(['progress.completed_at' => 'Completed date is required for Completed and 100%.']);
         }
 
-        $gameUpdates = [
-            'title' => $validated['game']['title'],
-            'normalized_title' => $normalizer->normalize($validated['game']['title']),
-            'publisher' => $validated['game']['publisher'] ?? null,
-            'description' => $validated['game']['description'] ?? null,
-            'base_price_default' => $validated['game']['base_price_default'] ?? null,
-            'total_achievements' => $totalAchievements,
-        ];
+        if ($gameData !== null) {
+            $gameUpdates = [
+                'title' => $gameData['title'],
+                'normalized_title' => $normalizer->normalize($gameData['title']),
+                'publisher' => $gameData['publisher'] ?? null,
+                'description' => $gameData['description'] ?? null,
+                'base_price_default' => $gameData['base_price_default'] ?? null,
+                'total_achievements' => $totalAchievements,
+            ];
 
-        if (array_key_exists('cover_path', $validated['game'])) {
-            $gameUpdates['cover_path'] = $validated['game']['cover_path'];
+            if (array_key_exists('cover_path', $gameData)) {
+                $gameUpdates['cover_path'] = $gameData['cover_path'];
+            }
+
+            $libraryGame->game->update($gameUpdates);
         }
-
-        $libraryGame->game->update($gameUpdates);
 
         $libraryGame->update([
             'status_id' => $status->id,

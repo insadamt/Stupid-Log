@@ -381,6 +381,63 @@ class LibraryGameRulesTest extends TestCase
         ]);
     }
 
+    public function test_library_game_progress_can_be_updated_without_changing_game_metadata(): void
+    {
+        $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Quick Edit Game',
+                'source' => 'manual',
+                'publisher' => 'Original Studio',
+                'description' => 'Original description.',
+                'cover_path' => 'covers/games/original-cover.webp',
+                'base_price_default' => 40,
+                'total_achievements' => 20,
+                'create_duplicate_anyway' => true,
+            ],
+        ]));
+        $inProgress = Status::where('name', 'In Progress')->firstOrFail();
+
+        $this->patch("/games/{$libraryGame->id}", [
+            'progress' => [
+                'status_id' => $inProgress->id,
+                'playtime_hours' => 12.5,
+                'earned_achievements' => 8,
+                'first_played_at' => '2025-01-12',
+                'last_played_at' => '2025-03-24',
+                'completed_at' => null,
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('games', [
+            'id' => $libraryGame->game_id,
+            'title' => 'Quick Edit Game',
+            'publisher' => 'Original Studio',
+            'description' => 'Original description.',
+            'cover_path' => 'covers/games/original-cover.webp',
+            'base_price_default' => 40,
+            'total_achievements' => 20,
+        ]);
+        $this->assertDatabaseHas('library_games', [
+            'id' => $libraryGame->id,
+            'status_id' => $inProgress->id,
+            'playtime_hours' => 12.5,
+            'earned_achievements' => 8,
+            'first_played_at' => '2025-01-12 00:00:00',
+            'last_played_at' => '2025-03-24 00:00:00',
+        ]);
+
+        $this->patch("/games/{$libraryGame->id}", [
+            'progress' => [
+                'status_id' => $inProgress->id,
+                'playtime_hours' => 12.5,
+                'earned_achievements' => 21,
+                'first_played_at' => '2025-01-12',
+                'last_played_at' => '2025-03-24',
+                'completed_at' => null,
+            ],
+        ])->assertSessionHasErrors('progress.earned_achievements');
+    }
+
     public function test_library_game_details_update_rejects_last_played_before_first_played(): void
     {
         $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload());

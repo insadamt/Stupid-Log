@@ -95,3 +95,8 @@ export type GameEditForm = {
     last_played_at: string;
     completed_at: string;
 };
+
+export type QuickEditForm = Pick<
+    GameEditForm,
+    'status_id' | 'playtime_hours' | 'earned_achievements' | 'first_played_at' | 'last_played_at' | 'completed_at'
+>;

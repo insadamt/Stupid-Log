@@ -14,11 +14,13 @@ import OverviewPanel from './components/OverviewPanel';
 import OwnershipCopyModal from './components/OwnershipCopyModal';
 import OwnershipPanel from './components/OwnershipPanel';
 import PurchasesPanel from './components/PurchasesPanel';
+import QuickEditDrawer from './components/QuickEditDrawer';
 import { ModeButton } from './components/SharedUi';
-import { formFromCopy } from './forms';
+import { formFromCopy, gameEditFormFromGame } from './forms';
 import { Details, Dlc, DlcForm, EditTab, GameEditForm, Mode, OwnershipCopyDetails, OwnershipForm, PaidBreakdown } from './types';
 import { useGameDetailsAnimations } from './useGameDetailsAnimations';
 import { useInAppPurchaseActions } from './useInAppPurchaseActions';
+import { useQuickEdit } from './useQuickEdit';
 
 export default function GameDetails({
     libraryGame,
@@ -59,21 +61,8 @@ export default function GameDetails({
     const [savingGame, setSavingGame] = useState(false);
     const [pendingGameStatusId, setPendingGameStatusId] = useState<string | null>(null);
     const [gameCompletionDateDraft, setGameCompletionDateDraft] = useState(new Date().toISOString().slice(0, 10));
-    const [gameForm, setGameForm] = useState<GameEditForm>(() => ({
-        title: libraryGame.title,
-        publisher: libraryGame.publisher ?? '',
-        description: libraryGame.description ?? '',
-        cover_path: libraryGame.cover_path ?? '',
-        cover_preview: libraryGame.cover_url ?? '',
-        base_price_default: libraryGame.base_price_default === null || libraryGame.base_price_default === undefined ? '' : String(libraryGame.base_price_default),
-        total_achievements: libraryGame.total_achievements ? String(libraryGame.total_achievements) : '',
-        status_id: String(references.statuses.find((status) => status.name === libraryGame.status)?.id ?? references.statuses[0]?.id ?? ''),
-        playtime_hours: String(libraryGame.playtime_hours ?? 0),
-        earned_achievements: String(libraryGame.earned_achievements ?? 0),
-        first_played_at: libraryGame.first_played_at ?? '',
-        last_played_at: libraryGame.last_played_at ?? '',
-        completed_at: libraryGame.completed_at ?? '',
-    }));
+    const [gameForm, setGameForm] = useState<GameEditForm>(() => gameEditFormFromGame(libraryGame, references));
+    const quickEdit = useQuickEdit({ libraryGame, references, setGameForm });
     const [platformDeviceErrors, setPlatformDeviceErrors] = useState<Record<string, string>>({});
     const [savingPlatformDevices, setSavingPlatformDevices] = useState(false);
     const [platformDeviceForm, setPlatformDeviceForm] = useState(() => ({
@@ -117,7 +106,6 @@ export default function GameDetails({
         libraryGameId: libraryGame.id,
         mode,
     });
-
     function changeMode(nextMode: Mode) {
         if (nextMode === mode) return;
         previousStageRect.current = stageRef.current?.getBoundingClientRect() ?? null;
@@ -147,7 +135,6 @@ export default function GameDetails({
         }
         setMode(nextMode);
     }
-
     function updateOwnershipForm(patch: Partial<OwnershipForm>) {
         setOwnershipForm((current) => ({ ...current, ...patch }));
     }
@@ -209,7 +196,6 @@ export default function GameDetails({
     function updateGameForm(patch: Partial<GameEditForm>) {
         setGameForm((current) => ({ ...current, ...patch }));
     }
-
     function updateGameStatus(statusId: string) {
         const nextStatus = references.statuses.find((status) => String(status.id) === statusId);
         if (nextStatus?.name === 'Completed' || nextStatus?.name === '100%') {
@@ -224,7 +210,6 @@ export default function GameDetails({
             completed_at: '',
         }));
     }
-
     function applyGameCompletedStatus() {
         if (!pendingGameStatusId) return;
         const nextStatus = references.statuses.find((status) => String(status.id) === pendingGameStatusId);
@@ -236,7 +221,6 @@ export default function GameDetails({
         }));
         setPendingGameStatusId(null);
     }
-
     function platformDevicesChanged() {
         const savedDeviceIds = details.device_ids.map(String).sort().join('|');
         const nextDeviceIds = platformDeviceForm.device_ids.map(String).sort().join('|');
@@ -370,7 +354,12 @@ export default function GameDetails({
             <section ref={pageRef} className="relative isolate h-full overflow-hidden rounded-[44px] border border-black/10 bg-[#e8eee8] px-7 pb-24 pt-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.75)]">
                 <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_42%,rgba(183,255,99,0.24),transparent_34%),radial-gradient(circle_at_82%_16%,rgba(0,0,0,0.08),transparent_24%),linear-gradient(rgba(0,0,0,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.035)_1px,transparent_1px)] bg-[length:auto,auto,38px_38px,38px_38px]" />
                 <div className="pointer-events-none absolute left-[42%] top-[53%] -z-10 h-[380px] w-[740px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#b7ff63]/18 blur-3xl" />
-                <DetailsHeader title={libraryGame.title} onEdit={() => { setEditTab('basics'); setEditingGame(true); }} onDelete={deleteLibraryGame} />
+                <DetailsHeader
+                    title={libraryGame.title}
+                    onQuickEdit={quickEdit.open}
+                    onEdit={() => { setEditTab('basics'); setEditingGame(true); }}
+                    onDelete={deleteLibraryGame}
+                />
 
                 <main
                     ref={layoutRef}
@@ -452,6 +441,22 @@ export default function GameDetails({
                     actions={purchaseActions}
                     firstEditableFinancialDate={firstEditableFinancialDate}
                 />
+
+                {quickEdit.isOpen && (
+                    <QuickEditDrawer
+                        form={quickEdit.form}
+                        errors={quickEdit.errors}
+                        references={references}
+                        selectedStatus={quickEdit.selectedStatus}
+                        gameHasAchievements={libraryGame.total_achievements > 0}
+                        saving={quickEdit.isSaving}
+                        saved={quickEdit.isSaved}
+                        updateForm={quickEdit.updateForm}
+                        updateStatus={quickEdit.updateStatus}
+                        submit={quickEdit.save}
+                        close={quickEdit.close}
+                    />
+                )}
 
                 {editingGame && (
                     <GameEditModal
