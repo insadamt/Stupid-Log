@@ -5,6 +5,8 @@ import { DonutArcLayout, Slice } from '../types';
 import { animationKey, clampPercent, percentLabel } from '../utils';
 
 const arcSeamOverlapDegrees = 0.35;
+const minimumVisibleSpanDegrees = 0.01;
+const fullCircleDegrees = 360;
 
 function donutLayout(data: Slice[], order?: string[]): DonutArcLayout[] {
     const orderRank = new Map(order?.map((label, index) => [label, index]) ?? []);
@@ -73,15 +75,20 @@ function pointOnCircle(cx: number, cy: number, radius: number, angle: number) {
 }
 
 function donutArcPath(arc: DonutArcLayout, cx: number, cy: number, radius: number) {
-    const span = Math.max(0, arc.end - arc.start);
-    if (span <= 0.01) return '';
+    const span = Math.min(fullCircleDegrees, Math.max(0, arc.end - arc.start));
+    if (span <= minimumVisibleSpanDegrees) return '';
 
-    const endAngle = span >= 359.99 ? arc.start + 359.99 : arc.end + arcSeamOverlapDegrees;
+    const endAngle = arc.start + Math.min(fullCircleDegrees, span + arcSeamOverlapDegrees);
     const start = pointOnCircle(cx, cy, radius, arc.start);
     const end = pointOnCircle(cx, cy, radius, endAngle);
-    const largeArcFlag = endAngle - arc.start > 180 ? 1 : 0;
+    const renderedSpan = endAngle - arc.start;
 
-    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
+    if (renderedSpan <= 180) {
+        return `M ${start.x} ${start.y} A ${radius} ${radius} 0 0 1 ${end.x} ${end.y}`;
+    }
+
+    const midpoint = pointOnCircle(cx, cy, radius, arc.start + renderedSpan / 2);
+    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 0 1 ${midpoint.x} ${midpoint.y} A ${radius} ${radius} 0 0 1 ${end.x} ${end.y}`;
 }
 
 export default function Donut({
@@ -173,32 +180,50 @@ export default function Donut({
     const focusedLabel = activeArc ? activeLabel : null;
     const renderedTotal = renderLayout.reduce((sum, arc) => sum + arc.value, 0);
     const activePercent = activeArc && renderedTotal > 0 ? (activeArc.value / renderedTotal) * 100 : 0;
+    const visiblePositiveArcs = renderLayout.filter((arc) => arc.value > 0 && arc.end - arc.start > minimumVisibleSpanDegrees);
+    const singleVisibleArc = visiblePositiveArcs.length === 1 ? visiblePositiveArcs[0] : null;
+    const circumference = 2 * Math.PI * radius;
 
     return (
         <div ref={chartRef} className="relative size-[min(42vh,380px)] min-h-[330px] min-w-[330px] shrink-0">
             <svg viewBox="0 0 220 220" className="size-full overflow-visible">
                 <circle cx="110" cy="110" r={radius} fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth={strokeWidth} />
-                {renderLayout.map((arc) => (
-                    <path
-                        key={arc.label}
-                        d={donutArcPath(arc, 110, 110, radius)}
-                        fill="none"
-                        stroke={arc.color}
-                        strokeWidth={focusedLabel === arc.label ? strokeWidth + 6 : strokeWidth}
-                        strokeLinecap="butt"
-                        opacity={focusedLabel && focusedLabel !== arc.label ? 0.28 : 1}
-                        pointerEvents="stroke"
-                        tabIndex={0}
-                        role="button"
-                        aria-label={`${arc.label}: ${format(arc.value)}, ${percentLabel(renderedTotal > 0 ? (arc.value / renderedTotal) * 100 : 0)}`}
-                        className="cursor-pointer outline-none transition-[stroke-width,opacity,filter] duration-200 ease-out focus-visible:[filter:drop-shadow(0_0_6px_currentColor)]"
-                        style={{ filter: focusedLabel === arc.label ? `drop-shadow(0 0 7px ${arc.color})` : undefined }}
-                        onPointerEnter={() => setActiveLabel(arc.label)}
-                        onPointerLeave={() => setActiveLabel(null)}
-                        onFocus={() => setActiveLabel(arc.label)}
-                        onBlur={() => setActiveLabel(null)}
-                    />
-                ))}
+                {renderLayout.map((arc) => {
+                    const isSingleVisibleArc = singleVisibleArc?.label === arc.label;
+                    const span = Math.min(fullCircleDegrees, Math.max(0, arc.end - arc.start));
+                    const sharedProps = {
+                        fill: 'none',
+                        stroke: arc.color,
+                        strokeWidth: focusedLabel === arc.label ? strokeWidth + 6 : strokeWidth,
+                        strokeLinecap: 'butt' as const,
+                        opacity: focusedLabel && focusedLabel !== arc.label ? 0.28 : 1,
+                        pointerEvents: 'stroke' as const,
+                        tabIndex: 0,
+                        role: 'button' as const,
+                        'aria-label': `${arc.label}: ${format(arc.value)}, ${percentLabel(renderedTotal > 0 ? (arc.value / renderedTotal) * 100 : 0)}`,
+                        className: 'cursor-pointer outline-none transition-[stroke-width,opacity,filter] duration-200 ease-out focus-visible:[filter:drop-shadow(0_0_6px_currentColor)]',
+                        style: { filter: focusedLabel === arc.label ? `drop-shadow(0 0 7px ${arc.color})` : undefined },
+                        onPointerEnter: () => setActiveLabel(arc.label),
+                        onPointerLeave: () => setActiveLabel(null),
+                        onFocus: () => setActiveLabel(arc.label),
+                        onBlur: () => setActiveLabel(null),
+                    };
+
+                    return isSingleVisibleArc ? (
+                        <circle
+                            key={arc.label}
+                            cx="110"
+                            cy="110"
+                            r={radius}
+                            strokeDasharray={circumference}
+                            strokeDashoffset={circumference * (1 - span / fullCircleDegrees)}
+                            transform="rotate(-90 110 110)"
+                            {...sharedProps}
+                        />
+                    ) : (
+                        <path key={arc.label} d={donutArcPath(arc, 110, 110, radius)} {...sharedProps} />
+                    );
+                })}
             </svg>
             <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
                 <div data-donut-center className="max-w-[62%]">
