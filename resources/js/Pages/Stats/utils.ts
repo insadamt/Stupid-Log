@@ -40,19 +40,27 @@ export function metricGrowth(key: MetricKey, current: StatView, previous?: StatV
     return current.growth?.[key] ?? growth(n(current[key]), n(previous[key]));
 }
 
+function fallbackSliceColor(label: string) {
+    const hash = Array.from(label).reduce((value, character) => ((value * 31) + character.charCodeAt(0)) >>> 0, 0);
+
+    return palette[hash % palette.length];
+}
+
 export function slices<T extends { label: string; color_hex?: string | null }>(items: T[], getter: (item: T) => number, previousItems: T[] = []): Slice[] {
-    return items
-        .map((item, index) => {
-            const previous = previousItems.find((candidate) => candidate.label === item.label);
-            const value = getter(item);
+    const labels = [...items, ...previousItems.filter((previous) => !items.some((item) => item.label === previous.label))];
+
+    return labels
+        .map((source) => {
+            const item = items.find((candidate) => candidate.label === source.label);
+            const previous = previousItems.find((candidate) => candidate.label === source.label);
+            const value = item ? getter(item) : 0;
             return {
-                label: item.label,
+                label: source.label,
                 value,
-                color: item.color_hex ?? palette[index % palette.length],
+                color: item?.color_hex ?? previous?.color_hex ?? fallbackSliceColor(source.label),
                 growth: previous ? growth(value, getter(previous)) : null,
             };
         })
-        .filter((slice) => slice.value > 0)
         .sort((a, b) => b.value - a.value);
 }
 

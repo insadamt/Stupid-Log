@@ -152,12 +152,6 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                     ? <BestGames year={selectedBestGamesYear} />
                     : <ArchivePanel stats={current} comparison={comparison} />;
     const panelRevealDelay = pendingTabTransition.current ? statsRevealAfterTabDelay : 0;
-    const panelKey = [
-        active,
-        bestGamesMode ? selectedBestGamesYear?.year ?? 'latest' : selectedYear?.year ?? 'all-time',
-        view,
-        bestGamesView,
-    ].join(':');
 
     return (
         <AppLayout title="Stats" lockViewport>
@@ -195,7 +189,7 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                     </header>
                     <main ref={panelShellRef} className="relative min-h-0 overflow-hidden rounded-[34px] border border-black/8 bg-white/35 p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.58)]">
                         <div ref={panelContentRef} className="relative z-10 h-full min-h-0">
-                            <StatsRevealDelayContext.Provider key={panelKey} value={panelRevealDelay}>
+                            <StatsRevealDelayContext.Provider key={active} value={panelRevealDelay}>
                                 {panel}
                             </StatsRevealDelayContext.Provider>
                         </div>

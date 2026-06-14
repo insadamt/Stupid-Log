@@ -13,5 +13,4 @@ export type StatsComparison = {
 export type Slice = { label: string; value: number; color: string; growth?: GrowthMetric | null };
 export type ChartConfig = { title: string; eyebrow: string; data: Slice[]; total: string; center: string; delta?: GrowthMetric | null; format: (value: number) => string; showPlatformIcons?: boolean };
 export type DonutArcLayout = { label: string; value: number; color: string; start: number; end: number };
-export type DonutTweenSlice = { label: string; from: number; to: number; color: string };
 export type StackSegment = { label: string; value: number; color: string };

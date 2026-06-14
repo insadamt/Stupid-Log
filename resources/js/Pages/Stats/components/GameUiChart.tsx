@@ -18,7 +18,8 @@ export default function GameUiChart({ config }: { config: ChartConfig }) {
     const chartRef = useRef<HTMLElement>(null);
     const hasRevealed = useRef(false);
     const revealDelay = useStatsRevealDelay();
-    const incomingData = [...config.data].sort((a, b) => b.value - a.value);
+    const donutData = [...config.data].sort((a, b) => b.value - a.value);
+    const incomingData = donutData.filter((slice) => slice.value > 0);
     const [renderedData, setRenderedData] = useState(incomingData);
     const data = renderedData;
     const sum = data.reduce((acc, slice) => acc + slice.value, 0);
@@ -42,23 +43,25 @@ export default function GameUiChart({ config }: { config: ChartConfig }) {
         }
 
         const rows = Array.from(chart.querySelectorAll<HTMLElement>('[data-chart-row]'));
-        const state = rows.length ? Flip.getState(rows) : null;
+        const state = Flip.getState(rows);
 
         flushSync(() => {
             setRenderedData(incomingData);
         });
 
-        if (!state) return;
+        const nextRows = Array.from(chart.querySelectorAll<HTMLElement>('[data-chart-row]'));
 
         Flip.from(state, {
+            targets: [...rows, ...nextRows],
             duration: 0.64,
             ease: 'power3.inOut',
             stagger: 0.045,
             absolute: true,
+            absoluteOnLeave: true,
             prune: true,
             nested: true,
-            onEnter: (elements) => gsap.fromTo(elements, { y: 14, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.38, ease: 'power3.out', stagger: 0.04 }),
-            onLeave: (elements) => gsap.to(elements, { y: -10, autoAlpha: 0, duration: 0.24, ease: 'power2.in' }),
+            onEnter: (elements) => gsap.fromTo(elements, { y: 14, scale: 0.94, autoAlpha: 0 }, { y: 0, scale: 1, autoAlpha: 1, duration: 0.38, ease: 'power3.out', stagger: 0.04 }),
+            onLeave: (elements) => gsap.to(elements, { y: -10, scale: 0.94, autoAlpha: 0, duration: 0.28, ease: 'power2.in' }),
         });
     }, { scope: chartRef, dependencies: [incomingChartKey, renderedChartKey] });
 
@@ -96,7 +99,7 @@ export default function GameUiChart({ config }: { config: ChartConfig }) {
                     </div>
                 </div>
                 <div className="grid min-h-0 place-items-center">
-                    <Donut data={data} total={config.total} center={config.center} />
+                    <Donut data={donutData} total={config.total} center={config.center} format={config.format} />
                 </div>
             </section>
             <section className="min-h-0 rounded-[26px] bg-white/[0.06] p-4 ring-1 ring-white/8">

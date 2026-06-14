@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\DB;
 
 class StatsService
 {
+    private ?array $platformColors = null;
+
     private const VALUE_OWNERSHIP_TYPES = ['Digital', 'Physical'];
 
     private const GROWTH_KEYS = [
@@ -179,10 +181,17 @@ class StatsService
     private function normalizeSnapshotSummaryTypes(array $summary): array
     {
         $summary = $this->castFloatKeys($summary, self::SUMMARY_FLOAT_KEYS);
+        $platformColors = $this->platformColors();
 
         $summary['breakdowns']['platforms'] = collect($summary['breakdowns']['platforms'] ?? [])
-            ->map(function (array $platform) {
+            ->map(function (array $platform) use ($platformColors) {
                 $platform = $this->castFloatKeys($platform, self::BREAKDOWN_FLOAT_KEYS);
+                $platformId = $platform['platform_id'] ?? null;
+                $savedColors = ($platformId !== null ? $platformColors['by_id'][$platformId] ?? null : null)
+                    ?? $platformColors['by_name'][$platform['label'] ?? '']
+                    ?? null;
+                $platform['color_key'] ??= $savedColors['color_key'] ?? null;
+                $platform['color_hex'] ??= $savedColors['color_hex'] ?? null;
                 $platform['statuses'] = collect($platform['statuses'] ?? [])
                     ->map(fn (array $status) => $this->castFloatKeys($status, ['playtime_hours']))
                     ->values()
@@ -244,6 +253,27 @@ class StatsService
         $summary['growth'] = $summary['growth'] ?? [];
 
         return $summary;
+    }
+
+    private function platformColors(): array
+    {
+        if ($this->platformColors !== null) {
+            return $this->platformColors;
+        }
+
+        $platforms = DB::table('platforms')
+            ->get(['id', 'name', 'color_key', 'color_hex'])
+            ->map(fn ($platform) => [
+                'id' => (int) $platform->id,
+                'name' => $platform->name,
+                'color_key' => $platform->color_key,
+                'color_hex' => $platform->color_hex,
+            ]);
+
+        return $this->platformColors = [
+            'by_id' => $platforms->keyBy('id')->all(),
+            'by_name' => $platforms->keyBy('name')->all(),
+        ];
     }
 
     private function castFloatKeys(array $item, array $keys): array
