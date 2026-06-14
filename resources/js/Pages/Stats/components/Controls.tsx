@@ -1,15 +1,16 @@
 import { tabs } from '../constants';
 import { TabKey } from '../types';
 
-export function Switch<T extends string>({ value, options, onChange }: { value: T; options: Array<{ value: T; label: string }>; onChange: (value: T) => void }) {
+export function Switch<T extends string>({ value, options, onChange }: { value: T; options: Array<{ value: T; label: string; disabled?: boolean }>; onChange: (value: T) => void }) {
     return (
         <div className="inline-flex rounded-full bg-black/7 p-1">
             {options.map((option) => (
                 <button
                     key={option.value}
                     type="button"
+                    disabled={option.disabled}
                     onClick={() => onChange(option.value)}
-                    className={`rounded-full px-3 py-2 text-[11px] font-black uppercase tracking-[0.12em] transition ${value === option.value ? 'bg-black text-[#b7ff63] shadow-sm' : 'text-black/42 hover:text-black'}`}
+                    className={`rounded-full px-3 py-2 text-[11px] font-black uppercase tracking-[0.12em] transition disabled:cursor-not-allowed disabled:opacity-30 ${value === option.value ? 'bg-black text-[#b7ff63] shadow-sm' : 'text-black/42 hover:text-black'}`}
                 >
                     {option.label}
                 </button>

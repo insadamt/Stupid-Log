@@ -24,7 +24,9 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
     const yearsDesc = useMemo(() => [...confirmedYears].sort((a, b) => b.year - a.year), [confirmedYears]);
     const selectedYear = view === 'all-time' ? null : confirmedYears.find((year) => String(year.year) === view) ?? null;
     const previousYear = selectedYear ? [...yearsAsc].filter((year) => year.year < selectedYear.year).pop() ?? null : null;
+    const previousPreviousYear = previousYear ? [...yearsAsc].filter((year) => year.year < previousYear.year).pop() ?? null : null;
     const latestYear = yearsDesc[0] ?? null;
+    const yearBeforeLatest = latestYear ? [...yearsAsc].filter((year) => year.year < latestYear.year).pop() ?? null : null;
     const bestGamesMode = active === 'best-games';
     const selectedBestGamesYear = bestGamesView === 'latest' ? latestYear : confirmedYears.find((year) => String(year.year) === bestGamesView) ?? latestYear;
     const headerSnapshot = bestGamesMode ? selectedBestGamesYear : selectedYear;
@@ -150,7 +152,7 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                 ? <Progression stats={current} previous={previous} comparison={comparison} />
                 : active === 'best-games'
                     ? <BestGames year={selectedBestGamesYear} />
-                    : <ArchivePanel stats={current} comparison={comparison} />;
+                    : <ArchivePanel stats={current} previous={previous} previousPrevious={selectedYear ? previousPreviousYear : yearBeforeLatest} comparison={comparison} />;
     const panelRevealDelay = pendingTabTransition.current ? statsRevealAfterTabDelay : 0;
 
     return (

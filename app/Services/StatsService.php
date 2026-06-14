@@ -151,7 +151,10 @@ class StatsService
     public function snapshotSummary(SnapshotRun $snapshot, bool $refresh = false): array
     {
         if (! $refresh && is_array($snapshot->summary_json)) {
-            return $this->withSnapshotMetadata($snapshot->summary_json, $snapshot);
+            $summary = $snapshot->summary_json;
+            $summary['archive']['playtime_rankings'] = $this->snapshotPlaytimeRankingRows($snapshot);
+
+            return $this->withSnapshotMetadata($summary, $snapshot);
         }
 
         return $this->refreshSnapshotSummary($snapshot);
@@ -892,9 +895,11 @@ class StatsService
     private function liveArchive(Collection $libraryGames): array
     {
         $items = $libraryGames->map(fn (LibraryGame $libraryGame) => $this->archiveItemFromLive($libraryGame));
+        $playtimeRankings = $items->sortByDesc('playtime_hours')->values();
 
         return [
-            'most_played' => $items->sortByDesc('playtime_hours')->take(8)->values()->all(),
+            'most_played' => $playtimeRankings->take(8)->all(),
+            'playtime_rankings' => $playtimeRankings->all(),
             'biggest_base_price' => $items->filter(fn ($item) => $item['base_value'] > 0)->sortByDesc('base_value')->take(8)->values()->all(),
             'biggest_paid_price' => $items->filter(fn ($item) => $item['purchased_value'] > 0)->sortByDesc('purchased_value')->take(8)->values()->all(),
         ];
@@ -903,16 +908,18 @@ class StatsService
     private function liveArchiveSql(User $user): array
     {
         $totals = $this->financialValues->calculateLiveFinancialValuesForUser($user);
+        $playtimeRankings = $this->liveArchiveRows($user, 'library_games.playtime_hours', false, null);
 
         return [
-            'most_played' => $this->liveArchiveRows($user, 'library_games.playtime_hours', false),
+            'most_played' => array_slice($playtimeRankings, 0, 8),
+            'playtime_rankings' => $playtimeRankings,
             'biggest_base_price' => $this->liveArchiveRows($user, 'base_value', true),
             'biggest_paid_price' => $this->liveArchiveRows($user, 'purchased_value', true),
             'unallocated_financial' => $this->unallocatedArchiveSummary($totals),
         ];
     }
 
-    private function liveArchiveRows(User $user, string $sortColumn, bool $positiveOnly): array
+    private function liveArchiveRows(User $user, string $sortColumn, bool $positiveOnly, ?int $limit = 8): array
     {
         $copyValues = DB::table('ownership_copies')
             ->join('ownership_types', 'ownership_types.id', '=', 'ownership_copies.ownership_type_id')
@@ -978,16 +985,22 @@ class StatsService
             $builder->whereRaw("{$valueSql} > 0");
         }
 
-        return $builder
+        $builder
             ->orderByDesc($sortColumn)
-            ->orderBy('library_games.id')
-            ->limit(8)
+            ->orderBy('library_games.id');
+
+        if ($limit !== null) {
+            $builder->limit($limit);
+        }
+
+        return $builder
             ->get()
             ->map(function ($row) {
                 $copyBase = (float) $row->copy_base_value;
                 $copyPaid = (float) $row->copy_purchased_value;
                 $dlcBase = (float) $row->dlc_base_value;
                 $dlcPaid = (float) $row->dlc_purchased_value;
+
                 return [
                     'library_game_id' => (int) $row->library_game_id,
                     'game_id' => (int) $row->game_id,
@@ -1103,12 +1116,52 @@ class StatsService
 
         $totals = $this->financialValues->calculateSnapshotFinancialValuesForRun($snapshot);
 
+        $playtimeRankings = $items->sortByDesc('playtime_hours')->values();
+
         return [
-            'most_played' => $items->sortByDesc('playtime_hours')->take(8)->values()->all(),
+            'most_played' => $playtimeRankings->take(8)->all(),
+            'playtime_rankings' => $playtimeRankings->all(),
             'biggest_base_price' => $items->filter(fn ($item) => $item['base_value'] > 0)->sortByDesc('base_value')->take(8)->values()->all(),
             'biggest_paid_price' => $items->filter(fn ($item) => $item['purchased_value'] > 0)->sortByDesc('purchased_value')->take(8)->values()->all(),
             'unallocated_financial' => $this->unallocatedArchiveSummary($totals),
         ];
+    }
+
+    private function snapshotPlaytimeRankingRows(SnapshotRun $snapshot): array
+    {
+        return DB::table('library_game_snapshots')
+            ->join('games', 'games.id', '=', 'library_game_snapshots.game_id')
+            ->join('platforms', 'platforms.id', '=', 'library_game_snapshots.platform_id')
+            ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
+            ->where('snapshot_run_id', $snapshot->id)
+            ->orderByDesc('library_game_snapshots.playtime_hours')
+            ->orderBy('library_game_snapshots.library_game_id')
+            ->get([
+                'library_game_snapshots.library_game_id',
+                'library_game_snapshots.game_id',
+                'games.title',
+                'games.cover_url_original',
+                'games.cover_path',
+                'platforms.name as platform',
+                'statuses.name as status',
+                'statuses.color_key as status_color_key',
+                'statuses.color_hex as status_color_hex',
+                'library_game_snapshots.playtime_hours',
+            ])
+            ->map(fn ($row) => [
+                'library_game_id' => (int) $row->library_game_id,
+                'game_id' => (int) $row->game_id,
+                'title' => $row->title,
+                'cover_url' => $row->cover_path ? asset('storage/'.$row->cover_path) : $row->cover_url_original,
+                'platform' => $row->platform,
+                'status' => $row->status,
+                'status_color_key' => $row->status_color_key,
+                'status_color_hex' => $row->status_color_hex,
+                'playtime_hours' => (float) $row->playtime_hours,
+                'base_value' => 0.0,
+                'purchased_value' => 0.0,
+            ])
+            ->all();
     }
 
     private function liveEligibleCopies(LibraryGame $libraryGame): Collection

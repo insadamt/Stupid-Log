@@ -119,6 +119,21 @@ class StatsFinancialValuesTest extends TestCase
         $this->assertSame($directCopy->library_game_id, $archive[1]['library_game_id']);
     }
 
+    public function test_archive_exposes_all_playtime_candidates_without_expanding_visible_most_played_rows(): void
+    {
+        foreach (range(1, 9) as $rank) {
+            $copy = $this->createOwnershipCopy($this->user, "Playtime Game {$rank}", 'Steam', 'Digital');
+            $copy->libraryGame->update(['playtime_hours' => $rank]);
+        }
+
+        $archive = app(StatsService::class)->live($this->user)['archive'];
+
+        $this->assertCount(8, $archive['most_played']);
+        $this->assertCount(9, $archive['playtime_rankings']);
+        $this->assertSame(9.0, $archive['playtime_rankings'][0]['playtime_hours']);
+        $this->assertSame(1.0, $archive['playtime_rankings'][8]['playtime_hours']);
+    }
+
     public function test_financial_component_fields_return_zero_without_subscription_or_iap(): void
     {
         $this->createOwnershipCopy($this->user, 'Zero Component Game', 'Steam', 'Digital', 20, 10);

@@ -129,6 +129,7 @@ export type StatsArchiveGame = {
 
 export type StatsArchive = {
     most_played: StatsArchiveGame[];
+    playtime_rankings?: StatsArchiveGame[];
     biggest_base_price: StatsArchiveGame[];
     biggest_paid_price: StatsArchiveGame[];
     unallocated_financial: {
