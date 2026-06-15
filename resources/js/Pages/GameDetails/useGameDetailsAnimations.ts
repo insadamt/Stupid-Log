@@ -1,5 +1,5 @@
 import { MutableRefObject, RefObject } from 'react';
-import { gsap, prefersReducedMotion, useGSAP } from '../../animation';
+import { gsap, motion, prefersReducedMotion, useGSAP } from '../../animation';
 import { Mode } from './types';
 
 export function useGameDetailsAnimations({
@@ -32,13 +32,13 @@ export function useGameDetailsAnimations({
             return;
         }
 
-        const timeline = gsap.timeline({ defaults: { ease: 'power3.out' } });
+        const timeline = gsap.timeline({ defaults: { ease: motion.ease.out } });
         timeline
-            .fromTo(page, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.28, clearProps: 'visibility,opacity' }, 0)
-            .fromTo(header, { autoAlpha: 0, y: -18 }, { autoAlpha: 1, y: 0, duration: 0.46, clearProps: 'transform,visibility,opacity' }, 0.06)
-            .fromTo(stage, { autoAlpha: 0, scale: 0.94, y: 18 }, { autoAlpha: 1, scale: 1, y: 0, duration: 0.58, clearProps: 'transform,visibility,opacity' }, 0.12)
-            .fromTo(card, { autoAlpha: 0, scale: 0.9, rotation: -1.5 }, { autoAlpha: 1, scale: 1, rotation: 0, duration: 0.62, clearProps: 'transform,visibility,opacity' }, 0.16)
-            .fromTo(panels, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.36, stagger: 0.06, clearProps: 'visibility,opacity' }, 0.24);
+            .fromTo(page, { autoAlpha: 0 }, { autoAlpha: 1, duration: motion.duration.normal, clearProps: 'visibility,opacity' }, 0)
+            .fromTo(header, { autoAlpha: 0, y: -motion.distance.medium }, { autoAlpha: 1, y: 0, duration: motion.duration.slow, clearProps: 'transform,visibility,opacity' }, 0.06)
+            .fromTo(stage, { autoAlpha: 0, scale: 0.94, y: motion.distance.medium }, { autoAlpha: 1, scale: 1, y: 0, duration: motion.duration.page, clearProps: 'transform,visibility,opacity' }, 0.12)
+            .fromTo(card, { autoAlpha: 0, scale: 0.9, rotation: -1.5 }, { autoAlpha: 1, scale: 1, rotation: 0, duration: motion.duration.page, clearProps: 'transform,visibility,opacity' }, 0.16)
+            .fromTo(panels, { autoAlpha: 0 }, { autoAlpha: 1, duration: motion.duration.normal, stagger: 0.06, clearProps: 'visibility,opacity' }, 0.24);
     }, { scope: pageRef, dependencies: [libraryGameId] });
 
     useGSAP(() => {
@@ -59,17 +59,22 @@ export function useGameDetailsAnimations({
         const nextRect = stage.getBoundingClientRect();
         const previousRect = previousStageRect.current;
         const timeline = gsap.timeline({
-            defaults: { ease: 'power3.inOut' },
+            defaults: { ease: motion.ease.inOut },
             onComplete: () => gsap.set(stage, { zIndex: 20 }),
         });
         gsap.set(stage, { zIndex: 40 });
 
         if (previousRect) {
-            timeline.fromTo(stage, { x: previousRect.left - nextRect.left, y: previousRect.top - nextRect.top }, { x: 0, y: 0, duration: 0.48, clearProps: 'transform' }, 0);
+            timeline.fromTo(stage, { x: previousRect.left - nextRect.left, y: previousRect.top - nextRect.top }, { x: 0, y: 0, duration: motion.duration.slow, clearProps: 'transform' }, 0);
         }
 
         if (detailsPanel) {
-            timeline.fromTo(detailsPanel, { autoAlpha: 0, x: mode === 'overview' ? -80 : -120, scale: 0.96, transformOrigin: 'left center' }, { autoAlpha: 1, x: 0, scale: 1, duration: 0.36, clearProps: 'transform,visibility,opacity' }, 0.18);
+            timeline.fromTo(
+                detailsPanel,
+                { autoAlpha: 0, x: mode === 'overview' ? -motion.distance.medium : -motion.distance.large, scale: 0.96, transformOrigin: 'left center' },
+                { autoAlpha: 1, x: 0, scale: 1, duration: motion.duration.normal, clearProps: 'transform,visibility,opacity' },
+                motion.duration.fast,
+            );
         }
         previousStageRect.current = null;
     }, { scope: pageRef, dependencies: [mode] });

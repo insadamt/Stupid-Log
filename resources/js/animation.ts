@@ -14,11 +14,31 @@ type PageTransition = {
     kind?: 'nav' | 'setup-complete';
 };
 
+export const motion = {
+    duration: {
+        fast: 0.18,
+        normal: 0.32,
+        slow: 0.52,
+        page: 0.62,
+    },
+    ease: {
+        out: 'power3.out',
+        inOut: 'power3.inOut',
+        soft: 'power2.out',
+        sharp: 'power2.in',
+    },
+    distance: {
+        small: 10,
+        medium: 24,
+        large: 56,
+    },
+} as const;
+
 export const pageTransition = {
-    duration: 0.62,
-    ease: 'power3.inOut',
-    firstLoadDuration: 0.52,
-    firstLoadEase: 'power3.out',
+    duration: motion.duration.page,
+    ease: motion.ease.inOut,
+    firstLoadDuration: motion.duration.slow,
+    firstLoadEase: motion.ease.out,
 };
 
 const layerId = 'stupid-log-page-transition-layer';
@@ -300,8 +320,8 @@ export function useStaggerRefresh<T extends HTMLElement>(
             { autoAlpha: 0 },
             {
                 autoAlpha: 1,
-                duration: 0.28,
-                ease: 'power3.out',
+                duration: motion.duration.normal,
+                ease: motion.ease.out,
                 stagger: 0.03,
                 overwrite: 'auto',
                 clearProps: 'visibility,opacity',

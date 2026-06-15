@@ -1,6 +1,6 @@
 import { Check, Save, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import { gsap, prefersReducedMotion } from '../../../animation';
+import { gsap, motion, prefersReducedMotion } from '../../../animation';
 import { statusPillStyle } from '../../../statusColors';
 import { ReferenceData } from '../../../types';
 import { QuickEditForm } from '../types';
@@ -55,9 +55,9 @@ export default function QuickEditDrawer({
         if (prefersReducedMotion()) {
             gsap.set([backdrop, drawer], { autoAlpha: 1, x: 0 });
         } else {
-            gsap.timeline({ defaults: { ease: 'power3.out' } })
-                .fromTo(backdrop, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2 }, 0)
-                .fromTo(drawer, { xPercent: 100 }, { xPercent: 0, duration: 0.32 }, 0);
+            gsap.timeline({ defaults: { ease: motion.ease.out } })
+                .fromTo(backdrop, { autoAlpha: 0 }, { autoAlpha: 1, duration: motion.duration.fast }, 0)
+                .fromTo(drawer, { xPercent: 100 }, { xPercent: 0, duration: motion.duration.normal }, 0);
         }
 
         closeButtonRef.current?.focus();
@@ -88,9 +88,9 @@ export default function QuickEditDrawer({
             return;
         }
 
-        gsap.timeline({ defaults: { ease: 'power2.in' }, onComplete: close })
-            .to(drawer, { xPercent: 100, duration: 0.24 }, 0)
-            .to(backdrop, { autoAlpha: 0, duration: 0.18 }, 0.06);
+        gsap.timeline({ defaults: { ease: motion.ease.sharp }, onComplete: close })
+            .to(drawer, { xPercent: 100, duration: motion.duration.fast }, 0)
+            .to(backdrop, { autoAlpha: 0, duration: motion.duration.fast }, 0);
     }
 
     return (

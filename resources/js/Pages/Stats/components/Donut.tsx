@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { gsap, prefersReducedMotion, useGSAP } from '../../../animation';
+import { gsap, motion, prefersReducedMotion, useGSAP } from '../../../animation';
 import { useStatsRevealDelay } from '../revealDelay';
 import { DonutArcLayout, Slice } from '../types';
 import { animationKey, clampPercent, percentLabel } from '../utils';
@@ -137,9 +137,9 @@ export default function Donut({
             setRenderLayout(initialLayout);
             activeTween.current = gsap.to(tweenState, {
                 progress: 1,
-                duration: 0.82,
+                duration: motion.duration.page,
                 delay: revealDelay,
-                ease: 'power3.out',
+                ease: motion.ease.out,
                 onUpdate: () => {
                     const nextLayout = revealedDonutLayout(targetLayout, tweenState.progress);
                     renderedLayout.current = nextLayout;
@@ -161,8 +161,8 @@ export default function Donut({
 
         activeTween.current = gsap.to(tweenState, {
             progress: 1,
-            duration: 0.68,
-            ease: 'power3.inOut',
+            duration: motion.duration.slow,
+            ease: motion.ease.inOut,
             onUpdate: () => {
                 const nextLayout = interpolatedDonutLayout(fromLayout, data, tweenState.progress, transitionOrder);
                 renderedLayout.current = nextLayout;

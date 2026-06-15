@@ -9,7 +9,5 @@ export const tabs: Array<{ key: TabKey; title: string; sub: string }> = [
 ];
 
 export const palette = ['#9BE44D', '#61C7DF', '#E86D78', '#DFC96B', '#A382DB', '#5CC193', '#D88F45', '#CED8D2'];
-export const statsTabTransitionDuration = 0.48;
-export const statsRevealAfterTabDelay = statsTabTransitionDuration + 0.16;
 export const donutRevealTotalDuration = 1.35;
 export const chartRowsRevealGap = 0.18;

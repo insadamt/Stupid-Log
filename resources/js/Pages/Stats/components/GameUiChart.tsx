@@ -2,7 +2,7 @@ import { BarChart3 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Flip } from 'gsap/Flip';
-import { gsap, prefersReducedMotion, useGSAP } from '../../../animation';
+import { gsap, motion, prefersReducedMotion, useGSAP } from '../../../animation';
 import PlatformIcon from '../../../Components/PlatformIcon';
 import { chartRowsRevealGap } from '../constants';
 import { StatsRevealDelayContext, useStatsRevealDelay } from '../revealDelay';
@@ -53,15 +53,25 @@ export default function GameUiChart({ config }: { config: ChartConfig }) {
 
         Flip.from(state, {
             targets: [...rows, ...nextRows],
-            duration: 0.64,
-            ease: 'power3.inOut',
+            duration: motion.duration.slow,
+            ease: motion.ease.inOut,
             stagger: 0.045,
             absolute: true,
             absoluteOnLeave: true,
             prune: true,
             nested: true,
-            onEnter: (elements) => gsap.fromTo(elements, { y: 14, scale: 0.94, autoAlpha: 0 }, { y: 0, scale: 1, autoAlpha: 1, duration: 0.38, ease: 'power3.out', stagger: 0.04 }),
-            onLeave: (elements) => gsap.to(elements, { y: -10, scale: 0.94, autoAlpha: 0, duration: 0.28, ease: 'power2.in' }),
+            onEnter: (elements) => gsap.fromTo(
+                elements,
+                { y: motion.distance.small, scale: 0.94, autoAlpha: 0 },
+                { y: 0, scale: 1, autoAlpha: 1, duration: motion.duration.normal, ease: motion.ease.out, stagger: 0.04 },
+            ),
+            onLeave: (elements) => gsap.to(elements, {
+                y: -motion.distance.small,
+                scale: 0.94,
+                autoAlpha: 0,
+                duration: motion.duration.fast,
+                ease: motion.ease.sharp,
+            }),
         });
     }, { scope: chartRef, dependencies: [incomingChartKey, renderedChartKey] });
 

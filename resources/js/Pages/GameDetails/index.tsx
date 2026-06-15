@@ -1,6 +1,6 @@
 import { router } from '@inertiajs/react';
 import { useMemo, useRef, useState } from 'react';
-import { gsap, prefersReducedMotion } from '../../animation';
+import { gsap, motion, prefersReducedMotion } from '../../animation';
 import AppLayout from '../../Components/AppLayout';
 import { GameCardData, ReferenceData } from '../../types';
 import DetailsHeader from './components/DetailsHeader';
@@ -126,10 +126,10 @@ export default function GameDetails({
             layoutRef.current.appendChild(clone);
             gsap.to(clone, {
                 autoAlpha: 0,
-                x: -28,
-                duration: 0.38,
+                x: -motion.distance.medium,
+                duration: motion.duration.normal,
                 delay: 0.08,
-                ease: 'power3.out',
+                ease: motion.ease.out,
                 onComplete: () => clone.remove(),
             });
         }

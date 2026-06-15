@@ -1,10 +1,10 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import { gsap, prefersReducedMotion, useGSAP } from '../../animation';
+import { gsap, motion, prefersReducedMotion, useGSAP } from '../../animation';
 import AppLayout from '../../Components/AppLayout';
 import { ConfirmedYearStats, StatsData } from '../../types';
 import { SlideNav } from './components/Controls';
-import { statsRevealAfterTabDelay, statsTabTransitionDuration, tabs } from './constants';
+import { tabs } from './constants';
 import { StatsRevealDelayContext } from './revealDelay';
 import { StatsComparison, StatView, TabKey } from './types';
 import ArchivePanel from './views/ArchivePanel';
@@ -12,6 +12,8 @@ import BestGames from './views/BestGames';
 import Breakdowns from './views/Breakdowns';
 import Overview from './views/Overview';
 import Progression from './views/Progression';
+
+const statsRevealAfterTabDelay = motion.duration.slow + 0.16;
 
 export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData; confirmedYears?: ConfirmedYearStats[] }) {
     const panelShellRef = useRef<HTMLElement>(null);
@@ -69,7 +71,7 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
         }
 
         const timeline = gsap.timeline({
-            defaults: { duration: statsTabTransitionDuration, ease: 'power3.inOut' },
+            defaults: { duration: motion.duration.slow, ease: motion.ease.inOut },
             onComplete: () => transition.clone?.remove(),
         });
 

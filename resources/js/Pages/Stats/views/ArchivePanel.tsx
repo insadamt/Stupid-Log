@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { Flip } from 'gsap/Flip';
-import { gsap, prefersReducedMotion, useGSAP } from '../../../animation';
+import { gsap, motion, prefersReducedMotion, useGSAP } from '../../../animation';
 import PlatformIcon from '../../../Components/PlatformIcon';
 import { statusPillStyle } from '../../../statusColors';
 import { StatsArchiveGame } from '../../../types';
@@ -111,14 +111,23 @@ function ArchiveList({
         if (!state) return;
 
         Flip.from(state, {
-            duration: 0.55,
-            ease: 'power3.inOut',
+            duration: motion.duration.slow,
+            ease: motion.ease.inOut,
             stagger: 0.035,
             absolute: true,
             prune: true,
             nested: true,
-            onEnter: (elements) => gsap.fromTo(elements, { y: 10, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.3, ease: 'power3.out' }),
-            onLeave: (elements) => gsap.to(elements, { y: -8, autoAlpha: 0, duration: 0.2, ease: 'power2.in' }),
+            onEnter: (elements) => gsap.fromTo(
+                elements,
+                { y: motion.distance.small, autoAlpha: 0 },
+                { y: 0, autoAlpha: 1, duration: motion.duration.normal, ease: motion.ease.out },
+            ),
+            onLeave: (elements) => gsap.to(elements, {
+                y: -motion.distance.small,
+                autoAlpha: 0,
+                duration: motion.duration.fast,
+                ease: motion.ease.sharp,
+            }),
         });
     }, { scope: listRef, dependencies: [incomingKey, renderedKey] });
 
