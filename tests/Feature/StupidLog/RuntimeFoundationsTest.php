@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\StupidLog;
 
-use App\Models\StupidLog\ProviderCredential;
 use App\Models\StupidLog\Platform;
+use App\Models\StupidLog\ProviderCredential;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\StupidLogReferenceSeeder;
@@ -21,12 +21,12 @@ class RuntimeFoundationsTest extends TestCase
     {
         $this->seed(StupidLogReferenceSeeder::class);
 
-        $this->assertSame('1.0.2', config('app.version'));
+        $this->assertSame('1.1.0', config('app.version'));
         $this->get('/setup')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Setup', false)
-                ->where('appVersion', '1.0.2'));
+                ->where('appVersion', '1.1.0'));
     }
 
     public function test_reference_seeder_assigns_stable_platform_colors_without_duplicates(): void

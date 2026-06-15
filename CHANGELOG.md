@@ -2,6 +2,23 @@
 
 All notable changes to Stupid Log are documented here. The project follows semantic versioning.
 
+## [1.1.0] - 2026-06-15
+
+### Added
+
+- Added Game Details Quick Edit for progress, achievement, and played-date updates.
+- Added archive rank movement plus cumulative and period playtime rankings.
+
+### Changed
+
+- Standardized stats comparison context, stable platform chart colors, and breakdown chart state transitions.
+- Standardized interface animation timing and shared motion presets.
+
+### Fixed
+
+- Kept Library hover cards above neighboring cards.
+- Fixed donut transitions for empty data, changing data, and single-slice charts.
+
 ## [1.0.2] - 2026-06-09
 
 ### Added
@@ -42,6 +59,7 @@ All notable changes to Stupid Log are documented here. The project follows seman
 
 - Stupid Log v1.0.0 is licensed under GPL-3.0.
 
+[1.1.0]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.1.0
 [1.0.2]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.0.2
 [1.0.1]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.0.1
 [1.0.0]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.0.0
