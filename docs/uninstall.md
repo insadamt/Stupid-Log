@@ -42,7 +42,7 @@ docker image ls | grep stupid-log
 Remove an unused image tag:
 
 ```bash
-docker image rm ghcr.io/insadamt/stupid-log:1.0.2
+docker image rm ghcr.io/insadamt/stupid-log:1.1.0
 ```
 
 If Docker reports that the image is still in use, stop and remove the related containers first.

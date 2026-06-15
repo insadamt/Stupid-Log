@@ -16,7 +16,7 @@ Stupid Log v1 must not be exposed directly to the public internet.
 The installer uses the published container image. It does not require Git, local image building, or manual environment-file creation.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.2/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.1.0/scripts/install.sh | bash
 ```
 
 By default, it:
@@ -32,7 +32,7 @@ By default, it:
 Review the installer first when installing on a machine you administer:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.2/scripts/install.sh
+curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.1.0/scripts/install.sh
 less install.sh
 bash install.sh
 ```
@@ -50,7 +50,7 @@ bash install.sh --port 8081
 Use another directory or image version:
 
 ```bash
-bash install.sh --dir /srv/stupid-log --version 1.0.2
+bash install.sh --dir /srv/stupid-log --version 1.1.0
 ```
 
 Bind to a trusted LAN address:
@@ -130,9 +130,9 @@ docker compose --env-file .env.production -f compose.production.yml up -d
 Export a portable backup from **Settings > Data & Recovery** before updating. Then download the installer for the intended release and run it with the target version:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.2/scripts/install.sh
+curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.1.0/scripts/install.sh
 less install.sh
-bash install.sh --dir "$HOME/stupid-log" --version 1.0.2
+bash install.sh --dir "$HOME/stupid-log" --version 1.1.0
 ```
 
 The installer preserves existing secrets, data, and Compose project identity while updating the image version. A v1.0.0 installation keeps the legacy `stupid-log` project name so its existing volumes remain attached. Do not replace or regenerate `.env.production` during an update.
@@ -153,8 +153,8 @@ The repository's production Compose file provides a source-build fallback.
 
 ```bash
 cp .env.production.example .env.production
-docker build -t stupid-log:1.0.2 .
-docker run --rm --entrypoint php stupid-log:1.0.2 artisan key:generate --show
+docker build -t stupid-log:1.1.0 .
+docker run --rm --entrypoint php stupid-log:1.1.0 artisan key:generate --show
 ```
 
 Edit `.env.production`:

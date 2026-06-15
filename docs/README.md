@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/images/stupid-log/stupid-log.png" alt="Stupid Log logo" width="150">
+  <img src="../public/images/stupid-log/stupid-log.png" alt="Stupid Log logo" width="150">
 </p>
 
 <h1 align="center">Stupid Log</h1>
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-1.0.2-B7FF63?style=for-the-badge&labelColor=000000" alt="Release 1.0.2">
+  <img src="https://img.shields.io/badge/release-1.1.0-B7FF63?style=for-the-badge&labelColor=000000" alt="Release 1.1.0">
   <img src="https://img.shields.io/badge/self--hosted-Docker-B7FF63?style=for-the-badge&labelColor=000000" alt="Self-hosted Docker">
   <img src="https://img.shields.io/badge/license-GPL--3.0--only-B7FF63?style=for-the-badge&labelColor=000000" alt="GPL-3.0-only license">
 </p>
@@ -55,7 +55,7 @@ Requirements:
 Install the published release:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.2/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.1.0/scripts/install.sh | bash
 ```
 
 By default, the installer creates `~/stupid-log`, binds the app to `127.0.0.1:8080`, starts the published Docker image, waits for the health check, and opens the app.
@@ -63,7 +63,7 @@ By default, the installer creates `~/stupid-log`, binds the app to `127.0.0.1:80
 Review the installer before running it:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.2/scripts/install.sh
+curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.1.0/scripts/install.sh
 less install.sh
 bash install.sh
 ```
@@ -74,7 +74,7 @@ Custom port example:
 bash install.sh --port 8081
 ```
 
-See [docs/install.md](docs/install.md) for custom directories, LAN binding, lifecycle commands, auto-start behavior, and persistent data notes.
+See [install.md](install.md) for custom directories, LAN binding, lifecycle commands, auto-start behavior, and persistent data notes.
 
 ## Update
 
@@ -82,17 +82,17 @@ Export a portable backup from **Settings > Data & Recovery** before updating.
 
 ```bash
 cd ~/stupid-log
-curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.0.2/scripts/install.sh
-bash install.sh --dir "$HOME/stupid-log" --version 1.0.2
+curl -fsSLO https://raw.githubusercontent.com/insadamt/Stupid-Log/v1.1.0/scripts/install.sh
+bash install.sh --dir "$HOME/stupid-log" --version 1.1.0
 ```
 
-Do not delete or regenerate `.env.production` during an update. See [docs/upgrade.md](docs/upgrade.md) for the full upgrade checklist.
+Do not delete or regenerate `.env.production` during an update. See [upgrade.md](upgrade.md) for the full upgrade checklist.
 
 ## Backup and restore
 
 Portable backups are exported from **Settings > Data & Recovery** as `.stupidlog.zip` archives. They include application data, snapshots, financial history, and uploaded cover media. Provider credentials are intentionally excluded and must be re-entered after restoring into a fresh installation.
 
-See [docs/backup-and-restore.md](docs/backup-and-restore.md).
+See [backup-and-restore.md](backup-and-restore.md).
 
 ## Uninstall
 
@@ -103,15 +103,15 @@ cd ~/stupid-log
 docker compose --env-file .env.production -f compose.production.yml down
 ```
 
-The command above removes containers and the network while preserving Docker volumes. To permanently delete the database and uploaded media, read [docs/uninstall.md](docs/uninstall.md) first.
+The command above removes containers and the network while preserving Docker volumes. To permanently delete the database and uploaded media, read [uninstall.md](uninstall.md) first.
 
 ## Operations
 
-- [Install](docs/install.md)
-- [Upgrade](docs/upgrade.md)
-- [Rollback](docs/rollback.md)
-- [Backup and restore](docs/backup-and-restore.md)
-- [Uninstall](docs/uninstall.md)
+- [Install](install.md)
+- [Upgrade](upgrade.md)
+- [Rollback](rollback.md)
+- [Backup and restore](backup-and-restore.md)
+- [Uninstall](uninstall.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 
@@ -133,4 +133,4 @@ Major or risky releases should be published as a pre-release or release candidat
 
 ## License
 
-Stupid Log is licensed under GPL-3.0. See [LICENSE](LICENSE). Composer metadata uses the SPDX identifier `GPL-3.0-only`.
+Stupid Log is licensed under GPL-3.0. See [LICENSE](../LICENSE). Composer metadata uses the SPDX identifier `GPL-3.0-only`.

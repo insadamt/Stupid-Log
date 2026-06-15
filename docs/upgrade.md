@@ -2,7 +2,7 @@
 
 ## Before Upgrading
 
-1. Read [CHANGELOG.md](../CHANGELOG.md).
+1. Read [CHANGELOG.md](CHANGELOG.md).
 2. Export a portable backup from **Settings > Data & Recovery**.
 3. Create infrastructure snapshots using [backup-and-restore.md](backup-and-restore.md).
 4. Preserve the current source revision or image identifier for rollback.
@@ -14,7 +14,7 @@ Fetch the intended release and inspect the exact version before rebuilding:
 
 ```bash
 git fetch --tags
-git switch --detach v1.0.2
+git switch --detach v1.1.0
 docker compose --env-file .env.production -f compose.production.yml build --pull
 docker compose --env-file .env.production -f compose.production.yml up -d
 ```

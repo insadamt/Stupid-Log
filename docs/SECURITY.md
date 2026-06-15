@@ -2,11 +2,11 @@
 
 ## Supported Versions
 
-Security fixes are provided for the latest released `1.0.x` version. Pre-release branches are supported only while they are under active development.
+Security fixes are provided for the latest released `1.1.x` version. Pre-release branches are supported only while they are under active development.
 
 ## Deployment Boundary
 
-Stupid Log v1.0.0 is designed for a trusted LAN or private VPN. It has no public-internet authentication boundary and must not be directly exposed through a public IP, public reverse proxy, or open tunnel.
+Stupid Log v1.1.0 is designed for a trusted LAN or private VPN. It has no public-internet authentication boundary and must not be directly exposed through a public IP, public reverse proxy, or open tunnel.
 
 Use a firewall and private network controls. Keep `.env.production`, `APP_KEY`, database credentials, infrastructure backups, and IGDB credentials private.
 
