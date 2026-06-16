@@ -22,13 +22,15 @@ class LibraryGameListService
         $builder = $this->query($user);
 
         if ($query !== '') {
-            $builder->where(function ($scope) use ($query) {
-                $scope->whereHas('game', function ($gameQuery) use ($query) {
-                    $gameQuery->where('title', 'like', "%{$query}%")
-                        ->orWhere('publisher', 'like', "%{$query}%");
-                })->orWhereHas('platform', fn ($platformQuery) => $platformQuery->where('name', 'like', "%{$query}%"))
-                    ->orWhereHas('devices', fn ($deviceQuery) => $deviceQuery->where('name', 'like', "%{$query}%"))
-                    ->orWhereHas('ownershipCopies.ownershipType', fn ($ownershipQuery) => $ownershipQuery->where('name', 'like', "%{$query}%"));
+            $searchTerm = '%'.mb_strtolower($query).'%';
+
+            $builder->where(function ($scope) use ($searchTerm) {
+                $scope->whereHas('game', function ($gameQuery) use ($searchTerm) {
+                    $gameQuery->whereRaw('LOWER(title) LIKE ?', [$searchTerm])
+                        ->orWhereRaw('LOWER(publisher) LIKE ?', [$searchTerm]);
+                })->orWhereHas('platform', fn ($platformQuery) => $platformQuery->whereRaw('LOWER(name) LIKE ?', [$searchTerm]))
+                    ->orWhereHas('devices', fn ($deviceQuery) => $deviceQuery->whereRaw('LOWER(name) LIKE ?', [$searchTerm]))
+                    ->orWhereHas('ownershipCopies.ownershipType', fn ($ownershipQuery) => $ownershipQuery->whereRaw('LOWER(name) LIKE ?', [$searchTerm]));
             });
         }
 
@@ -50,7 +52,7 @@ class LibraryGameListService
             default => $builder
                 ->join('games as sort_games', 'sort_games.id', '=', 'library_games.game_id')
                 ->select('library_games.*')
-                ->orderBy('sort_games.title')
+                ->orderByRaw('LOWER(sort_games.title)')
                 ->orderBy('library_games.id'),
         };
 

@@ -30,7 +30,6 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
     const cardsPerRow = filtersOpen ? 5 : 6;
     const debouncedQuery = useDebouncedValue(query);
     const requestKey = `${debouncedQuery}|${status}|${platform}|${sort}`;
-    const refreshKey = requestKey;
 
     const statusOptions = useMemo(() => {
         const merged = [...preferredStatuses, ...Object.keys(libraryMeta.statuses)];
@@ -166,7 +165,7 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                             <VirtualCardGrid
                                 items={games}
                                 columns={cardsPerRow}
-                                refreshKey={refreshKey}
+                                resultSetKey={requestKey}
                                 hasMore={hasMore}
                                 loading={loading}
                                 onNearEnd={loadMore}

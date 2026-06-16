@@ -1,5 +1,4 @@
 import { ReactNode, UIEvent, useEffect, useRef, useState } from 'react';
-import { useStaggerRefresh } from '../../../animation';
 import GameCard from '../../../Components/GameCard';
 import { GameCardData } from '../../../types';
 
@@ -8,7 +7,7 @@ const cardPanelExitDuration = 300;
 export default function VirtualCardGrid({
     items,
     columns,
-    refreshKey,
+    resultSetKey,
     hasMore,
     loading,
     empty,
@@ -16,14 +15,13 @@ export default function VirtualCardGrid({
 }: {
     items: GameCardData[];
     columns: number;
-    refreshKey: string;
+    resultSetKey: string;
     hasMore: boolean;
     loading: boolean;
     empty: ReactNode;
     onNearEnd: () => void;
 }) {
     const ref = useRef<HTMLDivElement>(null);
-    const gridRef = useRef<HTMLDivElement>(null);
     const clearActiveGameTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [scrollTop, setScrollTop] = useState(0);
     const [viewportHeight, setViewportHeight] = useState(0);
@@ -38,8 +36,6 @@ export default function VirtualCardGrid({
     const startIndex = startRow * columns;
     const endIndex = Math.min(items.length, endRow * columns);
     const visibleItems = items.slice(startIndex, endIndex);
-
-    useStaggerRefresh(gridRef, refreshKey);
 
     useEffect(() => {
         const node = ref.current;
@@ -59,6 +55,20 @@ export default function VirtualCardGrid({
             }
         };
     }, []);
+
+    useEffect(() => {
+        if (clearActiveGameTimeoutRef.current) {
+            clearTimeout(clearActiveGameTimeoutRef.current);
+            clearActiveGameTimeoutRef.current = null;
+        }
+
+        setActiveGameId(null);
+        setScrollTop(0);
+
+        if (ref.current) {
+            ref.current.scrollTop = 0;
+        }
+    }, [resultSetKey]);
 
     function activateGame(gameId: number) {
         if (clearActiveGameTimeoutRef.current) {
@@ -95,7 +105,7 @@ export default function VirtualCardGrid({
 
     return (
         <div ref={ref} onScroll={handleScroll} className="sl-scrollbar relative h-full min-h-0 overflow-y-auto overflow-x-hidden px-16 py-10">
-            <div ref={gridRef} className="relative mx-auto" style={{ width: columns * cardWidth + (columns - 1) * gapX, height: totalHeight }}>
+            <div className="relative mx-auto" style={{ width: columns * cardWidth + (columns - 1) * gapX, height: totalHeight }}>
                 {visibleItems.map((game, offset) => {
                     const index = startIndex + offset;
                     const row = Math.floor(index / columns);
