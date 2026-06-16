@@ -1,14 +1,37 @@
 import PlatformIcon from '../../../Components/PlatformIcon';
 import { statusColor, statusDotStyle } from '../../../statusColors';
-import { PlatformBreakdown } from '../../../types';
+import { PlatformBreakdown, StatusBreakdown } from '../../../types';
 import { DeltaBadge, PercentDeltaBadge } from '../components/Badges';
 import { Empty } from '../components/Controls';
 import { ProgressBar, StackedProgressBar } from '../components/Progress';
 import { StatsComparison, StatView } from '../types';
 import { growth, metricGrowth, num } from '../utils';
 
+const statusProgressionOrder = ['100%', 'Completed', 'In Progress', 'Dropped', 'Not Played'];
+
+function normalizeStatusBreakdowns(statuses: StatusBreakdown[] = []) {
+    const statusesByLabel = new Map(statuses.map((status) => [status.label.trim().toLowerCase(), status]));
+
+    return statusProgressionOrder.map((label) => {
+        const status = statusesByLabel.get(label.toLowerCase());
+
+        return {
+            ...status,
+            label,
+            library_games: status?.library_games ?? 0,
+            playtime_hours: status?.playtime_hours ?? 0,
+        };
+    });
+}
+
 function StatusStack({ platform, previous }: { platform: PlatformBreakdown; previous?: PlatformBreakdown }) {
-    const statuses = [...(platform.statuses ?? [])].sort((a, b) => b.library_games - a.library_games);
+    const statuses = normalizeStatusBreakdowns(platform.statuses);
+    const previousStatuses = previous ? normalizeStatusBreakdowns(previous.statuses) : [];
+    const visibleLegendStatuses = statuses.filter((status) => {
+        const previousStatus = previousStatuses.find((item) => item.label === status.label);
+
+        return status.library_games > 0 || (previousStatus?.library_games ?? 0) > 0;
+    });
     const total = Math.max(1, platform.library_games);
 
     return (
@@ -26,8 +49,8 @@ function StatusStack({ platform, previous }: { platform: PlatformBreakdown; prev
                 <StackedProgressBar total={total} segments={statuses.map((status) => ({ label: status.label, value: status.library_games, color: statusColor(status) }))} />
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {statuses.map((status) => {
-                    const previousStatus = previous?.statuses?.find((item) => item.label === status.label);
+                {visibleLegendStatuses.map((status) => {
+                    const previousStatus = previousStatuses.find((item) => item.label === status.label);
                     return (
                         <div key={status.label} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-2xl bg-[#f6faf4] px-3 py-2 text-xs font-black text-black/60">
                             <span className="flex min-w-0 items-center gap-2">
