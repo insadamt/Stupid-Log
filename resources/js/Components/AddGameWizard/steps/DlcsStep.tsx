@@ -61,11 +61,11 @@ export default function DlcsStep({
                                             )}
 
                                             {!draft.steam_app_id && (
-                                                <EmptyCard title="No Steam App ID." body="DLC catalog import needs a Steam App ID. Continue now and refresh DLCs from the details page after adding one." />
+                                                <EmptyCard title="No Steam App ID." />
                                             )}
 
                                             {draft.steam_app_id && !draft.dlcs.length && enrichmentStatus !== "loading" && (!dlcSummary || dlcSummary.total === 0) && (
-                                                <EmptyCard title="No DLC catalog loaded." body="Steam did not list any public DLCs for this game." />
+                                                <EmptyCard title="No DLC catalog." />
                                             )}
 
                                             {draft.dlcs.length > 0 && (
@@ -126,7 +126,7 @@ export default function DlcsStep({
                                                         })}
                                                     </div>
 
-                                                    {!filteredDlcs.length && <Notice>No DLC matches the current search.</Notice>}
+                                                    {!filteredDlcs.length && <Notice>No DLC matches.</Notice>}
                                                 </>
                                             )}
                                         </div>

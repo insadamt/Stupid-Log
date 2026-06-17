@@ -115,7 +115,7 @@ export default function Progression({ stats, previous, comparison }: { stats: St
                                 </div>
                             );
                         })}
-                        {achievementPlatforms.length === 0 && <Empty dark text="No achievement totals are available yet." />}
+                        {achievementPlatforms.length === 0 && <Empty dark text="No achievement totals." />}
                     </div>
                 </div>
             </section>
@@ -127,7 +127,7 @@ export default function Progression({ stats, previous, comparison }: { stats: St
                 <div className="mt-4 min-h-0 overflow-y-auto pr-1">
                     <div className="grid gap-3">
                         {statusPlatforms.map((platform) => <StatusStack key={platform.label} platform={platform} previous={prevPlatforms.find((item) => item.label === platform.label)} />)}
-                        {statusPlatforms.length === 0 && <Empty text="Add games to build status progression." />}
+                        {statusPlatforms.length === 0 && <Empty text="No games." />}
                     </div>
                 </div>
             </section>

@@ -65,7 +65,7 @@ export default function SubscriptionList({
                         </div>
                     </button>
                 ))}
-                {!entries.length && <p className="rounded-[20px] border border-dashed border-white/12 p-5 text-sm font-bold text-white/35">No subscriptions match this view.</p>}
+                {!entries.length && <p className="rounded-[20px] border border-dashed border-white/12 p-5 text-sm font-bold text-white/35">No subscriptions.</p>}
             </div>
         </aside>
     );

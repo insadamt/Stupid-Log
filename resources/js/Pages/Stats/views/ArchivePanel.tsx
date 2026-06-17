@@ -147,7 +147,7 @@ function ArchiveList({
             </header>
             <div className="min-h-0 overflow-y-auto px-3 py-3">
                 <div className="grid gap-2">
-                    {renderedRows.length === 0 && <Empty text="No games match this archive record yet." />}
+                    {renderedRows.length === 0 && <Empty text="No games." />}
                     {renderedRows.map(({ game, rank, value, movement }) => (
                         <div
                             key={getGameKey(game)}

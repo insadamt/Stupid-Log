@@ -124,7 +124,6 @@ export default function Settings({
                                     <div className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]/70">System configuration</div>
                                     <div className="mt-1 flex items-end gap-4">
                                         <h1 className="text-6xl font-black leading-none tracking-[-0.06em]">Settings</h1>
-                                        <p className="mb-2 text-sm font-bold text-white/38">Profile, providers, backup, and recovery.</p>
                                     </div>
                                 </div>
                             </div>

@@ -37,7 +37,7 @@ function CapturedGamesTable({
                 className="min-h-0 overflow-y-auto bg-white/55"
                 getKey={(game) => `${game.library_game_id}-${game.title}`}
                 empty={
-                    <div className="grid h-full place-items-center p-8 text-center text-sm font-bold text-black/42">No captured games in this snapshot.</div>
+                    <div className="grid h-full place-items-center p-8 text-center text-sm font-bold text-black/42">No captured games.</div>
                 }
                 render={(game) => <SnapshotGameRow game={game} />}
             />
@@ -128,7 +128,6 @@ export default function SnapshotInspector({
                         <Archive size={34} strokeWidth={3} />
                     </div>
                     <div className="mt-5 text-4xl font-black tracking-[-0.05em]">Select a snapshot</div>
-                    <p className="mx-auto mt-3 max-w-md text-sm font-bold leading-relaxed text-black/45">Open a draft or confirmed year to manage its best games, inspect captured rows, confirm, resnap, or delete.</p>
                 </div>
             </section>
         );

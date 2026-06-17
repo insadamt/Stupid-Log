@@ -39,7 +39,6 @@ export default function InAppPurchaseModal({
                         </div>
                         <p className="mt-5 text-[10px] font-black uppercase tracking-[0.24em] text-[#b7ff63]">In-App Purchase</p>
                         <h2 className="mt-2 text-3xl font-black leading-none tracking-[-0.05em]">{purchase ? 'Edit spending record' : 'Add spending record'}</h2>
-                        <p className="mt-4 text-sm font-bold leading-relaxed text-white/40">Track currency packs, cosmetics, expansions, and other purchases made inside this game.</p>
                     </div>
                 </aside>
 

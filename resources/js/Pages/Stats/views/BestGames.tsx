@@ -68,8 +68,8 @@ export default function BestGames({ year }: { year?: ConfirmedYearStats | null }
             </section>
 
             {year
-                ? <BestGameGrid games={year.best_games ?? []} empty={`No best games were selected for ${year.year}.`} />
-                : <Empty text="Confirm a yearly snapshot and select best games to build this list." />}
+                ? <BestGameGrid games={year.best_games ?? []} empty="No best games selected." />
+                : <Empty text="No confirmed snapshots." />}
         </div>
     );
 }

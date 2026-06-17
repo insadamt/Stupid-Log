@@ -82,8 +82,7 @@ export default function PurchasesPanel({
                     ))}
                     {!visiblePurchases.length && (
                         <div className="rounded-[26px] border border-white/10 bg-white/[0.06] p-8">
-                            <p className="text-2xl font-black">No purchases found.</p>
-                            <p className="mt-2 text-sm font-bold text-white/35">Change the search or filter, or add a new purchase.</p>
+                            <p className="text-2xl font-black">No purchases.</p>
                         </div>
                     )}
                 </div>

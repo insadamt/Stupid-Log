@@ -71,7 +71,7 @@ export default function DlcsPanel({
                         </div>
                     </div>
                 ))}
-                {!filteredDlcs.length && <div className="rounded-[26px] border border-white/10 bg-white/[0.06] p-8 text-2xl font-black">No DLCs saved for this game.</div>}
+                {!filteredDlcs.length && <div className="rounded-[26px] border border-white/10 bg-white/[0.06] p-8 text-2xl font-black">No DLCs.</div>}
                 </div>
             </div>
         </article>

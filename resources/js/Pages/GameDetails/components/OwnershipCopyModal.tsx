@@ -52,9 +52,6 @@ export default function OwnershipCopyModal({
                         <div className="mt-2 line-clamp-2 text-3xl font-black leading-[0.92] tracking-[-0.06em]">
                             {editingCopyId === 'new' ? 'New copy' : editingCopy?.ownership_type || 'Edit copy'}
                         </div>
-                        <div className="mt-3 text-sm font-black text-white/40">
-                            {editingCopyId === 'new' ? 'Create a new owned copy.' : editingCopy?.edition_name || editingCopy?.physical_status || 'Standard edition'}
-                        </div>
                     </div>
                 </aside>
 

@@ -118,7 +118,7 @@ export default function GameUiChart({ config }: { config: ChartConfig }) {
                     <div className="grid size-11 place-items-center rounded-2xl bg-[#b7ff63] text-black"><BarChart3 size={22} strokeWidth={3} /></div>
                 </div>
                 <div className="mt-4 grid max-h-[calc(100%-60px)] gap-3 overflow-y-auto pr-1">
-                    {data.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm font-bold text-white/35">No rows available.</div>}
+                    {data.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm font-bold text-white/35">No rows.</div>}
                     {data.map((slice) => {
                         const percent = sum > 0 ? (slice.value / sum) * 100 : 0;
                         const rowDelay = rowRevealDelay + data.findIndex((item) => item.label === slice.label) * 0.1;

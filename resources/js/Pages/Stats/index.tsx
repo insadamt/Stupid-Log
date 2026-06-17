@@ -170,7 +170,6 @@ export default function Stats({ stats, confirmedYears = [] }: { stats: StatsData
                                 </div>
                                 <div className="mt-1 flex items-end gap-4">
                                     <h1 className="text-6xl font-black leading-none tracking-[-0.06em]">Stats</h1>
-                                    <p className="mb-2 hidden max-w-2xl truncate text-sm font-bold text-white/38 xl:block">Fixed screen modules. Data overflow stays inside game-style containers.</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">

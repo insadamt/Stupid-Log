@@ -19,7 +19,6 @@ export default function ProfilePanel({
         <section id="settings-panel-profile" role="tabpanel" aria-labelledby="settings-tab-profile" className="max-w-3xl">
             <div className="text-[10px] font-black uppercase tracking-[0.24em] text-black/35">Local identity</div>
             <h2 className="mt-1 text-4xl font-black tracking-[-0.05em]">Profile</h2>
-            <p className="mt-2 text-sm font-bold text-black/45">Set the name shown throughout this local installation.</p>
 
             <form onSubmit={onSubmit} className="mt-6 border-t border-black/10 pt-6">
                 <div className="max-w-xl">
@@ -36,7 +35,6 @@ export default function ProfilePanel({
                         <Save size={16} strokeWidth={3} />
                         {saving ? 'Saving' : 'Save profile'}
                     </SettingsButton>
-                    <span className="text-xs font-bold text-black/35">Backups preserve the current local username.</span>
                 </div>
 
                 <div className="mt-4 max-w-xl">

@@ -178,7 +178,6 @@ export default function Snapshots({
                                 <div className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]/70">Snapshot manager</div>
                                 <div className="mt-1 flex items-end gap-4">
                                     <h1 className="text-6xl font-black leading-none tracking-[-0.06em]">Snapshots</h1>
-                                    <p className="mb-2 hidden max-w-2xl truncate text-sm font-bold text-white/38 xl:block">Create, inspect, resnap, confirm, and delete yearly captures. No stats dashboard here.</p>
                                 </div>
                             </div>
                             <div className="grid min-w-0 gap-2">

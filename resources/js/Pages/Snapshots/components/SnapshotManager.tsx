@@ -112,11 +112,10 @@ export default function SnapshotManager({
                 className="mt-5 min-h-0 overflow-y-auto pr-1"
                 getKey={(snapshot) => snapshot.snapshot_id}
                 empty={
-                    <div className="grid min-h-[320px] place-items-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.04] p-6 text-center">
+                    <div className="grid min-h-[220px] place-items-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.04] p-6 text-center">
                         <div>
                             <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#b7ff63] text-black"><Clock3 size={26} strokeWidth={3} /></div>
                             <div className="mt-4 text-2xl font-black">No snapshots yet</div>
-                            <p className="mt-2 text-sm font-bold text-white/38">Create a draft capture for a year to start the archive.</p>
                         </div>
                     </div>
                 }

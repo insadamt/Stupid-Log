@@ -107,24 +107,20 @@ export default function SearchStep({
         )}
 
 {results.length === 0 && !searching && (
-    <div className="grid min-h-[300px] place-items-center rounded-[34px] border border-dashed border-black/15 bg-[#eef2ed] p-8 text-center shadow-[inset_0_0_0_1px_rgb(255_255_255/0.45)]">
+    <div className="grid min-h-[220px] place-items-center rounded-[34px] border border-dashed border-black/15 bg-[#eef2ed] p-8 text-center shadow-[inset_0_0_0_1px_rgb(255_255_255/0.45)]">
         <div className="max-w-xl">
             <div className="mx-auto grid size-16 place-items-center rounded-[22px] bg-black text-[#b7ff63] shadow-[0_18px_34px_rgb(0_0_0/0.16)]">
                 <Package size={26} strokeWidth={3} />
             </div>
 
             <h4 className="mt-5 text-3xl font-black tracking-[-0.05em]">
-                Start manually.
+                No results.
             </h4>
-
-            <p className="mx-auto mt-2 max-w-md text-sm font-black leading-relaxed text-black/42">
-                Skip provider search and build the game record yourself.
-            </p>
 
             <button
                 type="button"
                 onClick={manualEntry}
-                className="mt-6 inline-flex h-[58px] items-center justify-center gap-3 rounded-[22px] bg-black px-8 text-base font-black text-[#b7ff63] shadow-[0_18px_34px_rgb(0_0_0/0.18)] transition hover:-translate-y-0.5"
+                className="mt-5 inline-flex h-[58px] items-center justify-center gap-3 rounded-[22px] bg-black px-8 text-base font-black text-[#b7ff63] shadow-[0_18px_34px_rgb(0_0_0/0.18)] transition hover:-translate-y-0.5"
             >
                 Manual Entry
                 <ChevronRight size={22} strokeWidth={3} />

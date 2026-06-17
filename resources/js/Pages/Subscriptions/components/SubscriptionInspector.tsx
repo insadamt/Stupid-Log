@@ -20,7 +20,6 @@ export default function SubscriptionInspector({
             <section className="grid min-h-0 place-items-center rounded-[34px] border border-dashed border-black/12 bg-[#eef4eb] p-8 text-center">
                 <div>
                     <p className="text-3xl font-black">No subscription selected</p>
-                    <p className="mt-2 text-sm font-bold text-black/40">Choose an entry or create a new subscription.</p>
                     <button type="button" onClick={startCreate} className="mt-5 rounded-[18px] bg-black px-6 py-3 font-black text-white">Add subscription</button>
                 </div>
             </section>
@@ -74,7 +73,7 @@ export default function SubscriptionInspector({
                                 {entry.locked_ownership_copy_ids.includes(copy.id) && <LockKeyhole size={15} />}
                             </div>
                         ))}
-                        {!selectedCopies.length && <p className="rounded-[20px] bg-white/65 p-5 text-sm font-bold text-black/40">No games selected. Yearly budgets remain counted as unallocated paid value.</p>}
+                        {!selectedCopies.length && <p className="rounded-[20px] bg-white/65 p-5 text-sm font-bold text-black/40">No games selected.</p>}
                     </div>
                 </section>
             </div>
@@ -109,7 +108,7 @@ function YearTimelineRow({ year, ownershipCopies }: { year: SubscriptionYear; ow
                             </div>
                         );
                     })}
-                    {!year.allocations.length && <p className="rounded-[16px] bg-white/8 px-4 py-3 text-sm font-bold text-white/40">Full budget is unallocated.</p>}
+                    {!year.allocations.length && <p className="rounded-[16px] bg-white/8 px-4 py-3 text-sm font-bold text-white/40">Unallocated.</p>}
                 </div>
             </div>
         </article>

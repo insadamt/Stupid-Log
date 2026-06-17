@@ -205,8 +205,7 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                                 onNearEnd={loadMore}
                                 empty={
                                     <div className="max-w-md rounded-[30px] bg-black p-8 text-center text-white shadow-[0_24px_55px_rgb(0_0_0/0.22)]">
-                                        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#b7ff63]">No Match</p>
-                                        <h3 className="mt-3 text-3xl font-black tracking-[-0.04em]">No games found.</h3>
+                                        <h3 className="text-3xl font-black tracking-[-0.04em]">No games.</h3>
                                     </div>
                                 }
                             />

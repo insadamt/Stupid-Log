@@ -264,7 +264,7 @@ function AllocationStep({ copies, platforms, query, platform, selectedCopyIds, l
                             </button>
                         );
                     })}
-                    {!copies.length && <p className="rounded-[20px] border border-dashed border-black/12 p-5 text-sm font-bold text-black/40">No matching games.</p>}
+                    {!copies.length && <p className="rounded-[20px] border border-dashed border-black/12 p-5 text-sm font-bold text-black/40">No games.</p>}
                 </div>
             </section>
 

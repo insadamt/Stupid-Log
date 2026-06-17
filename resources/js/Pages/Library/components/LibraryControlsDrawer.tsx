@@ -132,7 +132,6 @@ export default function LibraryControlsDrawer({
                     <div>
                         <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]">Library Controls</div>
                         <h2 id="library-controls-title" className="mt-2 text-4xl font-black leading-none tracking-[-0.055em]">Filter & Sort</h2>
-                        <p className="mt-2 text-sm font-bold text-white/45">{filterCount === 0 ? 'No filters active' : `${filterCount} active ${filterCount === 1 ? 'filter' : 'filters'}`}</p>
                     </div>
                     <button
                         ref={closeButtonRef}

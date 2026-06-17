@@ -28,7 +28,6 @@ export default function IntegrationsPanel({
         <section id="settings-panel-integrations" role="tabpanel" aria-labelledby="settings-tab-integrations">
             <div className="text-[10px] font-black uppercase tracking-[0.24em] text-black/35">Provider access</div>
             <h2 className="mt-1 text-4xl font-black tracking-[-0.05em]">Integrations</h2>
-            <p className="mt-2 text-sm font-bold text-black/45">Manage IGDB credentials. Steam uses public endpoints and needs no API key.</p>
 
             <form onSubmit={onSubmit} className="mt-6">
                 <input type="hidden" name="username" value={username} />
@@ -73,7 +72,6 @@ export default function IntegrationsPanel({
                         <Save size={16} strokeWidth={3} />
                         {saving ? 'Saving' : 'Save integrations'}
                     </SettingsButton>
-                    <span className="text-xs font-bold text-black/35">Blank fields keep the currently saved encrypted value.</span>
                 </div>
 
                 <div className="mt-4 max-w-xl">

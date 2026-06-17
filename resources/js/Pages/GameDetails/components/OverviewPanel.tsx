@@ -24,7 +24,7 @@ export default function OverviewPanel({
                 </div>
 
                 <p className="mt-7 min-h-[210px] max-w-[780px] text-[21px] font-black leading-tight tracking-[-0.025em] text-white/84">
-                    {libraryGame.description || 'No description saved yet. This archive entry is waiting for a clean note.'}
+                    {libraryGame.description || 'No description.'}
                 </p>
             </div>
 

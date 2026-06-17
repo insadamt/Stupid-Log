@@ -105,8 +105,8 @@ export default function SnapshotBestGames({
                 empty={
                     <div className="rounded-2xl border border-dashed border-black/15 bg-white/70 p-5 text-sm font-bold text-black/45">
                         {bestGames.length === 0
-                            ? selectedSnapshot.status === 'confirmed' ? 'No best games were selected before this snapshot was confirmed.' : 'No eligible completed games for this year.'
-                            : 'No favorite games match this search.'}
+                            ? selectedSnapshot.status === 'confirmed' ? 'No best games selected.' : 'No eligible games.'
+                            : 'No matches.'}
                     </div>
                 }
                 render={(game) => {

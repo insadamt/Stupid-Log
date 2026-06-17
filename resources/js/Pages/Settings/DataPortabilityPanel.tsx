@@ -91,7 +91,6 @@ export default function DataPortabilityPanel({
         <section id="settings-panel-data" role="tabpanel" aria-labelledby="settings-tab-data">
             <div className="text-[10px] font-black uppercase tracking-[0.24em] text-black/35">Backup & recovery</div>
             <h2 className="mt-1 text-4xl font-black tracking-[-0.05em]">Data & Safety</h2>
-            <p className="mt-2 text-sm font-bold text-black/45">Export, restore, or permanently reset local data.</p>
 
             <div className="mt-6 divide-y divide-black/10 border-y border-black/10">
                 <ActionRow
