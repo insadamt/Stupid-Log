@@ -14,7 +14,7 @@ Fetch the intended release and inspect the exact version before rebuilding:
 
 ```bash
 git fetch --tags
-git switch --detach v1.1.0
+git switch --detach v1.2.0
 docker compose --env-file .env.production -f compose.production.yml build --pull
 docker compose --env-file .env.production -f compose.production.yml up -d
 ```

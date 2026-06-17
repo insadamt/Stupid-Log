@@ -2,6 +2,26 @@
 
 All notable changes to Stupid Log are documented here. The project follows semantic versioning.
 
+## [1.2.0] - 2026-06-17
+
+### Added
+
+- Added Home widgets for recently added, recently completed, and random library picks.
+- Added the Library controls drawer for denser sorting, filtering, and display controls.
+- Added advanced Library filters for ownership, devices, status, value, achievements, and playtime.
+
+### Changed
+
+- Made Library search case-insensitive and kept the Library grid refresh stable during filter changes.
+- Fixed Stats progression to use a consistent status order across summaries and platform rows.
+- Tightened compact UI copy, empty states, loading feedback, and final interaction polish.
+- Hardened backup restore and upload handling for safer archive validation and recovery flows.
+
+### Fixed
+
+- Fixed value inheritance so copy and DLC value totals carry through Stats correctly.
+- Preserved cents in currency value rows and value/base/paid delta badges, including `$2.98` and `+2.98` deltas.
+
 ## [1.1.0] - 2026-06-15
 
 ### Added
@@ -59,6 +79,7 @@ All notable changes to Stupid Log are documented here. The project follows seman
 
 - Stupid Log v1.0.0 is licensed under GPL-3.0.
 
+[1.2.0]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.2.0
 [1.1.0]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.1.0
 [1.0.2]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.0.2
 [1.0.1]: https://github.com/insadamt/Stupid-Log/releases/tag/v1.0.1

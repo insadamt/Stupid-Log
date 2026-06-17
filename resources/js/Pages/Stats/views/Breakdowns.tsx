@@ -67,7 +67,7 @@ export default function Breakdowns({ stats, previous, comparison }: { stats: Sta
 
     const chartConfig: ChartConfig = (() => {
         if (chart === 'games') {
-            const data = gamesMode === 'platform' ? slices<PlatformBreakdown>(platforms, (item) => item.library_games, prevPlatforms) : slices<StatusBreakdown>(statuses, (item) => item.library_games, prevStatuses);
+            const data = gamesMode === 'platform' ? slices<PlatformBreakdown>(platforms, (item) => item.library_games, prevPlatforms, 0) : slices<StatusBreakdown>(statuses, (item) => item.library_games, prevStatuses, 0);
             return { title: 'Total Games', eyebrow: gamesMode === 'platform' ? 'By platform' : 'By status', data, total: num(stats.library_games), center: 'games', delta: metricGrowth('library_games', stats, baseline), format: (value: number) => num(value), showPlatformIcons: gamesMode === 'platform' };
         }
         if (chart === 'playtime') {
@@ -75,12 +75,12 @@ export default function Breakdowns({ stats, previous, comparison }: { stats: Sta
         }
         if (chart === 'achievements') {
             const key = achievementMode === 'total' ? 'total_achievements' : 'earned_achievements';
-            return { title: 'Achievement Pool', eyebrow: `Only by platform · ${achievementMode}`, data: slices<PlatformBreakdown>(platforms, (item) => n(item[key]), prevPlatforms), total: num(achievementMode === 'total' ? stats.total_achievements : stats.earned_achievements), center: achievementMode === 'total' ? 'available achievements' : 'earned achievements', delta: metricGrowth(achievementMode === 'total' ? 'total_achievements' : 'earned_achievements', stats, baseline), format: (value: number) => num(value), showPlatformIcons: true };
+            return { title: 'Achievement Pool', eyebrow: `Only by platform · ${achievementMode}`, data: slices<PlatformBreakdown>(platforms, (item) => n(item[key]), prevPlatforms, 0), total: num(achievementMode === 'total' ? stats.total_achievements : stats.earned_achievements), center: achievementMode === 'total' ? 'available achievements' : 'earned achievements', delta: metricGrowth(achievementMode === 'total' ? 'total_achievements' : 'earned_achievements', stats, baseline), format: (value: number) => num(value), showPlatformIcons: true };
         }
-        const data = slices<PlatformBreakdown>(platforms, valueGetter, prevPlatforms);
+        const data = slices<PlatformBreakdown>(platforms, valueGetter, prevPlatforms, 2);
         const total = data.reduce((sum, item) => sum + item.value, 0);
         const prevTotal = prevPlatforms.reduce((sum, item) => sum + valueGetter(item), 0);
-        return { title: 'Library Value', eyebrow: `Only by platform · ${valueMode}`, data, total: money(total), center: valueCenterLabel(), delta: baseline ? growth(total, prevTotal) : null, format: money, showPlatformIcons: true };
+        return { title: 'Library Value', eyebrow: `Only by platform · ${valueMode}`, data, total: money(total), center: valueCenterLabel(), delta: baseline ? growth(total, prevTotal, 2) : null, format: money, showPlatformIcons: true };
     })();
 
     return (

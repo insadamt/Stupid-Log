@@ -97,6 +97,32 @@ class StatsFinancialValuesTest extends TestCase
         $this->assertSame(1.99, $archive[$secondCopy->library_game_id]['base_value']);
     }
 
+    public function test_confirmed_year_growth_preserves_currency_delta_cents(): void
+    {
+        SnapshotRun::create([
+            'user_id' => $this->user->id,
+            'year' => 2025,
+            'status' => 'confirmed',
+            'confirmed_at' => now()->subYear(),
+            'summary_json' => $this->statsSummary(),
+        ]);
+        SnapshotRun::create([
+            'user_id' => $this->user->id,
+            'year' => 2026,
+            'status' => 'confirmed',
+            'confirmed_at' => now(),
+            'summary_json' => $this->statsSummary([
+                'base_value' => 2.98,
+                'purchased_value' => 2.98,
+            ]),
+        ]);
+
+        $latestYear = app(StatsService::class)->confirmedYears($this->user)[0];
+
+        $this->assertSame(2.98, $latestYear['growth']['base_value']['delta']);
+        $this->assertSame(2.98, $latestYear['growth']['purchased_value']['delta']);
+    }
+
     public function test_snapshot_stats_use_frozen_snapshot_mapping_for_financial_values(): void
     {
         $copy = $this->createOwnershipCopy($this->user, 'Frozen Mapping Game', 'Xbox', 'Game Pass');
@@ -260,6 +286,53 @@ class StatsFinancialValuesTest extends TestCase
             'base_price' => $basePrice,
             'purchased_price' => $paidPrice,
         ])->load('libraryGame.game');
+    }
+
+    private function statsSummary(array $overrides = []): array
+    {
+        return [
+            'unique_titles' => 0,
+            'library_games' => 0,
+            'ownership_copies' => 0,
+            'owned_dlcs' => 0,
+            'completed' => 0,
+            'hundred_percent' => 0,
+            'playtime_hours' => 0.0,
+            'earned_achievements' => 0,
+            'total_achievements' => 0,
+            'achievement_progress' => 0.0,
+            'copy_base_value' => 0.0,
+            'copy_purchased_value' => 0.0,
+            'dlc_base_value' => 0.0,
+            'dlc_purchased_value' => 0.0,
+            'subscription_allocated_value' => 0.0,
+            'subscription_unallocated_value' => 0.0,
+            'subscription_total_value' => 0.0,
+            'in_app_purchase_allocated_value' => 0.0,
+            'in_app_purchase_unallocated_value' => 0.0,
+            'in_app_purchase_total_value' => 0.0,
+            'in_app_purchase_value' => 0.0,
+            'base_value' => 0.0,
+            'purchased_value' => 0.0,
+            'breakdowns' => [
+                'platforms' => [],
+                'statuses' => [],
+                'ownership_types' => [],
+            ],
+            'archive' => [
+                'most_played' => [],
+                'biggest_base_price' => [],
+                'biggest_paid_price' => [],
+                'unallocated_financial' => [
+                    'subscription_unallocated_value' => 0.0,
+                    'in_app_purchase_unallocated_value' => 0.0,
+                    'total_unallocated_value' => 0.0,
+                ],
+            ],
+            'best_games' => [],
+            'growth' => [],
+            ...$overrides,
+        ];
     }
 
     private function createSubscription(string $ownershipTypeName, float $amount): SubscriptionEntry

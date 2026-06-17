@@ -148,6 +148,7 @@ export type StatsArchive = {
 export type GrowthMetric = {
     delta: number;
     percentage: number | null;
+    deltaDecimals?: number;
 };
 
 export type ReferenceData = {

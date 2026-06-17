@@ -6,7 +6,10 @@ use App\DataTransferObjects\DataPortability\BackupArtifact;
 use App\Models\User;
 use App\Services\DataPortability\BackupExporter;
 use Database\Seeders\DatabaseSeeder;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Exceptions\PostTooLargeException;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 use ZipArchive;
@@ -101,6 +104,19 @@ class DataPortabilityPreviewTest extends TestCase
         $this->postJson('/settings/data-portability/preview', [
             'backup' => $this->upload($artifact),
         ])->assertUnprocessable();
+    }
+
+    public function test_preview_post_too_large_exception_renders_json(): void
+    {
+        $request = Request::create('/settings/data-portability/preview', 'POST');
+        $response = app(ExceptionHandler::class)->render($request, new PostTooLargeException('The POST data is too large.'));
+
+        $this->assertSame(413, $response->getStatusCode());
+        $this->assertSame('application/json', $response->headers->get('content-type'));
+        $this->assertSame(
+            '{"message":"Backup upload rejected. The file is larger than the server upload limit."}',
+            $response->getContent(),
+        );
     }
 
     private function exportBackup(): BackupArtifact

@@ -54,6 +54,7 @@ COPY --from=vendor /app/vendor ./vendor
 COPY --from=frontend /app/public/build ./public/build
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/apache-servername.conf /etc/apache2/conf-enabled/servername.conf
+COPY docker/stupid-log.ini /usr/local/etc/php/conf.d/stupid-log.ini
 COPY docker/start.sh /usr/local/bin/stupid-log-start
 
 RUN chmod +x /usr/local/bin/stupid-log-start \

@@ -29,15 +29,25 @@ export function clampPercent(value: number) {
     return Math.max(0, Math.min(100, value));
 }
 
-export function growth(current: number, previous: number): GrowthMetric {
-    const delta = Number((current - previous).toFixed(1));
-    return { delta, percentage: previous > 0 ? Number(((delta / previous) * 100).toFixed(1)) : null };
+function defaultDeltaDecimals(key: MetricKey) {
+    if (key === 'base_value' || key === 'purchased_value') return 2;
+    if (key === 'playtime_hours' || key === 'achievement_progress') return 1;
+
+    return 0;
+}
+
+export function growth(current: number, previous: number, deltaDecimals = 1): GrowthMetric {
+    const delta = Number((current - previous).toFixed(deltaDecimals));
+    return { delta, deltaDecimals, percentage: previous > 0 ? Number(((delta / previous) * 100).toFixed(1)) : null };
 }
 
 export function metricGrowth(key: MetricKey, current: StatView, previous?: StatView | null) {
     if (!previous) return null;
 
-    return current.growth?.[key] ?? growth(n(current[key]), n(previous[key]));
+    const deltaDecimals = defaultDeltaDecimals(key);
+    const existingGrowth = current.growth?.[key];
+
+    return existingGrowth ? { ...existingGrowth, deltaDecimals } : growth(n(current[key]), n(previous[key]), deltaDecimals);
 }
 
 function fallbackSliceColor(label: string) {
@@ -46,7 +56,7 @@ function fallbackSliceColor(label: string) {
     return palette[hash % palette.length];
 }
 
-export function slices<T extends { label: string; color_hex?: string | null }>(items: T[], getter: (item: T) => number, previousItems: T[] = []): Slice[] {
+export function slices<T extends { label: string; color_hex?: string | null }>(items: T[], getter: (item: T) => number, previousItems: T[] = [], deltaDecimals = 1): Slice[] {
     const labels = [...items, ...previousItems.filter((previous) => !items.some((item) => item.label === previous.label))];
 
     return labels
@@ -58,7 +68,7 @@ export function slices<T extends { label: string; color_hex?: string | null }>(i
                 label: source.label,
                 value,
                 color: item?.color_hex ?? previous?.color_hex ?? fallbackSliceColor(source.label),
-                growth: previous ? growth(value, getter(previous)) : null,
+                growth: previous ? growth(value, getter(previous), deltaDecimals) : null,
             };
         })
         .sort((a, b) => b.value - a.value);

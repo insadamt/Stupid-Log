@@ -13,6 +13,8 @@ use App\Services\ProviderCredentialTestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use InvalidArgumentException;
@@ -67,7 +69,7 @@ class SetupController extends Controller
         BackupRestorer $restorer,
         LocalUserService $users,
     ): JsonResponse {
-        $validated = $request->validate([
+        $validated = $this->validateJson($request->all(), [
             'token' => ['required', 'string', 'size:64'],
         ]);
 
@@ -84,6 +86,18 @@ class SetupController extends Controller
         }
 
         return response()->json(['restored' => true]);
+    }
+
+    private function validateJson(array $payload, array $rules): array
+    {
+        try {
+            return Validator::make($payload, $rules)->validate();
+        } catch (ValidationException $exception) {
+            abort(response()->json([
+                'message' => $exception->validator->errors()->first() ?: 'The given data was invalid.',
+                'errors' => $exception->errors(),
+            ], 422));
+        }
     }
 
     public function storeImportedCredentials(

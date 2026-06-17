@@ -21,12 +21,12 @@ class RuntimeFoundationsTest extends TestCase
     {
         $this->seed(StupidLogReferenceSeeder::class);
 
-        $this->assertSame('1.1.0', config('app.version'));
+        $this->assertSame('1.2.0', config('app.version'));
         $this->get('/setup')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Setup', false)
-                ->where('appVersion', '1.1.0'));
+                ->where('appVersion', '1.2.0'));
     }
 
     public function test_reference_seeder_assigns_stable_platform_colors_without_duplicates(): void

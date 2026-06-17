@@ -1339,7 +1339,11 @@ class StatsService
 
     private function growthDeltaPrecision(string $key): int
     {
-        return str_contains($key, 'value') || in_array($key, ['playtime_hours', 'achievement_progress'], true) ? 1 : 0;
+        if (str_contains($key, 'value')) {
+            return 2;
+        }
+
+        return in_array($key, ['playtime_hours', 'achievement_progress'], true) ? 1 : 0;
     }
 
     private function boundedLimit(?Request $request, int $default, int $max): int

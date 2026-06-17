@@ -1,6 +1,6 @@
-# Stupid Log V1.1.0 — Seeders Only
+# Stupid Log V1.2.0 — Seeders Only
 
-This file contains only the seed data required for Stupid Log V1.1.0.
+This file contains only the seed data required for Stupid Log V1.2.0.
 
 Use correct spelling in code and database values.
 

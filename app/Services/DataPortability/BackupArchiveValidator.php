@@ -9,8 +9,6 @@ use ZipArchive;
 
 final class BackupArchiveValidator
 {
-    private const SAMPLE_ROWS = 20;
-
     public function __construct(
         private readonly BackupTableRegistry $tables,
         private readonly ArchivePathGuard $paths,
@@ -33,7 +31,8 @@ final class BackupArchiveValidator
             $declaredFiles = $this->declaredContentFiles($manifest);
             $this->validateDeclaredEntries($entries, $declaredFiles);
             $this->validateChecksums($zip, $checksums, $declaredFiles);
-            $this->sampleRows($zip, $manifest);
+            $this->validateTableRows($zip, $manifest);
+            $this->validateMediaIndex($zip, $manifest, $declaredFiles);
 
             return new ValidatedBackup($manifest, $checksums['files']);
         } finally {
@@ -208,33 +207,35 @@ final class BackupArchiveValidator
         }
     }
 
-    private function sampleRows(ZipArchive $zip, array $manifest): void
+    private function validateTableRows(ZipArchive $zip, array $manifest): void
     {
         foreach ($this->tables->tables() as $definition) {
-            $remaining = self::SAMPLE_ROWS;
+            $count = 0;
 
             foreach ($manifest['tables'][$definition->name]['files'] as $file) {
-                if ($remaining === 0) {
-                    break;
-                }
-
                 $stream = $zip->getStream($file);
 
                 if ($stream === false) {
                     throw new RuntimeException("Missing declared backup file: {$file}");
                 }
 
-                $sampled = 0;
-
-                foreach ($this->ndjson->rows($stream, $remaining) as $row) {
+                foreach ($this->ndjson->rows($stream) as $row) {
                     $this->validateRowShape($definition, $row);
-                    $sampled++;
+                    $count++;
                 }
 
                 fclose($stream);
-                $remaining -= $sampled;
+            }
+
+            if ($count !== $manifest['tables'][$definition->name]['count']) {
+                throw new RuntimeException("Backup row count does not match for {$definition->name}.");
             }
         }
+    }
+
+    private function validateMediaIndex(ZipArchive $zip, array $manifest, array $declaredFiles): void
+    {
+        $declared = array_fill_keys($declaredFiles, true);
 
         $stream = $zip->getStream('media-index.ndjson');
 
@@ -242,27 +243,47 @@ final class BackupArchiveValidator
             throw new RuntimeException('Unable to read the media index.');
         }
 
-        foreach ($this->ndjson->rows($stream, self::SAMPLE_ROWS) as $row) {
+        $count = 0;
+
+        foreach ($this->ndjson->rows($stream) as $row) {
             foreach (['entity_type', 'old_id', 'original_path', 'archive_path'] as $field) {
                 if (! array_key_exists($field, $row)) {
                     throw new RuntimeException("Media index row is missing {$field}.");
                 }
             }
 
-            $this->paths->assertSupportedMedia((string) $row['archive_path']);
+            if (! in_array($row['entity_type'], ['game', 'dlc'], true)
+                || ! is_int($row['old_id'])
+                || ! is_string($row['original_path'])
+                || ! is_string($row['archive_path'])) {
+                throw new RuntimeException('Media index row is malformed.');
+            }
+
+            $this->paths->assertSupportedMedia($row['archive_path']);
+
+            if (! isset($declared[$row['archive_path']])) {
+                throw new RuntimeException("Missing indexed media file: {$row['archive_path']}");
+            }
+
+            $count++;
         }
 
         fclose($stream);
+
+        if ($count !== $manifest['media']['count']) {
+            throw new RuntimeException('Backup media count does not match the media index.');
+        }
     }
 
     private function validateRowShape(BackupTableDefinition $definition, array $row): void
     {
         $expected = [...array_diff($definition->columns, ['id']), 'old_id'];
+        $actual = array_keys($row);
+        sort($expected);
+        sort($actual);
 
-        foreach ($expected as $column) {
-            if (! array_key_exists($column, $row)) {
-                throw new RuntimeException("{$definition->name} row is missing {$column}.");
-            }
+        if ($actual !== $expected || ! is_int($row['old_id'])) {
+            throw new RuntimeException("Malformed {$definition->name} backup row.");
         }
     }
 

@@ -1,6 +1,7 @@
 import { router } from '@inertiajs/react';
 import { ArchiveRestore, Download, RotateCcw, Upload } from 'lucide-react';
 import { ChangeEvent, ReactNode, useState } from 'react';
+import { readJsonResponse } from '../../http';
 import { SettingsButton } from './SettingsControls';
 
 type BackupPreview = {
@@ -51,7 +52,11 @@ export default function DataPortabilityPanel({
                 headers: requestHeaders(),
                 body: formData,
             });
-            const payload = await response.json();
+            const payload = await readJsonResponse(
+                response,
+                'Backup validation failed. Server returned a non-JSON error.',
+                'Backup upload rejected. The file is larger than the server upload limit.',
+            );
 
             if (!response.ok) throw new Error(responseMessage(payload, 'Backup validation failed.'));
             setPreview(payload as BackupPreview);
@@ -76,7 +81,7 @@ export default function DataPortabilityPanel({
                 headers: { ...requestHeaders(), 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token: preview.token, confirmation }),
             });
-            const payload = await response.json();
+            const payload = await readJsonResponse(response, 'Restore failed. Server returned a non-JSON error.');
 
             if (!response.ok) throw new Error(responseMessage(payload, 'Restore failed.'));
             router.visit('/settings?section=data');

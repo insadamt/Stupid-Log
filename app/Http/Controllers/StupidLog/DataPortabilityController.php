@@ -9,6 +9,8 @@ use App\Services\DataPortability\BackupRestorer;
 use App\Services\LocalUserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -27,7 +29,7 @@ class DataPortabilityController extends Controller
 
     public function preview(Request $request, BackupPreviewStore $previews): JsonResponse
     {
-        $validated = $request->validate([
+        $validated = $this->validateJson($request->all(), [
             'backup' => ['required', 'file', 'max:2097152'],
         ]);
 
@@ -46,7 +48,7 @@ class DataPortabilityController extends Controller
         BackupRestorer $restorer,
         LocalUserService $users,
     ): JsonResponse {
-        $validated = $request->validate([
+        $validated = $this->validateJson($request->all(), [
             'token' => ['required', 'string', 'size:64'],
             'confirmation' => ['required', 'in:RESTORE'],
         ]);
@@ -59,5 +61,17 @@ class DataPortabilityController extends Controller
         }
 
         return response()->json(['restored' => true]);
+    }
+
+    private function validateJson(array $payload, array $rules): array
+    {
+        try {
+            return Validator::make($payload, $rules)->validate();
+        } catch (ValidationException $exception) {
+            abort(response()->json([
+                'message' => $exception->validator->errors()->first() ?: 'The given data was invalid.',
+                'errors' => $exception->errors(),
+            ], 422));
+        }
     }
 }

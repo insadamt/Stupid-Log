@@ -120,7 +120,9 @@ class DataPortabilityRestoreTest extends TestCase
             'game_id' => $restoredGame->id,
         ]);
         $this->assertStringStartsWith('covers/restored/', $restoredGame->cover_path);
+        $this->assertStringStartsWith('covers/restored/', $restoredDlc->cover_path);
         Storage::disk('public')->assertExists($restoredGame->cover_path);
+        Storage::disk('public')->assertExists($restoredDlc->cover_path);
         Storage::disk('public')->assertMissing('covers/games/current.webp');
         $this->assertDirectoryDoesNotExist(storage_path('app/private/data-portability/imports/'.$preview['token']));
 
@@ -171,6 +173,34 @@ class DataPortabilityRestoreTest extends TestCase
             'token' => $preview['token'],
             'confirmation' => 'yes',
         ])->assertUnprocessable();
+    }
+
+    public function test_preview_rejects_invalid_backup_upload_with_json_error(): void
+    {
+        $this->post('/settings/data-portability/preview', [
+            'backup' => UploadedFile::fake()->createWithContent('not-a-backup.zip', 'plain text'),
+        ])->assertUnprocessable()
+            ->assertHeader('content-type', 'application/json')
+            ->assertJson(['message' => 'The uploaded file is not a readable ZIP archive.']);
+    }
+
+    public function test_preview_rejects_backup_with_mismatched_row_count(): void
+    {
+        $artifact = app(BackupExporter::class)->export(User::firstOrFail());
+
+        $this->replaceJsonFile($artifact, 'manifest.json', function (array $manifest) {
+            $manifest['tables']['games']['count']++;
+
+            return $manifest;
+        });
+
+        $this->postJson('/settings/data-portability/preview', [
+            'backup' => UploadedFile::fake()->createWithContent(
+                $artifact->downloadName,
+                (string) file_get_contents($artifact->path),
+            ),
+        ])->assertUnprocessable()
+            ->assertJson(['message' => 'Backup row count does not match for games.']);
     }
 
     public function test_restore_can_bootstrap_a_reset_installation_from_setup(): void
@@ -271,9 +301,11 @@ class DataPortabilityRestoreTest extends TestCase
             'base_price' => 50,
             'purchased_price' => 0,
         ]);
+        Storage::disk('public')->put('covers/dlcs/portable-dlc.webp', 'portable dlc cover');
         $dlc = Dlc::create([
             'game_id' => $game->id,
             'title' => 'Portable DLC',
+            'cover_path' => 'covers/dlcs/portable-dlc.webp',
             'source_provider_id' => $provider->id,
         ]);
         $ownedDlc = OwnedDlc::create([
@@ -394,6 +426,16 @@ class DataPortabilityRestoreTest extends TestCase
         $zip->addFromString($path, $contents);
         $zip->deleteName('checksums.json');
         $zip->addFromString('checksums.json', json_encode($checksums, JSON_THROW_ON_ERROR));
+        $zip->close();
+    }
+
+    private function replaceJsonFile(BackupArtifact $artifact, string $path, callable $mutate): void
+    {
+        $zip = new ZipArchive;
+        $this->assertTrue($zip->open($artifact->path) === true);
+        $contents = json_encode($mutate(json_decode($zip->getFromName($path), true, flags: JSON_THROW_ON_ERROR)), JSON_THROW_ON_ERROR);
+        $zip->deleteName($path);
+        $zip->addFromString($path, $contents);
         $zip->close();
     }
 

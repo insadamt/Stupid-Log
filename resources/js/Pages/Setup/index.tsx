@@ -6,6 +6,7 @@ import {
     prefersReducedMotion,
     removePageTransitionLayer,
 } from '../../animation';
+import { readJsonResponse } from '../../http';
 import SetupIntro from './components/SetupIntro';
 import SetupImportBackup from './components/SetupImportBackup';
 import SetupImportedProviders from './components/SetupImportedProviders';
@@ -200,7 +201,11 @@ export default function Setup() {
                 headers: requestHeaders(),
                 body: formData,
             });
-            const payload = await response.json();
+            const payload = await readJsonResponse(
+                response,
+                'Backup validation failed. Server returned a non-JSON error.',
+                'Backup upload rejected. The file is larger than the server upload limit.',
+            );
 
             if (!response.ok) {
                 throw new Error(responseMessage(payload, 'Backup validation failed.'));
@@ -217,7 +222,7 @@ export default function Setup() {
                 },
                 body: JSON.stringify({ token: preview.token }),
             });
-            const restorePayload = await restoreResponse.json();
+            const restorePayload = await readJsonResponse(restoreResponse, 'Backup import failed. Server returned a non-JSON error.');
 
             if (!restoreResponse.ok) {
                 throw new Error(responseMessage(restorePayload, 'Backup import failed.'));
