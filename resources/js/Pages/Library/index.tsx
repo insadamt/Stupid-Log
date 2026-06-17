@@ -1,5 +1,5 @@
 import { ArrowDownAZ, Clock3, Trophy, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AppLayout from '../../Components/AppLayout';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { GameCardData, ReferenceData } from '../../types';
@@ -35,10 +35,12 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
     const [games, setGames] = useState<GameCardData[]>(libraryGames);
     const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(libraryGames.length < libraryMeta.total);
-    const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const cardsPerRow = 6;
     const debouncedQuery = useDebouncedValue(query);
     const requestKey = JSON.stringify({ query: debouncedQuery, filters, sort });
+    const requestKeyRef = useRef(requestKey);
 
     const statusOptions = useMemo(() => {
         const merged = [...preferredStatuses, ...Object.keys(libraryMeta.statuses)];
@@ -100,11 +102,13 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
     const hasActiveFilters = activeFilterChips.length > 0;
 
     useEffect(() => {
+        requestKeyRef.current = requestKey;
         let canceled = false;
         const params = libraryRequestParams(debouncedQuery, filters, sort);
         params.set('limit', '40');
 
-        setLoading(true);
+        setLoadingMore(false);
+        setRefreshing(true);
         fetch(`/library-games?${params.toString()}`, { headers: { Accept: 'application/json' } })
             .then((response) => response.json())
             .then((payload) => {
@@ -114,7 +118,7 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                 setHasMore(Boolean(payload.has_more));
             })
             .finally(() => {
-                if (!canceled) setLoading(false);
+                if (!canceled) setRefreshing(false);
             });
 
         return () => {
@@ -123,21 +127,28 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
     }, [requestKey]);
 
     function loadMore() {
-        if (!hasMore || loading || !nextCursor) return;
+        if (!hasMore || refreshing || loadingMore || !nextCursor) return;
 
         const params = libraryRequestParams(debouncedQuery, filters, sort);
         params.set('cursor', nextCursor);
         params.set('limit', '40');
+        const loadMoreRequestKey = requestKey;
 
-        setLoading(true);
+        setLoadingMore(true);
         fetch(`/library-games?${params.toString()}`, { headers: { Accept: 'application/json' } })
             .then((response) => response.json())
             .then((payload) => {
+                if (requestKeyRef.current !== loadMoreRequestKey) return;
+
                 setGames((current) => [...current, ...(payload.items ?? [])]);
                 setNextCursor(payload.next_cursor ?? null);
                 setHasMore(Boolean(payload.has_more));
             })
-            .finally(() => setLoading(false));
+            .finally(() => {
+                if (requestKeyRef.current === loadMoreRequestKey) {
+                    setLoadingMore(false);
+                }
+            });
     }
 
     function updateFilters(updates: Partial<LibraryFilters>) {
@@ -145,10 +156,12 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
     }
 
     function clearFilters() {
+        if (refreshing) return;
         setFilters(defaultFilters);
     }
 
     function removeFilter(key: keyof LibraryFilters) {
+        if (refreshing) return;
         setFilters((current) => ({ ...current, [key]: defaultFilters[key] }));
     }
 
@@ -163,12 +176,14 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                     references={references}
                     onQueryChange={setQuery}
                     onToggleControls={() => setControlsOpen(true)}
+                    loading={refreshing}
                 />
 
                 <main className="h-full min-h-0">
                     <section className="relative h-full min-h-0 overflow-hidden rounded-[38px] border border-black/8 bg-[#f4f7f1] shadow-[0_24px_70px_rgb(0_0_0/0.08)]">
                         <div className="absolute inset-0 opacity-55 [background-image:linear-gradient(rgba(0,0,0,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.045)_1px,transparent_1px)] [background-size:36px_36px]" />
                         <div className="absolute left-0 top-0 h-24 w-full bg-gradient-to-b from-[#b7ff63]/18 to-transparent" />
+                        <div className={`absolute inset-x-0 top-0 z-30 h-1 bg-[#b7ff63] transition-opacity ${refreshing ? 'opacity-100' : 'opacity-0'}`} />
 
                         <div className="absolute left-6 right-6 top-6 z-20 flex min-w-0 items-start justify-between gap-3">
                             <div className="flex min-w-0 flex-wrap gap-2">
@@ -177,7 +192,8 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                                         key={chip.key}
                                         type="button"
                                         onClick={() => removeFilter(chip.key)}
-                                        className="inline-flex h-9 max-w-[220px] items-center gap-2 rounded-full bg-black px-3 text-xs font-black text-white shadow-[0_12px_24px_rgb(0_0_0/0.12)]"
+                                        disabled={refreshing}
+                                        className="inline-flex h-9 max-w-[220px] items-center gap-2 rounded-full bg-black px-3 text-xs font-black text-white shadow-[0_12px_24px_rgb(0_0_0/0.12)] transition disabled:cursor-wait disabled:opacity-55"
                                     >
                                         <span className="truncate">{chip.label}</span>
                                         <X size={14} strokeWidth={3} className="shrink-0 text-[#b7ff63]" />
@@ -188,20 +204,22 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                                 <button
                                     type="button"
                                     onClick={clearFilters}
-                                    className="h-9 shrink-0 rounded-full bg-[#b7ff63] px-4 text-xs font-black uppercase tracking-[0.14em] text-black shadow-[0_12px_24px_rgb(0_0_0/0.12)]"
+                                    disabled={refreshing}
+                                    className="h-9 shrink-0 rounded-full bg-[#b7ff63] px-4 text-xs font-black uppercase tracking-[0.14em] text-black shadow-[0_12px_24px_rgb(0_0_0/0.12)] transition disabled:cursor-wait disabled:opacity-55"
                                 >
-                                    Clear Filters
+                                    {refreshing ? 'Clearing' : 'Clear Filters'}
                                 </button>
                             )}
                         </div>
 
-                        <div className="relative z-10 h-full min-h-0">
+                        <div className="relative z-10 h-full min-h-0" aria-busy={refreshing || loadingMore}>
                             <VirtualCardGrid
                                 items={games}
                                 columns={cardsPerRow}
                                 resultSetKey={requestKey}
                                 hasMore={hasMore}
-                                loading={loading}
+                                refreshing={refreshing}
+                                loadingMore={loadingMore}
                                 onNearEnd={loadMore}
                                 empty={
                                     <div className="max-w-md rounded-[30px] bg-black p-8 text-center text-white shadow-[0_24px_55px_rgb(0_0_0/0.22)]">
@@ -227,6 +245,7 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                         onFiltersChange={updateFilters}
                         onSortChange={setSort}
                         onClearFilters={clearFilters}
+                        loading={refreshing}
                         close={() => setControlsOpen(false)}
                     />
                 )}

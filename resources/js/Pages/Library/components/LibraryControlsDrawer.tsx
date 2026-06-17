@@ -36,6 +36,7 @@ export default function LibraryControlsDrawer({
     onFiltersChange,
     onSortChange,
     onClearFilters,
+    loading,
     close,
 }: {
     filters: LibraryFilters;
@@ -57,6 +58,7 @@ export default function LibraryControlsDrawer({
     onFiltersChange: (filters: Partial<LibraryFilters>) => void;
     onSortChange: (sort: SortMode) => void;
     onClearFilters: () => void;
+    loading: boolean;
     close: () => void;
 }) {
     const [activeTab, setActiveTab] = useState<ControlsTab>('filter');
@@ -95,7 +97,7 @@ export default function LibraryControlsDrawer({
 
         document.addEventListener('keydown', closeOnEscape);
         return () => document.removeEventListener('keydown', closeOnEscape);
-    });
+    }, []);
 
     function requestClose() {
         if (closingRef.current) return;
@@ -173,8 +175,9 @@ export default function LibraryControlsDrawer({
                                                 key={item.label}
                                                 type="button"
                                                 onClick={() => onFiltersChange({ status: item.label })}
+                                                disabled={loading}
                                                 className={[
-                                                    'flex min-h-11 w-full min-w-0 max-w-full items-center justify-between gap-2 overflow-hidden rounded-[16px] px-3 py-2 text-left text-sm font-black transition',
+                                                    'flex min-h-11 w-full min-w-0 max-w-full items-center justify-between gap-2 overflow-hidden rounded-[16px] px-3 py-2 text-left text-sm font-black transition disabled:cursor-wait disabled:opacity-55',
                                                     selected
                                                         ? item.status ? 'text-black' : 'bg-[#b7ff63] text-black'
                                                         : 'bg-white/10 text-white/58 hover:bg-white/15 hover:text-white',
@@ -202,18 +205,21 @@ export default function LibraryControlsDrawer({
                                         }))}
                                         value={filters.platform}
                                         onChange={(platform) => onFiltersChange({ platform })}
+                                        disabled={loading}
                                     />
                                     <SelectField
                                         label="Ownership"
                                         options={ownershipOptions}
                                         value={filters.ownershipType}
                                         onChange={(ownershipType) => onFiltersChange({ ownershipType })}
+                                        disabled={loading}
                                     />
                                     <SelectField
                                         label="Device"
                                         options={deviceOptions}
                                         value={filters.device}
                                         onChange={(device) => onFiltersChange({ device })}
+                                        disabled={loading}
                                     />
                                 </div>
                             </FilterSection>
@@ -229,6 +235,7 @@ export default function LibraryControlsDrawer({
                                         ]}
                                         value={filters.achievements}
                                         onChange={(achievements) => onFiltersChange({ achievements: achievements as LibraryFilters['achievements'] })}
+                                        disabled={loading}
                                     />
                                     <SegmentedControl
                                         label="Cover"
@@ -239,6 +246,7 @@ export default function LibraryControlsDrawer({
                                         ]}
                                         value={filters.cover}
                                         onChange={(cover) => onFiltersChange({ cover: cover as LibraryFilters['cover'] })}
+                                        disabled={loading}
                                     />
                                 </div>
                             </FilterSection>
@@ -250,12 +258,14 @@ export default function LibraryControlsDrawer({
                                         options={firstPlayedYearOptions}
                                         value={filters.firstPlayedYear}
                                         onChange={(firstPlayedYear) => onFiltersChange({ firstPlayedYear })}
+                                        disabled={loading}
                                     />
                                     <SelectField
                                         label="Completed"
                                         options={completedYearOptions}
                                         value={filters.completedYear}
                                         onChange={(completedYear) => onFiltersChange({ completedYear })}
+                                        disabled={loading}
                                     />
                                 </div>
                             </FilterSection>
@@ -271,8 +281,9 @@ export default function LibraryControlsDrawer({
                                         key={option.value}
                                         type="button"
                                         onClick={() => onSortChange(option.value)}
+                                        disabled={loading}
                                         className={[
-                                            'flex min-h-12 w-full items-center gap-3 rounded-[18px] px-4 py-3 text-left text-sm font-black transition',
+                                            'flex min-h-12 w-full items-center gap-3 rounded-[18px] px-4 py-3 text-left text-sm font-black transition disabled:cursor-wait disabled:opacity-55',
                                             selected ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-white/58 hover:bg-white/15 hover:text-white',
                                         ].join(' ')}
                                     >
@@ -290,11 +301,11 @@ export default function LibraryControlsDrawer({
                         <button
                             type="button"
                             onClick={onClearFilters}
-                            disabled={filterCount === 0}
+                            disabled={filterCount === 0 || loading}
                             className="inline-flex h-11 items-center gap-2 rounded-[16px] bg-white/10 px-4 text-sm font-black text-white/65 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
                         >
                             <RotateCcw size={17} strokeWidth={3} />
-                            Clear All
+                            {loading ? 'Updating' : 'Clear All'}
                         </button>
                         <button
                             type="button"
@@ -328,11 +339,13 @@ function SelectField({
     options,
     value,
     onChange,
+    disabled = false,
 }: {
     label: string;
     options: Array<string | { value: string; label: string }>;
     value: string;
     onChange: (value: string) => void;
+    disabled?: boolean;
 }) {
     return (
         <label className="grid gap-1.5">
@@ -340,7 +353,8 @@ function SelectField({
             <select
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
-                className="h-12 min-w-0 rounded-[16px] border border-white/10 bg-white/10 px-3 text-sm font-black text-white outline-none transition hover:bg-white/15 focus:border-[#b7ff63] focus:bg-white/15"
+                disabled={disabled}
+                className="h-12 min-w-0 rounded-[16px] border border-white/10 bg-white/10 px-3 text-sm font-black text-white outline-none transition hover:bg-white/15 focus:border-[#b7ff63] focus:bg-white/15 disabled:cursor-wait disabled:opacity-55"
             >
                 {options.map((option) => {
                     const optionValue = typeof option === 'string' ? option : option.value;
@@ -366,11 +380,13 @@ function SegmentedControl({
     options,
     value,
     onChange,
+    disabled = false,
 }: {
     label: string;
     options: Array<{ value: string; label: string }>;
     value: string;
     onChange: (value: string) => void;
+    disabled?: boolean;
 }) {
     return (
         <div className="grid gap-1.5">
@@ -384,8 +400,9 @@ function SegmentedControl({
                             key={option.value}
                             type="button"
                             onClick={() => onChange(option.value)}
+                            disabled={disabled}
                             className={[
-                                'h-10 min-w-0 rounded-[13px] px-2 text-sm font-black transition',
+                                'h-10 min-w-0 rounded-[13px] px-2 text-sm font-black transition disabled:cursor-wait disabled:opacity-55',
                                 selected ? 'bg-[#b7ff63] text-black' : 'text-white/55 hover:bg-white/10 hover:text-white',
                             ].join(' ')}
                         >

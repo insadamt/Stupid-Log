@@ -8,12 +8,14 @@ export default function LibraryToolbar({
     references,
     onQueryChange,
     onToggleControls,
+    loading,
 }: {
     query: string;
     controlsOpen: boolean;
     references: ReferenceData;
     onQueryChange: (query: string) => void;
     onToggleControls: () => void;
+    loading: boolean;
 }) {
     return (
         <section className="grid gap-3 rounded-[26px] border border-black/8 bg-[#e9eee9] p-2 shadow-[0_18px_44px_rgb(0_0_0/0.06)] xl:grid-cols-[minmax(360px,1fr)_auto]">
@@ -31,13 +33,14 @@ export default function LibraryToolbar({
                 <button
                     type="button"
                     onClick={onToggleControls}
+                    disabled={loading}
                     className={[
-                        'inline-flex h-[46px] items-center gap-2 rounded-[17px] px-4 text-sm font-black transition',
+                        'inline-flex h-[46px] items-center gap-2 rounded-[17px] px-4 text-sm font-black transition disabled:cursor-wait disabled:opacity-65',
                         controlsOpen ? 'bg-[#b7ff63] text-black' : 'bg-black text-white',
                     ].join(' ')}
                 >
                     <Filter size={18} strokeWidth={3} />
-                    Controls
+                    {loading ? 'Updating' : 'Controls'}
                 </button>
 
                 <AddGameWizard

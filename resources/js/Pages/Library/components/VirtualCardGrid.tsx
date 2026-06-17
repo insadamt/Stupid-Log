@@ -9,7 +9,8 @@ export default function VirtualCardGrid({
     columns,
     resultSetKey,
     hasMore,
-    loading,
+    refreshing,
+    loadingMore,
     empty,
     onNearEnd,
 }: {
@@ -17,7 +18,8 @@ export default function VirtualCardGrid({
     columns: number;
     resultSetKey: string;
     hasMore: boolean;
-    loading: boolean;
+    refreshing: boolean;
+    loadingMore: boolean;
     empty: ReactNode;
     onNearEnd: () => void;
 }) {
@@ -30,7 +32,7 @@ export default function VirtualCardGrid({
     const rowHeight = 355;
     const gapX = 24;
     const totalRows = Math.ceil(items.length / columns);
-    const totalHeight = Math.max(1, totalRows) * rowHeight + (hasMore || loading ? 76 : 0);
+    const totalHeight = Math.max(1, totalRows) * rowHeight + (hasMore || loadingMore ? 76 : 0);
     const startRow = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
     const endRow = Math.min(totalRows, Math.ceil((scrollTop + viewportHeight) / rowHeight) + 2);
     const startIndex = startRow * columns;
@@ -99,12 +101,22 @@ export default function VirtualCardGrid({
         }
     }
 
-    if (items.length === 0 && !loading) {
+    if (items.length === 0 && !refreshing) {
         return <div className="grid h-full place-items-center">{empty}</div>;
     }
 
     return (
         <div ref={ref} onScroll={handleScroll} className="sl-scrollbar relative h-full min-h-0 overflow-y-auto overflow-x-hidden px-16 py-10">
+            {items.length === 0 && refreshing && (
+                <div className="grid h-full place-items-center">
+                    <div className="rounded-[28px] bg-black px-6 py-5 text-center text-white shadow-[0_24px_55px_rgb(0_0_0/0.22)]">
+                        <div className="mx-auto h-1 w-28 overflow-hidden rounded-full bg-white/10">
+                            <div className="h-full w-1/2 animate-pulse rounded-full bg-[#b7ff63]" />
+                        </div>
+                        <p className="mt-4 text-sm font-black uppercase tracking-[0.18em] text-[#b7ff63]">Updating</p>
+                    </div>
+                </div>
+            )}
             <div className="relative mx-auto" style={{ width: columns * cardWidth + (columns - 1) * gapX, height: totalHeight }}>
                 {visibleItems.map((game, offset) => {
                     const index = startIndex + offset;
@@ -136,9 +148,9 @@ export default function VirtualCardGrid({
                         </div>
                     );
                 })}
-                {hasMore && (
+                {(hasMore || loadingMore) && (
                     <div className="absolute left-0 right-0 grid h-14 place-items-center rounded-[22px] bg-black/5 text-xs font-black uppercase tracking-[0.16em] text-black/35" style={{ top: totalRows * rowHeight }}>
-                        Scroll for more
+                        {loadingMore ? 'Loading more' : 'Scroll for more'}
                     </div>
                 )}
             </div>

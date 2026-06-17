@@ -11,7 +11,7 @@ type HomeGameWidgetProps = {
     game: GameCardData | null;
     icon: LucideIcon;
     emptyTitle: string;
-    emptyText: string;
+    emptyText?: string;
     variant: 'feature' | 'compact';
     coverRef?: RefObject<HTMLDivElement | null>;
     action?: {
@@ -32,6 +32,8 @@ const HomeGameWidget = forwardRef<HTMLElement, HomeGameWidgetProps>(function Hom
     coverRef,
     action,
 }, ref) {
+    const featureDetail = action?.loading ? 'Picking...' : game ? 'Still open.' : emptyText;
+
     if (variant === 'feature') {
         return (
             <section ref={ref} data-home-widget className="relative min-h-0 overflow-hidden rounded-[38px] border border-white/10 bg-[#101816] p-6 shadow-[0_24px_70px_rgb(0_0_0/0.24)]">
@@ -57,9 +59,11 @@ const HomeGameWidget = forwardRef<HTMLElement, HomeGameWidgetProps>(function Hom
                             {game?.title ?? emptyTitle}
                         </h2>
 
-                        <p data-random-copy className="mt-5 max-w-[540px] text-base font-black leading-relaxed text-white/46">
-                            {game ? 'This one is still open. Give it a clean session or roll again.' : emptyText}
-                        </p>
+                        {featureDetail && (
+                            <p data-random-copy className="mt-5 max-w-[540px] text-base font-black leading-relaxed text-white/46">
+                                {featureDetail}
+                            </p>
+                        )}
 
                         {game && (
                             <div data-random-copy className="mt-6 flex flex-wrap items-center gap-3">
@@ -134,7 +138,7 @@ const HomeGameWidget = forwardRef<HTMLElement, HomeGameWidgetProps>(function Hom
                             <Icon size={24} strokeWidth={3} />
                         </div>
                         <h3 className="mt-4 text-2xl font-black tracking-[-0.04em]">{emptyTitle}</h3>
-                        <p className="mx-auto mt-2 max-w-[260px] text-sm font-black leading-relaxed text-white/36">{emptyText}</p>
+                        {emptyText && <p className="mx-auto mt-2 max-w-[260px] text-sm font-black leading-relaxed text-white/36">{emptyText}</p>}
                     </div>
                 </div>
             )}
@@ -166,10 +170,11 @@ function ActionButton({ action }: { action: NonNullable<HomeGameWidgetProps['act
             type="button"
             onClick={action.onClick}
             disabled={action.loading}
-            className="inline-flex h-13 items-center gap-2 rounded-full bg-white px-5 text-sm font-black text-black transition hover:-translate-y-0.5 disabled:opacity-50"
+            aria-busy={action.loading}
+            className="inline-flex h-13 items-center gap-2 rounded-full bg-white px-5 text-sm font-black text-black transition hover:-translate-y-0.5 disabled:cursor-wait disabled:translate-y-0 disabled:opacity-65"
         >
-            <Dice5 size={18} strokeWidth={3} />
-            {action.loading ? 'Picking' : action.label}
+            <Dice5 size={18} strokeWidth={3} className={action.loading ? 'animate-pulse' : ''} />
+            {action.loading ? 'Picking...' : action.label}
         </button>
     );
 }

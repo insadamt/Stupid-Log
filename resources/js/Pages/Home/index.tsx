@@ -16,6 +16,8 @@ export default function Home({
     const pageRef = useRef<HTMLElement>(null);
     const randomWidgetRef = useRef<HTMLElement>(null);
     const randomCoverRef = useRef<HTMLDivElement>(null);
+    const pickingRandomGameRef = useRef(false);
+    const randomRequestIdRef = useRef(0);
     const [randomGame, setRandomGame] = useState<GameCardData | null>(homeWidgets.randomGame);
     const [pickingRandomGame, setPickingRandomGame] = useState(false);
 
@@ -30,11 +32,15 @@ export default function Home({
     }, { scope: pageRef });
 
     const pickRandomGame = contextSafe(() => {
-        if (pickingRandomGame) return;
+        if (pickingRandomGameRef.current) return;
 
+        pickingRandomGameRef.current = true;
+        const requestId = randomRequestIdRef.current + 1;
+        randomRequestIdRef.current = requestId;
         setPickingRandomGame(true);
 
         if (!prefersReducedMotion()) {
+            gsap.killTweensOf([randomWidgetRef.current, randomCoverRef.current]);
             gsap.timeline()
                 .to(randomWidgetRef.current, {
                     y: -4,
@@ -55,8 +61,18 @@ export default function Home({
 
         fetch('/home/random-game', { headers: { Accept: 'application/json' } })
             .then((response) => response.json())
-            .then((payload) => setRandomGame(payload.game ?? null))
+            .then((payload) => {
+                if (randomRequestIdRef.current === requestId) {
+                    setRandomGame(payload.game ?? null);
+                }
+            })
+            .catch(() => {
+                // Keep the current pick visible if the request fails.
+            })
             .finally(() => {
+                if (randomRequestIdRef.current !== requestId) return;
+
+                pickingRandomGameRef.current = false;
                 setPickingRandomGame(false);
 
                 if (!prefersReducedMotion()) {
@@ -116,7 +132,6 @@ export default function Home({
                             game={randomGame}
                             icon={Dice5}
                             emptyTitle="Nothing unfinished."
-                            emptyText="Random picks only use Not Played, In Progress, or Dropped games."
                             action={{
                                 label: randomGame ? 'Pick Again' : 'Pick Game',
                                 loading: pickingRandomGame,
@@ -132,7 +147,6 @@ export default function Home({
                                 game={homeWidgets.lastAddedGame}
                                 icon={Sparkles}
                                 emptyTitle="No games yet."
-                                emptyText="Add a game to start filling the home shelf."
                             />
 
                             <HomeGameWidget
@@ -142,7 +156,6 @@ export default function Home({
                                 game={homeWidgets.lastCompletedGame}
                                 icon={Clock3}
                                 emptyTitle="No clears yet."
-                                emptyText="Completed and 100% games will appear here after they are logged."
                             />
                         </aside>
                     </section>
