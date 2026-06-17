@@ -13,7 +13,7 @@ export function num(value: unknown, decimals = 0) {
 
 export function money(value: unknown) {
     const parsed = n(value);
-    return Math.abs(parsed) >= 1000 ? `$${(parsed / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}K` : `$${num(parsed, parsed % 1 ? 2 : 0)}`;
+    return Math.abs(parsed) >= 1000 ? `$${(parsed / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}K` : `$${num(parsed, 2)}`;
 }
 
 export function hours(value: unknown) {

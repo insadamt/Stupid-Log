@@ -91,35 +91,67 @@ class LibraryGameMutationController extends Controller
             throw ValidationException::withMessages(['progress.completed_at' => 'Completed date is required for Completed and 100%.']);
         }
 
-        if ($gameData !== null) {
-            $gameUpdates = [
-                'title' => $gameData['title'],
-                'normalized_title' => $normalizer->normalize($gameData['title']),
-                'publisher' => $gameData['publisher'] ?? null,
-                'description' => $gameData['description'] ?? null,
-                'base_price_default' => $gameData['base_price_default'] ?? null,
-                'total_achievements' => $totalAchievements,
-            ];
+        DB::transaction(function () use ($libraryGame, $normalizer, $gameData, $totalAchievements, $status, $validated, $earnedAchievements) {
+            if ($gameData !== null) {
+                $previousBaseValue = $libraryGame->game->base_price_default;
+                $nextBaseValue = $gameData['base_price_default'] ?? null;
+                $gameUpdates = [
+                    'title' => $gameData['title'],
+                    'normalized_title' => $normalizer->normalize($gameData['title']),
+                    'publisher' => $gameData['publisher'] ?? null,
+                    'description' => $gameData['description'] ?? null,
+                    'base_price_default' => $nextBaseValue,
+                    'total_achievements' => $totalAchievements,
+                ];
 
-            if (array_key_exists('cover_path', $gameData)) {
-                $gameUpdates['cover_path'] = $gameData['cover_path'];
+                if (array_key_exists('cover_path', $gameData)) {
+                    $gameUpdates['cover_path'] = $gameData['cover_path'];
+                }
+
+                $libraryGame->game->update($gameUpdates);
+                $this->updateInheritedOwnershipCopyBaseValues($libraryGame, $previousBaseValue, $nextBaseValue);
             }
 
-            $libraryGame->game->update($gameUpdates);
-        }
-
-        $libraryGame->update([
-            'status_id' => $status->id,
-            'playtime_hours' => $validated['progress']['playtime_hours'] ?? 0,
-            'earned_achievements' => $earnedAchievements,
-            'first_played_at' => $validated['progress']['first_played_at'] ?? null,
-            'last_played_at' => $validated['progress']['last_played_at'] ?? null,
-            'completed_at' => in_array($status->name, ['Completed', '100%'], true)
-                ? $validated['progress']['completed_at']
-                : null,
-        ]);
+            $libraryGame->update([
+                'status_id' => $status->id,
+                'playtime_hours' => $validated['progress']['playtime_hours'] ?? 0,
+                'earned_achievements' => $earnedAchievements,
+                'first_played_at' => $validated['progress']['first_played_at'] ?? null,
+                'last_played_at' => $validated['progress']['last_played_at'] ?? null,
+                'completed_at' => in_array($status->name, ['Completed', '100%'], true)
+                    ? $validated['progress']['completed_at']
+                    : null,
+            ]);
+        });
 
         return back();
+    }
+
+    private function updateInheritedOwnershipCopyBaseValues(LibraryGame $libraryGame, mixed $previousBaseValue, mixed $nextBaseValue): void
+    {
+        if ($this->sameCurrencyValue($previousBaseValue, $nextBaseValue)) {
+            return;
+        }
+
+        $libraryGame->ownershipCopies()
+            ->where(function ($query) use ($previousBaseValue) {
+                $query->whereNull('base_price');
+
+                if ($previousBaseValue !== null) {
+                    $query->orWhere('base_price', $this->currencyString($previousBaseValue));
+                }
+            })
+            ->update(['base_price' => $nextBaseValue]);
+    }
+
+    private function sameCurrencyValue(mixed $first, mixed $second): bool
+    {
+        return $this->currencyString($first) === $this->currencyString($second);
+    }
+
+    private function currencyString(mixed $value): ?string
+    {
+        return $value === null || $value === '' ? null : number_format((float) $value, 2, '.', '');
     }
 
     public function destroyLibraryGame(

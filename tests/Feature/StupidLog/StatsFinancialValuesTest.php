@@ -78,6 +78,25 @@ class StatsFinancialValuesTest extends TestCase
         $this->assertSame(24.0, $ownership['purchased_value']);
     }
 
+    public function test_live_value_stats_preserve_currency_cents(): void
+    {
+        $firstCopy = $this->createOwnershipCopy($this->user, 'First Cents Game', 'Steam', 'Digital', 0.99, 0.99);
+        $secondCopy = $this->createOwnershipCopy($this->user, 'Second Cents Game', 'Steam', 'Digital', 1.99, 1.99);
+
+        $stats = app(StatsService::class)->live($this->user);
+        $platform = collect($stats['breakdowns']['platforms'])->firstWhere('label', 'Steam');
+        $archive = collect($stats['archive']['biggest_base_price'])->keyBy('library_game_id');
+
+        $this->assertSame(2.98, $stats['base_value']);
+        $this->assertSame(2.98, $stats['purchased_value']);
+        $this->assertSame(2.98, $platform['copy_base_value']);
+        $this->assertSame(2.98, $platform['base_value']);
+        $this->assertSame(2.98, $platform['copy_purchased_value']);
+        $this->assertSame(2.98, $platform['purchased_value']);
+        $this->assertSame(0.99, $archive[$firstCopy->library_game_id]['base_value']);
+        $this->assertSame(1.99, $archive[$secondCopy->library_game_id]['base_value']);
+    }
+
     public function test_snapshot_stats_use_frozen_snapshot_mapping_for_financial_values(): void
     {
         $copy = $this->createOwnershipCopy($this->user, 'Frozen Mapping Game', 'Xbox', 'Game Pass');

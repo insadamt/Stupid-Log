@@ -348,6 +348,54 @@ class LibraryGameRulesTest extends TestCase
         ]);
     }
 
+    public function test_library_game_base_value_update_propagates_only_to_inherited_ownership_copies(): void
+    {
+        $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload([
+            'game' => [
+                'title' => 'Inherited Base Value Game',
+                'source' => 'manual',
+                'base_price_default' => 10,
+                'total_achievements' => 0,
+                'create_duplicate_anyway' => true,
+            ],
+            'ownership_copies' => [[
+                'ownership_type_id' => OwnershipType::where('name', 'Digital')->firstOrFail()->id,
+                'base_price' => null,
+                'purchased_price' => 10,
+            ]],
+        ]));
+        $inheritedCopy = $libraryGame->ownershipCopies()->firstOrFail();
+        $familySharing = OwnershipType::where('name', 'Family Sharing')->firstOrFail();
+        $inProgress = Status::where('name', 'In Progress')->firstOrFail();
+
+        $this->post("/games/{$libraryGame->id}/ownership-copies", [
+            'ownership_type_id' => $familySharing->id,
+            'edition_name' => 'Shared copy',
+            'base_price' => 7,
+            'purchased_price' => 0,
+        ])->assertRedirect();
+
+        $overriddenCopy = $libraryGame->ownershipCopies()->where('ownership_type_id', $familySharing->id)->firstOrFail();
+
+        $this->patch("/games/{$libraryGame->id}", [
+            'game' => [
+                'title' => 'Inherited Base Value Game',
+                'publisher' => null,
+                'description' => null,
+                'base_price_default' => 15,
+                'total_achievements' => 0,
+            ],
+            'progress' => [
+                'status_id' => $inProgress->id,
+                'playtime_hours' => 0,
+                'earned_achievements' => 0,
+            ],
+        ])->assertRedirect();
+
+        $this->assertSame('15.00', $inheritedCopy->refresh()->base_price);
+        $this->assertSame('7.00', $overriddenCopy->refresh()->base_price);
+    }
+
     public function test_library_game_details_update_preserves_cover_when_cover_path_is_omitted(): void
     {
         $libraryGame = app(LibraryGameCreator::class)->create($this->user, $this->payload([
