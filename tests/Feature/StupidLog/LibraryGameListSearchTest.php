@@ -76,6 +76,60 @@ class LibraryGameListSearchTest extends TestCase
         $this->assertSame(['alpha', 'Alpha', 'Beta'], $this->libraryGameTitles('/library-games?sort=title'));
     }
 
+    public function test_advanced_filters_can_target_library_metadata(): void
+    {
+        $this->createLibraryGame('Xbox Console Digital', 'Xbox', 'Xbox Series X|S', 'Digital', options: [
+            'total_achievements' => 10,
+            'cover_path' => 'covers/games/xbox.webp',
+            'first_played_at' => '2024-03-01',
+        ]);
+        $this->createLibraryGame('Xbox Subscription', 'Xbox', 'PC', 'Game Pass', options: [
+            'total_achievements' => 0,
+            'completed_at' => '2025-04-10',
+            'status' => 'Completed',
+        ]);
+
+        $this->assertSame(['Xbox Console Digital'], $this->libraryGameTitles('/library-games?ownership_type=Digital'));
+        $this->assertSame(['Xbox Console Digital'], $this->libraryGameTitles('/library-games?device=Xbox%20Series%20X%7CS'));
+        $this->assertSame(['Xbox Console Digital'], $this->libraryGameTitles('/library-games?achievements=has'));
+        $this->assertSame(['Xbox Subscription'], $this->libraryGameTitles('/library-games?achievements=none'));
+        $this->assertSame(['Xbox Console Digital'], $this->libraryGameTitles('/library-games?cover=has'));
+        $this->assertSame(['Xbox Subscription'], $this->libraryGameTitles('/library-games?cover=missing'));
+        $this->assertSame(['Xbox Console Digital'], $this->libraryGameTitles('/library-games?first_played_year=2024'));
+        $this->assertSame(['Xbox Subscription'], $this->libraryGameTitles('/library-games?completed_year=2025'));
+    }
+
+    public function test_search_filters_and_sort_work_together(): void
+    {
+        $this->createLibraryGame('Alpha Portable Match', 'Xbox', 'Xbox Series X|S', 'Digital', options: [
+            'total_achievements' => 5,
+            'playtime_hours' => 4,
+            'first_played_at' => '2024-01-02',
+        ]);
+        $this->createLibraryGame('Beta Portable Match', 'Xbox', 'Xbox Series X|S', 'Digital', options: [
+            'total_achievements' => 5,
+            'playtime_hours' => 12,
+            'first_played_at' => '2024-05-02',
+        ]);
+        $this->createLibraryGame('Portable Wrong Device', 'Xbox', 'PC', 'Digital', options: [
+            'total_achievements' => 5,
+            'playtime_hours' => 99,
+            'first_played_at' => '2024-03-02',
+        ]);
+
+        $query = http_build_query([
+            'query' => 'portable',
+            'platform' => 'Xbox',
+            'ownership_type' => 'Digital',
+            'device' => 'Xbox Series X|S',
+            'achievements' => 'has',
+            'first_played_year' => '2024',
+            'sort' => 'playtime',
+        ]);
+
+        $this->assertSame(['Beta Portable Match', 'Alpha Portable Match'], $this->libraryGameTitles("/library-games?{$query}"));
+    }
+
     private function assertSearchReturnsSameTitles(array $queries, array $expectedTitles): void
     {
         foreach ($queries as $query) {
@@ -98,23 +152,26 @@ class LibraryGameListSearchTest extends TestCase
         string $device,
         string $ownership,
         ?string $publisher = null,
+        array $options = [],
     ): void {
-        app(LibraryGameCreator::class)->create($this->user, $this->payload($title, $platform, $device, $ownership, $publisher));
+        app(LibraryGameCreator::class)->create($this->user, $this->payload($title, $platform, $device, $ownership, $publisher, $options));
     }
 
-    private function payload(string $title, string $platform, string $device, string $ownership, ?string $publisher): array
+    private function payload(string $title, string $platform, string $device, string $ownership, ?string $publisher, array $options): array
     {
         $platformModel = Platform::where('name', $platform)->firstOrFail();
         $deviceModel = Device::where('name', $device)->firstOrFail();
         $ownershipModel = OwnershipType::where('name', $ownership)->firstOrFail();
-        $status = Status::where('name', 'Not Played')->firstOrFail();
+        $status = Status::where('name', $options['status'] ?? 'Not Played')->firstOrFail();
 
         return [
             'game' => [
                 'title' => $title,
                 'source' => 'manual',
                 'publisher' => $publisher,
-                'total_achievements' => 0,
+                'cover_path' => $options['cover_path'] ?? null,
+                'cover_url_original' => $options['cover_url_original'] ?? null,
+                'total_achievements' => $options['total_achievements'] ?? 0,
                 'create_duplicate_anyway' => true,
             ],
             'platform_id' => $platformModel->id,
@@ -127,8 +184,11 @@ class LibraryGameListSearchTest extends TestCase
             ]],
             'progress' => [
                 'status_id' => $status->id,
-                'playtime_hours' => 0,
-                'earned_achievements' => 0,
+                'playtime_hours' => $options['playtime_hours'] ?? 0,
+                'earned_achievements' => $options['earned_achievements'] ?? 0,
+                'first_played_at' => $options['first_played_at'] ?? null,
+                'last_played_at' => $options['last_played_at'] ?? null,
+                'completed_at' => $options['completed_at'] ?? null,
             ],
         ];
     }

@@ -1,4 +1,4 @@
-import { ArrowDownAZ, Clock3, Trophy } from 'lucide-react';
+import { ArrowDownAZ, Clock3, Trophy, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import AppLayout from '../../Components/AppLayout';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
@@ -7,9 +7,19 @@ import LibraryControlsDrawer from './components/LibraryControlsDrawer';
 import LibraryMetaPanel from './components/LibraryMetaPanel';
 import LibraryToolbar from './components/LibraryToolbar';
 import VirtualCardGrid from './components/VirtualCardGrid';
-import { LibraryMeta, SortMode } from './types';
+import { LibraryFilters, LibraryMeta, SortMode } from './types';
 
 const preferredStatuses = ['All', 'Not Played', 'In Progress', 'Completed', 'Dropped', '100%'];
+const defaultFilters: LibraryFilters = {
+    status: 'All',
+    platform: 'All',
+    ownershipType: 'All',
+    device: 'All',
+    achievements: 'all',
+    cover: 'all',
+    firstPlayedYear: 'All',
+    completedYear: 'All',
+};
 
 const sortOptions = [
     { value: 'title', label: 'Title', icon: ArrowDownAZ },
@@ -20,8 +30,7 @@ const sortOptions = [
 export default function Library({ libraryGames, libraryMeta, references }: { libraryGames: GameCardData[]; libraryMeta: LibraryMeta; references: ReferenceData }) {
     const [query, setQuery] = useState('');
     const [sort, setSort] = useState<SortMode>('title');
-    const [status, setStatus] = useState('All');
-    const [platform, setPlatform] = useState('All');
+    const [filters, setFilters] = useState<LibraryFilters>(defaultFilters);
     const [controlsOpen, setControlsOpen] = useState(false);
     const [games, setGames] = useState<GameCardData[]>(libraryGames);
     const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -29,7 +38,7 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
     const [loading, setLoading] = useState(false);
     const cardsPerRow = 6;
     const debouncedQuery = useDebouncedValue(query);
-    const requestKey = `${debouncedQuery}|${status}|${platform}|${sort}`;
+    const requestKey = JSON.stringify({ query: debouncedQuery, filters, sort });
 
     const statusOptions = useMemo(() => {
         const merged = [...preferredStatuses, ...Object.keys(libraryMeta.statuses)];
@@ -67,15 +76,33 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
         [libraryMeta.platforms, libraryMeta.total, platformOptions],
     );
 
+    const ownershipOptions = useMemo(
+        () => ['All', ...references.ownershipTypes.map((item) => item.name).sort((a, b) => a.localeCompare(b))],
+        [references.ownershipTypes],
+    );
+
+    const deviceOptions = useMemo(
+        () => ['All', ...references.devices.map((item) => item.name).sort((a, b) => a.localeCompare(b))],
+        [references.devices],
+    );
+
+    const firstPlayedYearOptions = useMemo(
+        () => ['All', ...libraryMeta.first_played_years.map((year) => String(year))],
+        [libraryMeta.first_played_years],
+    );
+
+    const completedYearOptions = useMemo(
+        () => ['All', ...libraryMeta.completed_years.map((year) => String(year))],
+        [libraryMeta.completed_years],
+    );
+
+    const activeFilterChips = useMemo(() => activeFilters(filters), [filters]);
+    const hasActiveFilters = activeFilterChips.length > 0;
+
     useEffect(() => {
         let canceled = false;
-        const params = new URLSearchParams({
-            query: debouncedQuery,
-            status,
-            platform,
-            sort,
-            limit: '40',
-        });
+        const params = libraryRequestParams(debouncedQuery, filters, sort);
+        params.set('limit', '40');
 
         setLoading(true);
         fetch(`/library-games?${params.toString()}`, { headers: { Accept: 'application/json' } })
@@ -98,14 +125,9 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
     function loadMore() {
         if (!hasMore || loading || !nextCursor) return;
 
-        const params = new URLSearchParams({
-            query: debouncedQuery,
-            status,
-            platform,
-            sort,
-            cursor: nextCursor,
-            limit: '40',
-        });
+        const params = libraryRequestParams(debouncedQuery, filters, sort);
+        params.set('cursor', nextCursor);
+        params.set('limit', '40');
 
         setLoading(true);
         fetch(`/library-games?${params.toString()}`, { headers: { Accept: 'application/json' } })
@@ -116,6 +138,18 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                 setHasMore(Boolean(payload.has_more));
             })
             .finally(() => setLoading(false));
+    }
+
+    function updateFilters(updates: Partial<LibraryFilters>) {
+        setFilters((current) => ({ ...current, ...updates }));
+    }
+
+    function clearFilters() {
+        setFilters(defaultFilters);
+    }
+
+    function removeFilter(key: keyof LibraryFilters) {
+        setFilters((current) => ({ ...current, [key]: defaultFilters[key] }));
     }
 
     return (
@@ -136,15 +170,25 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                         <div className="absolute inset-0 opacity-55 [background-image:linear-gradient(rgba(0,0,0,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.045)_1px,transparent_1px)] [background-size:36px_36px]" />
                         <div className="absolute left-0 top-0 h-24 w-full bg-gradient-to-b from-[#b7ff63]/18 to-transparent" />
 
-                        <div className="absolute right-6 top-7 z-20 flex items-center gap-2">
-                            {(status !== 'All' || platform !== 'All') && (
+                        <div className="absolute left-6 right-6 top-6 z-20 flex min-w-0 items-start justify-between gap-3">
+                            <div className="flex min-w-0 flex-wrap gap-2">
+                                {activeFilterChips.map((chip) => (
+                                    <button
+                                        key={chip.key}
+                                        type="button"
+                                        onClick={() => removeFilter(chip.key)}
+                                        className="inline-flex h-9 max-w-[220px] items-center gap-2 rounded-full bg-black px-3 text-xs font-black text-white shadow-[0_12px_24px_rgb(0_0_0/0.12)]"
+                                    >
+                                        <span className="truncate">{chip.label}</span>
+                                        <X size={14} strokeWidth={3} className="shrink-0 text-[#b7ff63]" />
+                                    </button>
+                                ))}
+                            </div>
+                            {hasActiveFilters && (
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setStatus('All');
-                                        setPlatform('All');
-                                    }}
-                                    className="rounded-full bg-black px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-[#b7ff63]"
+                                    onClick={clearFilters}
+                                    className="h-9 shrink-0 rounded-full bg-[#b7ff63] px-4 text-xs font-black uppercase tracking-[0.14em] text-black shadow-[0_12px_24px_rgb(0_0_0/0.12)]"
                                 >
                                     Clear Filters
                                 </button>
@@ -172,19 +216,52 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
 
                 {controlsOpen && (
                     <LibraryControlsDrawer
-                        status={status}
-                        platform={platform}
+                        filters={filters}
                         sort={sort}
                         statusCounts={statusCounts}
                         platformCounts={platformCounts}
+                        ownershipOptions={ownershipOptions}
+                        deviceOptions={deviceOptions}
+                        firstPlayedYearOptions={firstPlayedYearOptions}
+                        completedYearOptions={completedYearOptions}
                         sortOptions={sortOptions}
-                        onStatusChange={setStatus}
-                        onPlatformChange={setPlatform}
+                        onFiltersChange={updateFilters}
                         onSortChange={setSort}
+                        onClearFilters={clearFilters}
                         close={() => setControlsOpen(false)}
                     />
                 )}
             </section>
         </AppLayout>
     );
+}
+
+function libraryRequestParams(query: string, filters: LibraryFilters, sort: SortMode) {
+    return new URLSearchParams({
+        query,
+        status: filters.status,
+        platform: filters.platform,
+        ownership_type: filters.ownershipType,
+        device: filters.device,
+        achievements: filters.achievements,
+        cover: filters.cover,
+        first_played_year: filters.firstPlayedYear,
+        completed_year: filters.completedYear,
+        sort,
+    });
+}
+
+function activeFilters(filters: LibraryFilters) {
+    const chips: Array<{ key: keyof LibraryFilters; label: string }> = [];
+
+    if (filters.status !== 'All') chips.push({ key: 'status', label: `Status: ${filters.status}` });
+    if (filters.platform !== 'All') chips.push({ key: 'platform', label: `Platform: ${filters.platform}` });
+    if (filters.ownershipType !== 'All') chips.push({ key: 'ownershipType', label: `Ownership: ${filters.ownershipType}` });
+    if (filters.device !== 'All') chips.push({ key: 'device', label: `Device: ${filters.device}` });
+    if (filters.achievements !== 'all') chips.push({ key: 'achievements', label: filters.achievements === 'has' ? 'Has achievements' : 'No achievements' });
+    if (filters.cover !== 'all') chips.push({ key: 'cover', label: filters.cover === 'has' ? 'Has cover' : 'Missing cover' });
+    if (filters.firstPlayedYear !== 'All') chips.push({ key: 'firstPlayedYear', label: `First played: ${filters.firstPlayedYear}` });
+    if (filters.completedYear !== 'All') chips.push({ key: 'completedYear', label: `Completed: ${filters.completedYear}` });
+
+    return chips;
 }

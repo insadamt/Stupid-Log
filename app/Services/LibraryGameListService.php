@@ -18,6 +18,12 @@ class LibraryGameListService
         $query = trim($request->string('query')->toString());
         $status = $request->string('status')->toString();
         $platform = $request->string('platform')->toString();
+        $ownershipType = $request->string('ownership_type')->toString();
+        $device = $request->string('device')->toString();
+        $achievements = $request->string('achievements')->toString();
+        $cover = $request->string('cover')->toString();
+        $firstPlayedYear = $request->string('first_played_year')->toString();
+        $completedYear = $request->string('completed_year')->toString();
 
         $builder = $this->query($user);
 
@@ -41,6 +47,15 @@ class LibraryGameListService
         if ($platform !== '' && strcasecmp($platform, 'All') !== 0) {
             $builder->whereHas('platform', fn ($platformQuery) => $platformQuery->where('name', $platform));
         }
+
+        $this->applyAdvancedFilters($builder, [
+            'ownership_type' => $ownershipType,
+            'device' => $device,
+            'achievements' => $achievements,
+            'cover' => $cover,
+            'first_played_year' => $firstPlayedYear,
+            'completed_year' => $completedYear,
+        ]);
 
         match ($sort) {
             'playtime' => $builder->orderByDesc('playtime_hours')->orderBy('id'),
@@ -98,6 +113,8 @@ class LibraryGameListService
                 ->get()
                 ->mapWithKeys(fn ($row) => [$row->name => (int) $row->count])
                 ->all(),
+            'first_played_years' => $this->activeYears($user, 'first_played_at'),
+            'completed_years' => $this->activeYears($user, 'completed_at'),
         ];
     }
 
@@ -105,6 +122,93 @@ class LibraryGameListService
     {
         return LibraryGame::where('user_id', $user->id)
             ->with(['game', 'platform', 'status', 'devices', 'ownershipCopies.ownershipType']);
+    }
+
+    private function applyAdvancedFilters($builder, array $filters): void
+    {
+        if ($this->isActiveFilter($filters['ownership_type'])) {
+            $builder->whereHas(
+                'ownershipCopies.ownershipType',
+                fn ($ownershipQuery) => $ownershipQuery->where('name', $filters['ownership_type'])
+            );
+        }
+
+        if ($this->isActiveFilter($filters['device'])) {
+            $builder->whereHas('devices', fn ($deviceQuery) => $deviceQuery->where('name', $filters['device']));
+        }
+
+        if ($filters['achievements'] === 'has') {
+            $builder->whereHas('game', fn ($gameQuery) => $gameQuery->where('total_achievements', '>', 0));
+        } elseif ($filters['achievements'] === 'none') {
+            $builder->whereHas(
+                'game',
+                fn ($gameQuery) => $gameQuery
+                    ->whereNull('total_achievements')
+                    ->orWhere('total_achievements', '<=', 0)
+            );
+        }
+
+        if ($filters['cover'] === 'has') {
+            $builder->whereHas('game', fn ($gameQuery) => $this->whereGameHasCover($gameQuery));
+        } elseif ($filters['cover'] === 'missing') {
+            $builder->whereHas('game', fn ($gameQuery) => $this->whereGameMissingCover($gameQuery));
+        }
+
+        if ($this->isYearFilter($filters['first_played_year'])) {
+            $builder->whereYear('first_played_at', (int) $filters['first_played_year']);
+        }
+
+        if ($this->isYearFilter($filters['completed_year'])) {
+            $builder->whereYear('completed_at', (int) $filters['completed_year']);
+        }
+    }
+
+    private function activeYears(User $user, string $column): array
+    {
+        return LibraryGame::query()
+            ->where('user_id', $user->id)
+            ->whereNotNull($column)
+            ->orderByDesc($column)
+            ->get([$column])
+            ->map(fn (LibraryGame $libraryGame) => (int) $libraryGame->{$column}->format('Y'))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function whereGameHasCover($gameQuery): void
+    {
+        $gameQuery->where(function ($coverQuery) {
+            $coverQuery->whereNotNull('cover_path')
+                ->where('cover_path', '<>', '')
+                ->orWhere(function ($urlQuery) {
+                    $urlQuery->whereNotNull('cover_url_original')
+                        ->where('cover_url_original', '<>', '');
+                });
+        });
+    }
+
+    private function whereGameMissingCover($gameQuery): void
+    {
+        $gameQuery->where(function ($coverQuery) {
+            $coverQuery->where(function ($pathQuery) {
+                $pathQuery->whereNull('cover_path')
+                    ->orWhere('cover_path', '');
+            })->where(function ($urlQuery) {
+                $urlQuery->whereNull('cover_url_original')
+                    ->orWhere('cover_url_original', '');
+            });
+        });
+    }
+
+    private function isActiveFilter(string $value): bool
+    {
+        return $value !== '' && strcasecmp($value, 'All') !== 0;
+    }
+
+    private function isYearFilter(string $value): bool
+    {
+        return preg_match('/^\d{4}$/', $value) === 1;
     }
 
     private function boundedLimit(Request $request, int $default, int $max): int

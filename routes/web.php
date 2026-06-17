@@ -28,6 +28,7 @@ Route::middleware('installation.needs-setup')->group(function (): void {
 
 Route::middleware('installation.complete')->group(function (): void {
     Route::get('/', [HomeController::class, 'home'])->name('home');
+    Route::get('/home/random-game', [HomeController::class, 'randomGame'])->name('home.random-game');
     Route::get('/library', [LibraryController::class, 'library'])->name('library');
     Route::get('/library-games', [LibraryController::class, 'libraryGames'])->name('library-games.index');
     Route::post('/library-games', [LibraryGameMutationController::class, 'storeLibraryGame'])->name('library-games.store');

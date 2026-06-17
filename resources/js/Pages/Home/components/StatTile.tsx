@@ -4,7 +4,6 @@ export default function StatTile({
     label,
     value,
     icon: Icon,
-    dark = false,
 }: {
     label: string;
     value: string | number;
@@ -13,39 +12,18 @@ export default function StatTile({
         strokeWidth?: number;
         className?: string;
     }>;
-    dark?: boolean;
 }) {
     return (
-        <div
-            className={[
-                "rounded-[24px] border p-4 shadow-[0_14px_28px_rgb(0_0_0/0.06)]",
-                dark
-                    ? "border-white/10 bg-black text-white"
-                    : "border-black/5 bg-[#eef2ed] text-black",
-            ].join(" ")}
-        >
-            <div className="mb-5 flex items-center justify-between gap-4">
-                <p
-                    className={[
-                        "text-[11px] font-black uppercase tracking-[0.26em]",
-                        dark ? "text-white/45" : "text-black/42",
-                    ].join(" ")}
-                >
-                    {label}
-                </p>
-                <span
-                    className={[
-                        "grid size-10 place-items-center rounded-[14px]",
-                        dark
-                            ? "bg-[#b7ff63] text-black"
-                            : "bg-black text-[#b7ff63]",
-                    ].join(" ")}
-                >
-                    <Icon size={22} strokeWidth={3} />
+        <div data-home-stat className="rounded-[22px] border border-white/8 bg-black/38 px-4 py-3 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.05)]">
+            <div className="flex items-center justify-between gap-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/30">{label}</p>
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#b7ff63] text-black">
+                    <Icon size={19} strokeWidth={3} />
                 </span>
             </div>
-            <div className="text-[30px] font-black leading-none tracking-[-0.03em]">
-                {value}
+            <div className="mt-4 flex items-end justify-between gap-3">
+                <div className="min-w-0 truncate text-2xl font-black leading-none tracking-[-0.04em]">{value}</div>
+                <span className="h-1.5 w-8 shrink-0 rounded-full bg-[#b7ff63]/70" />
             </div>
         </div>
     );

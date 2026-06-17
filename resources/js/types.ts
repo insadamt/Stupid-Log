@@ -53,6 +53,12 @@ export type StatsData = {
     archive: StatsArchive;
 };
 
+export type HomeWidgetsData = {
+    lastAddedGame: GameCardData | null;
+    randomGame: GameCardData | null;
+    lastCompletedGame: GameCardData | null;
+};
+
 export type PlatformBreakdown = {
     platform_id: number | null;
     label: string;

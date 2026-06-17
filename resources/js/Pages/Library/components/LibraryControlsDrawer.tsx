@@ -1,9 +1,8 @@
-import { SlidersHorizontal, X } from 'lucide-react';
+import { Check, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { gsap, motion, prefersReducedMotion } from '../../../animation';
-import PlatformIcon from '../../../Components/PlatformIcon';
 import { statusDotStyle, statusPillStyle } from '../../../statusColors';
-import { SortMode, SortOption } from '../types';
+import { LibraryFilters, SortMode, SortOption } from '../types';
 
 type ControlsTab = 'filter' | 'sort';
 
@@ -11,20 +10,35 @@ function sameStatus(a: string, b: string) {
     return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
+function activeFilterCount(filters: LibraryFilters) {
+    return [
+        filters.status !== 'All',
+        filters.platform !== 'All',
+        filters.ownershipType !== 'All',
+        filters.device !== 'All',
+        filters.achievements !== 'all',
+        filters.cover !== 'all',
+        filters.firstPlayedYear !== 'All',
+        filters.completedYear !== 'All',
+    ].filter(Boolean).length;
+}
+
 export default function LibraryControlsDrawer({
-    status,
-    platform,
+    filters,
     sort,
     statusCounts,
     platformCounts,
+    ownershipOptions,
+    deviceOptions,
+    firstPlayedYearOptions,
+    completedYearOptions,
     sortOptions,
-    onStatusChange,
-    onPlatformChange,
+    onFiltersChange,
     onSortChange,
+    onClearFilters,
     close,
 }: {
-    status: string;
-    platform: string;
+    filters: LibraryFilters;
     sort: SortMode;
     statusCounts: Array<{
         label: string;
@@ -35,10 +49,14 @@ export default function LibraryControlsDrawer({
         label: string;
         count: number;
     }>;
+    ownershipOptions: string[];
+    deviceOptions: string[];
+    firstPlayedYearOptions: string[];
+    completedYearOptions: string[];
     sortOptions: SortOption[];
-    onStatusChange: (status: string) => void;
-    onPlatformChange: (platform: string) => void;
+    onFiltersChange: (filters: Partial<LibraryFilters>) => void;
     onSortChange: (sort: SortMode) => void;
+    onClearFilters: () => void;
     close: () => void;
 }) {
     const [activeTab, setActiveTab] = useState<ControlsTab>('filter');
@@ -46,6 +64,7 @@ export default function LibraryControlsDrawer({
     const drawerRef = useRef<HTMLElement>(null);
     const closeButtonRef = useRef<HTMLButtonElement>(null);
     const closingRef = useRef(false);
+    const filterCount = activeFilterCount(filters);
 
     useEffect(() => {
         const backdrop = backdropRef.current;
@@ -113,6 +132,7 @@ export default function LibraryControlsDrawer({
                     <div>
                         <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#b7ff63]">Library Controls</div>
                         <h2 id="library-controls-title" className="mt-2 text-4xl font-black leading-none tracking-[-0.055em]">Filter & Sort</h2>
+                        <p className="mt-2 text-sm font-bold text-white/45">{filterCount === 0 ? 'No filters active' : `${filterCount} active ${filterCount === 1 ? 'filter' : 'filters'}`}</p>
                     </div>
                     <button
                         ref={closeButtonRef}
@@ -143,58 +163,102 @@ export default function LibraryControlsDrawer({
 
                 <div className="sl-scrollbar min-h-0 overflow-y-auto overflow-x-hidden px-7 py-6">
                     {activeTab === 'filter' ? (
-                        <div className="grid gap-6">
+                        <div className="grid gap-7">
                             <FilterSection title="Status">
-                                {statusCounts.map((item) => {
-                                    const selected = sameStatus(status, item.label);
+                                <div className="grid grid-cols-2 gap-2">
+                                    {statusCounts.map((item) => {
+                                        const selected = sameStatus(filters.status, item.label);
 
-                                    return (
-                                        <button
-                                            key={item.label}
-                                            type="button"
-                                            onClick={() => onStatusChange(item.label)}
-                                            className={[
-                                                'flex min-h-12 w-full min-w-0 max-w-full items-center justify-between gap-3 overflow-hidden rounded-[18px] px-4 py-3 text-left text-sm font-black transition',
-                                                selected
-                                                    ? item.status ? 'text-black' : 'bg-[#b7ff63] text-black'
-                                                    : 'bg-white/10 text-white/58 hover:bg-white/15 hover:text-white',
-                                            ].join(' ')}
-                                            style={selected && item.status ? statusPillStyle({ status: item.status.name, status_color_hex: item.status.color_hex }) : undefined}
-                                        >
-                                            <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-                                                {item.status && <span className="size-2.5 shrink-0 rounded-full" style={statusDotStyle({ status: item.status.name, status_color_hex: item.status.color_hex })} />}
-                                                <span className="truncate">{item.label}</span>
-                                            </span>
-                                            <span className="shrink-0">{item.count}</span>
-                                        </button>
-                                    );
-                                })}
+                                        return (
+                                            <button
+                                                key={item.label}
+                                                type="button"
+                                                onClick={() => onFiltersChange({ status: item.label })}
+                                                className={[
+                                                    'flex min-h-11 w-full min-w-0 max-w-full items-center justify-between gap-2 overflow-hidden rounded-[16px] px-3 py-2 text-left text-sm font-black transition',
+                                                    selected
+                                                        ? item.status ? 'text-black' : 'bg-[#b7ff63] text-black'
+                                                        : 'bg-white/10 text-white/58 hover:bg-white/15 hover:text-white',
+                                                ].join(' ')}
+                                                style={selected && item.status ? statusPillStyle({ status: item.status.name, status_color_hex: item.status.color_hex }) : undefined}
+                                            >
+                                                <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+                                                    {item.status && <span className="size-2.5 shrink-0 rounded-full" style={statusDotStyle({ status: item.status.name, status_color_hex: item.status.color_hex })} />}
+                                                    <span className="truncate">{item.label}</span>
+                                                </span>
+                                                <span className="shrink-0">{item.count}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </FilterSection>
 
-                            <FilterSection title="Platform">
-                                {platformCounts.map((item) => {
-                                    const selected = platform === item.label;
+                            <FilterSection title="Library Details">
+                                <div className="grid gap-3">
+                                    <SelectField
+                                        label="Platform"
+                                        options={platformCounts.map((item) => ({
+                                            value: item.label,
+                                            label: item.label === 'All' ? `All platforms (${item.count})` : `${item.label} (${item.count})`,
+                                        }))}
+                                        value={filters.platform}
+                                        onChange={(platform) => onFiltersChange({ platform })}
+                                    />
+                                    <SelectField
+                                        label="Ownership"
+                                        options={ownershipOptions}
+                                        value={filters.ownershipType}
+                                        onChange={(ownershipType) => onFiltersChange({ ownershipType })}
+                                    />
+                                    <SelectField
+                                        label="Device"
+                                        options={deviceOptions}
+                                        value={filters.device}
+                                        onChange={(device) => onFiltersChange({ device })}
+                                    />
+                                </div>
+                            </FilterSection>
 
-                                    return (
-                                        <button
-                                            key={item.label}
-                                            type="button"
-                                            onClick={() => onPlatformChange(item.label)}
-                                            className={[
-                                                'flex min-h-12 w-full min-w-0 max-w-full items-center justify-between gap-3 overflow-hidden rounded-[18px] px-4 py-3 text-left text-sm font-black transition',
-                                                selected
-                                                    ? 'bg-[#b7ff63] text-black'
-                                                    : 'bg-white/10 text-white/58 hover:bg-white/15 hover:text-white',
-                                            ].join(' ')}
-                                        >
-                                            <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-                                                <PlatformIcon platform={item.label} surface={selected ? 'lime' : 'dark'} size="sm" />
-                                                <span className="truncate">{item.label}</span>
-                                            </span>
-                                            <span className="shrink-0">{item.count}</span>
-                                        </button>
-                                    );
-                                })}
+                            <FilterSection title="Availability">
+                                <div className="grid gap-3">
+                                    <SegmentedControl
+                                        label="Achievements"
+                                        options={[
+                                            { value: 'all', label: 'All' },
+                                            { value: 'has', label: 'Has' },
+                                            { value: 'none', label: 'None' },
+                                        ]}
+                                        value={filters.achievements}
+                                        onChange={(achievements) => onFiltersChange({ achievements: achievements as LibraryFilters['achievements'] })}
+                                    />
+                                    <SegmentedControl
+                                        label="Cover"
+                                        options={[
+                                            { value: 'all', label: 'All' },
+                                            { value: 'has', label: 'Has' },
+                                            { value: 'missing', label: 'Missing' },
+                                        ]}
+                                        value={filters.cover}
+                                        onChange={(cover) => onFiltersChange({ cover: cover as LibraryFilters['cover'] })}
+                                    />
+                                </div>
+                            </FilterSection>
+
+                            <FilterSection title="Years">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <SelectField
+                                        label="First played"
+                                        options={firstPlayedYearOptions}
+                                        value={filters.firstPlayedYear}
+                                        onChange={(firstPlayedYear) => onFiltersChange({ firstPlayedYear })}
+                                    />
+                                    <SelectField
+                                        label="Completed"
+                                        options={completedYearOptions}
+                                        value={filters.completedYear}
+                                        onChange={(completedYear) => onFiltersChange({ completedYear })}
+                                    />
+                                </div>
                             </FilterSection>
                         </div>
                     ) : (
@@ -223,9 +287,24 @@ export default function LibraryControlsDrawer({
                 </div>
 
                 <footer className="border-t border-white/10 px-7 py-5">
-                    <div className="rounded-[24px] bg-[#b7ff63] p-4 text-black">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-black/45">Active View</p>
-                        <p className="mt-1 break-words text-xl font-black leading-tight">{status} / {platform} / {sort}</p>
+                    <div className="flex items-center justify-between gap-3">
+                        <button
+                            type="button"
+                            onClick={onClearFilters}
+                            disabled={filterCount === 0}
+                            className="inline-flex h-11 items-center gap-2 rounded-[16px] bg-white/10 px-4 text-sm font-black text-white/65 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+                        >
+                            <RotateCcw size={17} strokeWidth={3} />
+                            Clear All
+                        </button>
+                        <button
+                            type="button"
+                            onClick={requestClose}
+                            className="inline-flex h-11 items-center gap-2 rounded-[16px] bg-[#b7ff63] px-5 text-sm font-black text-black"
+                        >
+                            <Check size={17} strokeWidth={4} />
+                            Done
+                        </button>
                     </div>
                 </footer>
             </section>
@@ -242,5 +321,80 @@ function FilterSection({ title, children }: { title: string; children: ReactNode
             </div>
             <div className="grid gap-2">{children}</div>
         </section>
+    );
+}
+
+function SelectField({
+    label,
+    options,
+    value,
+    onChange,
+}: {
+    label: string;
+    options: Array<string | { value: string; label: string }>;
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    return (
+        <label className="grid gap-1.5">
+            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">{label}</span>
+            <select
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                className="h-12 min-w-0 rounded-[16px] border border-white/10 bg-white/10 px-3 text-sm font-black text-white outline-none transition hover:bg-white/15 focus:border-[#b7ff63] focus:bg-white/15"
+            >
+                {options.map((option) => {
+                    const optionValue = typeof option === 'string' ? option : option.value;
+                    const optionLabel = typeof option === 'string' ? option : option.label;
+
+                    return (
+                        <option
+                            key={optionValue}
+                            value={optionValue}
+                            className="bg-black text-white"
+                        >
+                            {optionLabel}
+                        </option>
+                    );
+                })}
+            </select>
+        </label>
+    );
+}
+
+function SegmentedControl({
+    label,
+    options,
+    value,
+    onChange,
+}: {
+    label: string;
+    options: Array<{ value: string; label: string }>;
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    return (
+        <div className="grid gap-1.5">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">{label}</div>
+            <div className="grid grid-cols-3 gap-1 rounded-[17px] bg-white/10 p-1">
+                {options.map((option) => {
+                    const selected = value === option.value;
+
+                    return (
+                        <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => onChange(option.value)}
+                            className={[
+                                'h-10 min-w-0 rounded-[13px] px-2 text-sm font-black transition',
+                                selected ? 'bg-[#b7ff63] text-black' : 'text-white/55 hover:bg-white/10 hover:text-white',
+                            ].join(' ')}
+                        >
+                            <span className="block truncate">{option.label}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
     );
 }
