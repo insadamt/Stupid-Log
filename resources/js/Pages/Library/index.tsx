@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AppLayout from '../../Components/AppLayout';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { GameCardData, ReferenceData } from '../../types';
-import LibraryFilters from './components/LibraryFilters';
+import LibraryControlsDrawer from './components/LibraryControlsDrawer';
 import LibraryMetaPanel from './components/LibraryMetaPanel';
 import LibraryToolbar from './components/LibraryToolbar';
 import VirtualCardGrid from './components/VirtualCardGrid';
@@ -22,12 +22,12 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
     const [sort, setSort] = useState<SortMode>('title');
     const [status, setStatus] = useState('All');
     const [platform, setPlatform] = useState('All');
-    const [filtersOpen, setFiltersOpen] = useState(false);
+    const [controlsOpen, setControlsOpen] = useState(false);
     const [games, setGames] = useState<GameCardData[]>(libraryGames);
     const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(libraryGames.length < libraryMeta.total);
     const [loading, setLoading] = useState(false);
-    const cardsPerRow = filtersOpen ? 5 : 6;
+    const cardsPerRow = 6;
     const debouncedQuery = useDebouncedValue(query);
     const requestKey = `${debouncedQuery}|${status}|${platform}|${sort}`;
 
@@ -125,24 +125,14 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
 
                 <LibraryToolbar
                     query={query}
-                    sort={sort}
-                    filtersOpen={filtersOpen}
+                    controlsOpen={controlsOpen}
                     references={references}
-                    sortOptions={sortOptions}
                     onQueryChange={setQuery}
-                    onSortChange={setSort}
-                    onToggleFilters={() => setFiltersOpen((open) => !open)}
+                    onToggleControls={() => setControlsOpen(true)}
                 />
 
-                <main
-                    className={[
-                        'grid min-h-0 transition-[grid-template-columns] duration-300',
-                        filtersOpen
-                            ? 'grid-cols-[minmax(0,1fr)_320px] gap-4'
-                            : 'grid-cols-[minmax(0,1fr)_0px] gap-0',
-                    ].join(' ')}
-                >
-                    <section className="relative min-h-0 overflow-hidden rounded-[38px] border border-black/8 bg-[#f4f7f1] shadow-[0_24px_70px_rgb(0_0_0/0.08)]">
+                <main className="h-full min-h-0">
+                    <section className="relative h-full min-h-0 overflow-hidden rounded-[38px] border border-black/8 bg-[#f4f7f1] shadow-[0_24px_70px_rgb(0_0_0/0.08)]">
                         <div className="absolute inset-0 opacity-55 [background-image:linear-gradient(rgba(0,0,0,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.045)_1px,transparent_1px)] [background-size:36px_36px]" />
                         <div className="absolute left-0 top-0 h-24 w-full bg-gradient-to-b from-[#b7ff63]/18 to-transparent" />
 
@@ -178,18 +168,22 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                             />
                         </div>
                     </section>
+                </main>
 
-                    <LibraryFilters
-                        filtersOpen={filtersOpen}
+                {controlsOpen && (
+                    <LibraryControlsDrawer
                         status={status}
                         platform={platform}
                         sort={sort}
                         statusCounts={statusCounts}
                         platformCounts={platformCounts}
+                        sortOptions={sortOptions}
                         onStatusChange={setStatus}
                         onPlatformChange={setPlatform}
+                        onSortChange={setSort}
+                        close={() => setControlsOpen(false)}
                     />
-                </main>
+                )}
             </section>
         </AppLayout>
     );
