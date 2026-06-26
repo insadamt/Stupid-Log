@@ -91,6 +91,14 @@ function donutArcPath(arc: DonutArcLayout, cx: number, cy: number, radius: numbe
     return `M ${start.x} ${start.y} A ${radius} ${radius} 0 0 1 ${midpoint.x} ${midpoint.y} A ${radius} ${radius} 0 0 1 ${end.x} ${end.y}`;
 }
 
+function centerValueTextSize(value: string) {
+    if (value.length > 12) return 'text-2xl';
+    if (value.length > 7) return 'text-3xl';
+    if (value.length > 5) return 'text-4xl';
+
+    return 'text-5xl';
+}
+
 export default function Donut({
     data,
     total,
@@ -110,7 +118,7 @@ export default function Donut({
     const revealDelay = useStatsRevealDelay();
     const radius = 72;
     const strokeWidth = 24;
-    const centerValueSize = total.length > 8 ? 'text-3xl' : total.length > 5 ? 'text-4xl' : 'text-5xl';
+    const centerValueSize = centerValueTextSize(total);
     const dataKey = animationKey(data.map((slice) => `${slice.label}:${slice.value}:${slice.color}`));
     const stableOrder = useMemo(() => data.map((slice) => slice.label).sort((a, b) => a.localeCompare(b)), [dataKey]);
     const targetLayout = useMemo(() => donutLayout(data, stableOrder), [dataKey]);
@@ -228,7 +236,7 @@ export default function Donut({
                 })}
             </svg>
             <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-                <div data-donut-center className="grid w-[42%] max-w-[138px] justify-items-center overflow-hidden">
+                <div data-donut-center className="grid w-[50%] max-w-[170px] justify-items-center">
                     {activeArc ? (
                         <>
                             <div className="line-clamp-2 max-w-full break-words text-xl font-black leading-[0.95] text-white" title={activeArc.label}>
@@ -243,7 +251,7 @@ export default function Donut({
                         </>
                     ) : (
                         <>
-                            <div className={`${centerValueSize} max-w-full truncate font-black leading-none text-white`} title={total}>
+                            <div className={`${centerValueSize} max-w-full whitespace-nowrap font-black leading-none text-white tabular-nums`} title={total}>
                                 {total}
                             </div>
                             <div className="mt-2 line-clamp-2 max-w-full break-words text-[10px] font-black uppercase leading-tight tracking-[0.12em] text-white/35" title={center}>
