@@ -11,7 +11,6 @@ import { physicalLike, steps } from "./constants";
 import StepRenderer from "./components/StepRenderer";
 import WizardFooter from "./components/WizardFooter";
 import WizardHeader from "./components/WizardHeader";
-import WizardSidebar from "./components/WizardSidebar";
 import CompletionDateModal from "./modals/CompletionDateModal";
 import DuplicateCandidatesModal from "./modals/DuplicateCandidatesModal";
 import { Draft, ManualDuplicate, OwnedDlcDraft, OwnershipCopyDraft, ProviderMode, SteamOriginal, StepKey, WizardSearchResult } from "./types";
@@ -137,7 +136,6 @@ export default function AddGameWizard({
         }
 
         const header = panel.querySelector(".sl-wizard-header");
-        const sidebar = panel.querySelector(".sl-wizard-sidebar");
         const main = panel.querySelector(".sl-wizard-main");
         const footer = panel.querySelector("footer");
         const stepButtons = panel.querySelectorAll(".sl-wizard-step");
@@ -152,8 +150,7 @@ export default function AddGameWizard({
                 0.04,
             )
             .fromTo(header, { y: -18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.42, clearProps: "transform,visibility,opacity" }, 0.14)
-            .fromTo(sidebar, { x: -24, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: 0.44, clearProps: "transform,visibility,opacity" }, 0.18)
-            .fromTo(main, { y: 18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.44, clearProps: "transform,visibility,opacity" }, 0.2)
+            .fromTo(main, { y: 18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.44, clearProps: "transform,visibility,opacity" }, 0.18)
             .fromTo(footer, { y: 18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.36, clearProps: "transform,visibility,opacity" }, 0.26)
             .fromTo(stepButtons, { autoAlpha: 0, x: -8 }, { autoAlpha: 1, x: 0, duration: 0.28, stagger: 0.025, clearProps: "transform,visibility,opacity" }, 0.28);
     }, { scope: backdropRef, dependencies: [open] });
@@ -819,9 +816,7 @@ export default function AddGameWizard({
                         <WizardHeader stepIndex={stepIndex} step={step} stepProgress={stepProgress} closeWizard={closeWizard} />
 
                         <main className="sl-wizard-main overflow-y-auto bg-[#e8eee8] p-0">
-                            <div className="grid min-h-[640px] lg:grid-cols-[300px_minmax(0,1fr)]">
-                                <WizardSidebar coverPreview={coverPreview} draft={draft} visibleStepQueue={visibleStepQueue} stepIndex={stepIndex} canOpenStep={canOpenStep} setWizardStep={setWizardStep} />
-
+                            <div className="grid min-h-[640px]">
                                 <div className="min-w-0 p-5 md:p-7">
                                     <div ref={stepShellRef} className="sl-wizard-step-shell relative min-w-0 overflow-hidden">
                                     <section ref={stepContentRef} className="sl-wizard-step-content relative z-10 min-w-0">

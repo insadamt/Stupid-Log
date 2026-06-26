@@ -114,12 +114,6 @@
     padding-bottom: 8px !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center > section > main > div.grid.gap-7 {
-    grid-template-columns: 286px minmax(0, 1fr) !important;
-    gap: 24px !important;
-    align-items: stretch !important;
-}
-
 .fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-6,
 .fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-5 {
     align-content: start !important;
@@ -172,50 +166,6 @@
         inset 0 2px 0 rgb(255 255 255 / 0.62) !important;
 }
 
-/* Draft side panel */
-.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 {
-    display: grid !important;
-    grid-template-rows: auto auto !important;
-    gap: 16px !important;
-    align-content: start !important;
-}
-
-.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:first-child {
-    border-radius: 31px !important;
-    background: var(--sl-ink) !important;
-    padding: 10px !important;
-    box-shadow: 0 24px 58px rgb(0 0 0 / 0.2) !important;
-}
-
-.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:first-child img,
-.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:first-child > div {
-    height: 350px !important;
-    border-radius: 24px !important;
-    object-fit: cover !important;
-}
-
-.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child {
-    border: 1px solid rgb(255 255 255 / 0.08) !important;
-    border-radius: 30px !important;
-    background:
-        radial-gradient(circle at 100% 0%, rgb(183 255 99 / 0.16), transparent 30%),
-        var(--sl-ink) !important;
-    color: white !important;
-    padding: 22px !important;
-    box-shadow: 0 20px 44px rgb(0 0 0 / 0.14) !important;
-}
-
-.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child h3 {
-    color: white !important;
-    font-size: 26px !important;
-    line-height: 0.96 !important;
-}
-
-.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child .text-black\/35,
-.fixed.inset-0.z-50.grid.place-items-center aside.space-y-4 > div:last-child .text-\[11px\] {
-    color: rgb(183 255 99 / 0.76) !important;
-}
-
 /* STEP 1 — Search: smaller scanner, larger result area. */
 .fixed.inset-0.z-50.grid.place-items-center section.min-w-0 > div.grid.gap-5:has(section.relative.overflow-hidden.rounded-\[38px\].bg-black) {
     height: 100% !important;
@@ -247,10 +197,6 @@
     color: rgb(255 255 255 / 0.45) !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black .mt-7 {
-    margin-top: 18px !important;
-}
-
 .fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black label {
     height: 62px !important;
     border-radius: 22px !important;
@@ -264,71 +210,90 @@
     font-size: 25px !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center section.relative.overflow-hidden.rounded-\[38px\].bg-black button.bg-\[\#b7ff63\] {
-    height: 62px !important;
-    border-radius: 22px !important;
-}
-
-.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] {
+.fixed.inset-0.z-50.grid.place-items-center .sl-search-results {
     min-height: 0 !important;
-    display: grid !important;
-    grid-template-rows: auto minmax(0, 1fr) !important;
-    overflow: hidden !important;
-    border-radius: 34px !important;
-    background: rgb(223 230 223 / 0.82) !important;
-    padding: 16px !important;
-    box-shadow:
-        inset 0 0 0 1px rgb(0 0 0 / 0.05),
-        0 16px 36px rgb(0 0 0 / 0.07) !important;
-}
-
-.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] > div:last-child {
-    min-height: 0 !important;
-    max-height: min(460px, calc(100vh - 430px)) !important;
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     align-content: start !important;
-    gap: 12px !important;
-    overflow-y: auto !important;
-    padding-right: 8px !important;
-}
-
-.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group {
-    min-height: 132px !important;
-    grid-template-columns: 82px minmax(0, 1fr) 48px !important;
     gap: 14px !important;
-    border-radius: 27px !important;
-    border: 1px solid rgb(5 9 9 / 0.08) !important;
-    background: rgb(247 250 245 / 0.92) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .sl-search-result-card {
+    min-height: 132px !important;
+    grid-template-columns: 86px minmax(0, 1fr) 40px !important;
+    gap: 16px !important;
+    border-radius: 24px !important;
+    border: 1px solid rgb(5 9 9 / 0.12) !important;
+    background:
+        linear-gradient(110deg, rgb(255 255 255 / 0.92), rgb(235 241 233 / 0.9) 52%, rgb(5 9 9 / 0.1)),
+        #f7faf5 !important;
     color: var(--sl-ink) !important;
-    box-shadow: 0 12px 26px rgb(0 0 0 / 0.055) !important;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.72),
+        inset 0 -3px 0 rgb(5 9 9 / 0.045),
+        0 14px 26px rgb(0 0 0 / 0.09) !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group > div:first-child {
-    width: 82px !important;
-    height: 104px !important;
-    border-radius: 22px !important;
+.fixed.inset-0.z-50.grid.place-items-center .sl-search-result-card > div:first-child {
+    width: 86px !important;
+    height: 114px !important;
+    aspect-ratio: 3 / 4 !important;
+    border-radius: 19px !important;
     background: var(--sl-lime) !important;
-    padding: 6px !important;
-    box-shadow: 0 13px 22px rgb(0 0 0 / 0.12) !important;
+    padding: 4px !important;
+    box-shadow:
+        0 13px 24px rgb(0 0 0 / 0.18),
+        inset 0 0 0 1px rgb(255 255 255 / 0.5) !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group img,
-.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group div:first-child > div {
+.fixed.inset-0.z-50.grid.place-items-center .sl-search-result-card img,
+.fixed.inset-0.z-50.grid.place-items-center .sl-search-result-card div:first-child > div {
     width: 100% !important;
     height: 100% !important;
-    border-radius: 16px !important;
+    border-radius: 15px !important;
     object-fit: cover !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group h4 {
+.fixed.inset-0.z-50.grid.place-items-center .sl-search-result-card h4 {
     color: var(--sl-ink) !important;
-    font-size: 23px !important;
-    line-height: 0.95 !important;
+    font-size: clamp(20px, 1.55vw, 24px) !important;
+    line-height: 1.02 !important;
+    letter-spacing: 0 !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center .rounded-\[38px\].bg-\[\#dfe5df\] button.group p {
-    color: rgb(5 9 9 / 0.48) !important;
+.fixed.inset-0.z-50.grid.place-items-center .sl-search-result-card:hover,
+.fixed.inset-0.z-50.grid.place-items-center .sl-search-result-card:focus-visible {
+    border-color: rgb(5 9 9 / 0.2) !important;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.8),
+        inset 0 -3px 0 rgb(5 9 9 / 0.06),
+        0 20px 38px rgb(0 0 0 / 0.14) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .sl-search-result-card.bg-black {
+    background:
+        radial-gradient(circle at 0% 0%, rgb(183 255 99 / 0.18), transparent 36%),
+        linear-gradient(135deg, #050909, #101916) !important;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.1),
+        inset 0 -3px 0 rgb(183 255 99 / 0.18),
+        0 22px 42px rgb(0 0 0 / 0.24) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .sl-search-result-card.bg-black h4 {
+    color: white !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .sl-search-result-card-icon {
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.42),
+        0 10px 20px rgb(0 0 0 / 0.1);
+}
+
+@media (max-width: 900px) {
+    .fixed.inset-0.z-50.grid.place-items-center .sl-search-results {
+        grid-template-columns: 1fr !important;
+    }
 }
 
 /* STEP 2 — Basics: clean form, portrait 600x800 cover ratio. */
@@ -420,42 +385,114 @@
     color: #b91c1c !important;
 }
 
-/* STEP 7 — DLCs: no spreadsheet feeling, compact readable rows. */
-.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] {
-    grid-template-columns: 94px minmax(0, 1fr) minmax(450px, auto) !important;
-    min-height: 82px !important;
-    border-radius: 25px !important;
-    border: 1px solid rgb(5 9 9 / 0.07) !important;
-    background: rgb(247 250 245 / 0.9) !important;
-    box-shadow: 0 10px 22px rgb(0 0 0 / 0.04) !important;
+/* STEP 4 — Platform: icon-only square cards. */
+.fixed.inset-0.z-50.grid.place-items-center .sl-platform-grid {
+    align-content: start !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] img {
-    height: 56px !important;
-    border-radius: 15px !important;
-    object-fit: cover !important;
+.fixed.inset-0.z-50.grid.place-items-center .sl-platform-card {
+    min-height: 92px !important;
+    border-radius: 24px !important;
+    background:
+        linear-gradient(145deg, rgb(255 255 255 / 0.92), rgb(235 241 233 / 0.88)) !important;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.78),
+        inset 0 -3px 0 rgb(5 9 9 / 0.045),
+        0 14px 26px rgb(0 0 0 / 0.08) !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] > div:nth-child(2) > div:first-child {
-    color: var(--sl-ink) !important;
-    font-size: 18px !important;
-    line-height: 1 !important;
+.fixed.inset-0.z-50.grid.place-items-center .sl-platform-card:hover,
+.fixed.inset-0.z-50.grid.place-items-center .sl-platform-card:focus-visible {
+    border-color: rgb(5 9 9 / 0.22) !important;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.82),
+        inset 0 -3px 0 rgb(5 9 9 / 0.06),
+        0 20px 36px rgb(0 0 0 / 0.13) !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] > div:nth-child(2) > div:last-child {
-    color: rgb(5 9 9 / 0.5) !important;
+.fixed.inset-0.z-50.grid.place-items-center .sl-platform-card.is-selected {
+    background:
+        radial-gradient(circle at 50% 0%, rgb(183 255 99 / 0.18), transparent 44%),
+        linear-gradient(145deg, #050909, #101916) !important;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.12),
+        inset 0 -4px 0 rgb(183 255 99 / 0.18),
+        0 22px 42px rgb(0 0 0 / 0.24) !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] .sm\:grid-cols-\[150px_120px_150px_auto\] {
-    grid-template-columns: 150px 112px 144px 74px !important;
-    align-items: center !important;
+.fixed.inset-0.z-50.grid.place-items-center .sl-platform-card img {
+    max-height: 46px !important;
+    max-width: 58px !important;
 }
 
-.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] select,
-.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] input,
-.fixed.inset-0.z-50.grid.place-items-center [class~='rounded-\[22px\]'][class~='border'][class~='p-3'][class*='lg:grid-cols'] button {
-    height: 46px !important;
-    border-radius: 16px !important;
+/* STEP 7 — DLCs: card catalog instead of spreadsheet rows. */
+.fixed.inset-0.z-50.grid.place-items-center .sl-dlc-toolbar {
+    border-radius: 28px !important;
+    background:
+        linear-gradient(145deg, rgb(255 255 255 / 0.76), rgb(235 241 233 / 0.74)) !important;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.72),
+        0 14px 30px rgb(0 0 0 / 0.06) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .sl-dlc-toolbar input {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .sl-dlc-grid {
+    align-content: start !important;
+    max-height: min(520px, calc(100vh - 390px)) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .sl-dlc-card {
+    border-radius: 26px !important;
+    background:
+        linear-gradient(145deg, rgb(255 255 255 / 0.88), rgb(236 242 234 / 0.84)) !important;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.74),
+        inset 0 -3px 0 rgb(5 9 9 / 0.04),
+        0 14px 28px rgb(0 0 0 / 0.075) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .sl-dlc-card.is-selected {
+    background:
+        radial-gradient(circle at 0% 0%, rgb(183 255 99 / 0.18), transparent 38%),
+        linear-gradient(145deg, #050909, #101916) !important;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.1),
+        inset 0 -3px 0 rgb(183 255 99 / 0.17),
+        0 22px 42px rgb(0 0 0 / 0.24) !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .sl-dlc-card h4 {
+    letter-spacing: 0 !important;
+}
+
+.fixed.inset-0.z-50.grid.place-items-center .sl-dlc-card.is-selected h4 {
+    color: white !important;
+}
+
+.sl-dlc-editor section {
+    border: 1px solid rgb(255 255 255 / 0.72);
+}
+
+.sl-dlc-editor label {
+    display: grid !important;
+    gap: 9px !important;
+}
+
+.sl-dlc-editor label > span {
+    color: rgb(5 9 9 / 0.52) !important;
+}
+
+.sl-dlc-editor input,
+.sl-dlc-editor select {
+    height: 52px !important;
+    border-radius: 17px !important;
+    border-color: rgb(5 9 9 / 0.12) !important;
+    background: rgb(247 250 245 / 0.86) !important;
 }
 
 /* STEP 8 — Progress: statuses are chips, not giant cards. */

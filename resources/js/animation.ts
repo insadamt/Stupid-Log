@@ -55,13 +55,6 @@ function injectAddGameWizardUxStyles() {
     const style = document.createElement('style');
     style.id = addGameWizardUxStyleId;
     style.textContent = `
-        .sl-wizard-modal [data-sl-search-title='true'] {
-            max-width: 560px !important;
-            font-size: clamp(34px, 3.6vw, 46px) !important;
-            line-height: 0.92 !important;
-            letter-spacing: -0.05em !important;
-        }
-
         .sl-wizard-modal section.relative.overflow-hidden.rounded-\[38px\].bg-black {
             border-radius: 36px !important;
         }
@@ -76,92 +69,88 @@ function injectAddGameWizardUxStyles() {
             letter-spacing: -0.045em !important;
         }
 
-        .sl-wizard-modal section.relative.overflow-hidden.rounded-\[38px\].bg-black button.bg-\[\#b7ff63\] {
-            border-radius: 18px !important;
+        .sl-wizard-modal .sl-search-results {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 14px !important;
         }
 
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] {
-            border-radius: 32px !important;
-        }
-
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] > div:last-child {
-            max-height: 420px !important;
-        }
-
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group {
-            min-height: 126px !important;
-            grid-template-columns: 86px minmax(0, 1fr) auto !important;
-            gap: 18px !important;
-            border-radius: 22px !important;
-            border-color: rgb(0 0 0 / 0.08) !important;
-            background: rgb(246 249 244 / 0.82) !important;
+        .sl-wizard-modal .sl-search-result-card {
+            min-height: 132px !important;
+            grid-template-columns: 86px minmax(0, 1fr) 40px !important;
+            gap: 16px !important;
+            border-radius: 24px !important;
+            border-color: rgb(5 9 9 / 0.12) !important;
+            background:
+                linear-gradient(110deg, rgb(255 255 255 / 0.92), rgb(235 241 233 / 0.9) 52%, rgb(5 9 9 / 0.1)),
+                #f7faf5 !important;
             box-shadow:
-                inset 0 0 0 1px rgb(255 255 255 / 0.4),
-                0 12px 26px rgb(0 0 0 / 0.055) !important;
+                inset 0 1px 0 rgb(255 255 255 / 0.72),
+                inset 0 -3px 0 rgb(5 9 9 / 0.045),
+                0 14px 26px rgb(0 0 0 / 0.09) !important;
         }
 
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group:hover,
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group:focus-visible {
-            border-color: rgb(0 0 0 / 0.14) !important;
-            background: #ffffff !important;
+        .sl-wizard-modal .sl-search-result-card:hover,
+        .sl-wizard-modal .sl-search-result-card:focus-visible {
+            border-color: rgb(5 9 9 / 0.2) !important;
             transform: translateY(-2px) !important;
             box-shadow:
-                inset 0 0 0 1px rgb(255 255 255 / 0.64),
-                0 18px 34px rgb(0 0 0 / 0.1) !important;
+                inset 0 1px 0 rgb(255 255 255 / 0.8),
+                inset 0 -3px 0 rgb(5 9 9 / 0.06),
+                0 20px 38px rgb(0 0 0 / 0.14) !important;
         }
 
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group.bg-black {
+        .sl-wizard-modal .sl-search-result-card.bg-black {
             border-color: rgb(0 0 0 / 0.88) !important;
-            background: #050909 !important;
+            background:
+                radial-gradient(circle at 0% 0%, rgb(183 255 99 / 0.18), transparent 36%),
+                linear-gradient(135deg, #050909, #101916) !important;
             color: #ffffff !important;
             box-shadow:
                 inset 0 0 0 1px rgb(255 255 255 / 0.1),
-                0 20px 44px rgb(0 0 0 / 0.24) !important;
+                inset 0 -3px 0 rgb(183 255 99 / 0.18),
+                0 22px 42px rgb(0 0 0 / 0.24) !important;
         }
 
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group > div:first-child {
+        .sl-wizard-modal .sl-search-result-card > div:first-child {
+            width: 86px !important;
+            height: 114px !important;
             border-radius: 16px !important;
-            padding: 0 !important;
-            background: transparent !important;
-            box-shadow: 0 10px 20px rgb(0 0 0 / 0.1) !important;
+            padding: 4px !important;
+            background: #b7ff63 !important;
+            box-shadow:
+                0 13px 24px rgb(0 0 0 / 0.18),
+                inset 0 0 0 1px rgb(255 255 255 / 0.5) !important;
         }
 
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group img,
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group [class*='No Cover'] {
-            width: 80px !important;
-            height: 110px !important;
+        .sl-wizard-modal .sl-search-result-card img,
+        .sl-wizard-modal .sl-search-result-card [class*='No Cover'] {
+            width: 100% !important;
+            height: 100% !important;
             border-radius: 15px !important;
             object-fit: cover !important;
             object-position: top center !important;
         }
 
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group h4 {
-            font-size: clamp(21px, 2vw, 26px) !important;
-            line-height: 0.94 !important;
+        .sl-wizard-modal .sl-search-result-card h4 {
+            font-size: clamp(20px, 1.55vw, 24px) !important;
+            line-height: 1.02 !important;
+            letter-spacing: 0 !important;
         }
 
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group p {
-            margin-top: 10px !important;
-            font-size: 11px !important;
-            letter-spacing: 0.14em !important;
+        .sl-wizard-modal .sl-search-result-card.bg-black h4 {
+            color: white !important;
         }
 
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group > span:last-child {
-            width: 46px !important;
-            height: 46px !important;
-            border-radius: 16px !important;
-            transform: none !important;
+        .sl-wizard-modal .sl-search-result-card-icon {
+            box-shadow:
+                inset 0 1px 0 rgb(255 255 255 / 0.42),
+                0 10px 20px rgb(0 0 0 / 0.1);
         }
 
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group:hover > span:last-child,
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group:focus-visible > span:last-child {
-            transform: none !important;
-        }
-
-        .sl-wizard-modal .rounded-\[38px\].bg-\[\#dfe5df\] button.group > span:last-child svg {
-            width: 21px !important;
-            height: 21px !important;
-            transform: none !important;
+        @media (max-width: 900px) {
+            .sl-wizard-modal .sl-search-results {
+                grid-template-columns: 1fr !important;
+            }
         }
 
         .sl-card-hover .sl-card-panel {
@@ -192,12 +181,6 @@ function injectAddGameWizardUxStyles() {
 }
 
 function applyAddGameWizardDomPatch() {
-    document.querySelectorAll<HTMLElement>('.sl-wizard-modal h3').forEach((node) => {
-        if (node.textContent?.trim() === 'Find the game file.') {
-            node.dataset.slSearchTitle = 'true';
-        }
-    });
-
     document.querySelectorAll<HTMLElement>('.sl-wizard-modal p, .sl-wizard-modal div').forEach((node) => {
         const text = node.textContent?.trim();
         if (!text) return;

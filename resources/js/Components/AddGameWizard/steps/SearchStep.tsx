@@ -1,6 +1,5 @@
 import { AlertTriangle, ChevronRight, Loader2, Package, Search } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
-import BuilderTitle from "../components/BuilderTitle";
 import SearchResultCard from "../components/SearchResultCard";
 import SourceSwitch from "../components/SourceSwitch";
 import { Draft, ProviderMode, WizardSearchResult } from "../types";
@@ -36,21 +35,12 @@ export default function SearchStep({
 }) {
     return (
     <div className="grid gap-5">
-        <section className="relative overflow-hidden rounded-[38px] bg-black p-6 text-white shadow-[0_28px_80px_rgb(0_0_0/0.24)]">
+        <section className="relative overflow-hidden rounded-[38px] bg-black p-4 text-white shadow-[0_28px_80px_rgb(0_0_0/0.24)] md:p-5">
             <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-[#b7ff63]/18 blur-3xl" />
             <div className="pointer-events-none absolute bottom-0 left-1/4 h-28 w-[520px] rounded-full bg-[#b7ff63]/10 blur-3xl" />
 
-<div className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-center">
-<BuilderTitle
-    eyebrow="Archive Builder"
-    title="Find the game file."
-/>
-
-<SourceSwitch providerMode={providerMode} setProviderMode={setProviderMode} />
-</div>
-
-            <div className="relative z-10 mt-7 grid gap-4 rounded-[30px] bg-white/[0.08] p-3 ring-1 ring-white/10 md:grid-cols-[1fr_auto]">
-                <label className="flex h-[76px] items-center gap-4 rounded-[24px] bg-[#eef2ed] px-6 text-black">
+            <div className="relative z-10 grid gap-3 rounded-[30px] bg-white/[0.08] p-3 ring-1 ring-white/10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <label className="flex h-[72px] min-w-0 items-center gap-4 rounded-[24px] bg-[#eef2ed] px-5 text-black md:px-6">
                     <Search className="size-7 shrink-0 text-black/35" strokeWidth={3} />
 
                     <input
@@ -66,29 +56,16 @@ export default function SearchStep({
                             }
                         }}
                         placeholder={`Search ${providerMode === "igdb" ? "IGDB" : "Steam"}...`}
-                        className="min-w-0 flex-1 bg-transparent text-[30px] font-black tracking-[-0.055em] outline-none placeholder:text-black/25"
+                        className="min-w-0 flex-1 bg-transparent text-2xl font-black outline-none placeholder:text-black/25 md:text-[30px]"
                         autoFocus
                     />
+
+                    {searching && (
+                        <Loader2 className="size-6 shrink-0 animate-spin text-black/40" aria-label="Searching" />
+                    )}
                 </label>
 
-                <button
-                    type="button"
-                    onClick={() => void runSearch(searchQuery, providerMode)}
-                    disabled={searching || searchQuery.trim().length < 2}
-                    className="flex h-[76px] items-center justify-center gap-3 rounded-[24px] bg-[#b7ff63] px-8 text-lg font-black text-black transition hover:-translate-y-0.5 disabled:opacity-40"
-                >
-                    {searching ? (
-                        <>
-                            <Loader2 className="animate-spin" size={22} />
-                            Scanning
-                        </>
-                    ) : (
-                        <>
-                            Scan
-                            <ChevronRight size={24} strokeWidth={3} />
-                        </>
-                    )}
-                </button>
+                <SourceSwitch providerMode={providerMode} setProviderMode={setProviderMode} />
             </div>
         </section>
 
@@ -127,37 +104,19 @@ export default function SearchStep({
             </button>
         </div>
     </div>
-)}
+        )}
 
         {results.length > 0 && (
-            <section className="rounded-[38px] bg-[#dfe5df] p-5 shadow-[inset_0_0_0_1px_rgb(0_0_0/0.05)]">
-                <div className="mb-4 flex items-center justify-between gap-4">
-                    <div>
-                        <p className="text-[11px] font-black uppercase tracking-[0.32em] text-black/36">
-                            Search Results
-                        </p>
-
-                        <h4 className="mt-1 text-3xl font-black leading-none tracking-[-0.05em]">
-                            Pick the correct file.
-                        </h4>
-                    </div>
-
-                    <span className="rounded-full bg-black px-5 py-2 text-sm font-black text-[#b7ff63]">
-                        {results.length} loaded
-                    </span>
-                </div>
-
-                <div className="grid max-h-[460px] gap-3 overflow-y-auto pr-2">
-                    {results.map((result) => (
-                        <SearchResultCard
-                            key={resultKey(result)}
-                            result={result}
-                            selected={selectedResultKey === resultKey(result)}
-                            onSelect={() => void selectResult(result)}
-                        />
-                    ))}
-                </div>
-            </section>
+            <div className="sl-search-results grid grid-cols-1 gap-4 xl:grid-cols-2">
+                {results.map((result) => (
+                    <SearchResultCard
+                        key={resultKey(result)}
+                        result={result}
+                        selected={selectedResultKey === resultKey(result)}
+                        onSelect={() => void selectResult(result)}
+                    />
+                ))}
+            </div>
         )}
     </div>
     );
