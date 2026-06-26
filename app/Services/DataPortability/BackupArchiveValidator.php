@@ -27,7 +27,7 @@ final class BackupArchiveValidator
             $entries = $this->validateEntryPaths($zip);
             $manifest = $this->readJson($zip, 'manifest.json');
             $checksums = $this->readJson($zip, 'checksums.json');
-            $this->validateManifest($manifest);
+            $manifest = $this->validateManifest($manifest);
             $declaredFiles = $this->declaredContentFiles($manifest);
             $this->validateDeclaredEntries($entries, $declaredFiles);
             $this->validateChecksums($zip, $checksums, $declaredFiles);
@@ -76,7 +76,7 @@ final class BackupArchiveValidator
         return array_keys($entries);
     }
 
-    private function validateManifest(array $manifest): void
+    private function validateManifest(array $manifest): array
     {
         if (($manifest['format'] ?? null) !== 'stupid-log-backup') {
             throw new RuntimeException('Unsupported backup format.');
@@ -99,6 +99,12 @@ final class BackupArchiveValidator
         foreach ($this->tables->tables() as $definition) {
             $metadata = $manifest['tables'][$definition->name] ?? null;
 
+            if ($metadata === null && $definition->canBeMissingFromReleasedBackups) {
+                $manifest['tables'][$definition->name] = ['count' => 0, 'files' => []];
+
+                continue;
+            }
+
             if (! is_array($metadata) || ! is_int($metadata['count'] ?? null) || ($metadata['count'] ?? -1) < 0) {
                 throw new RuntimeException("Manifest count is invalid for {$definition->name}.");
             }
@@ -117,6 +123,8 @@ final class BackupArchiveValidator
         if (($manifest['media']['index_file'] ?? null) !== 'media-index.ndjson') {
             throw new RuntimeException('Manifest media index is invalid.');
         }
+
+        return $manifest;
     }
 
     private function validateTableFiles(BackupTableDefinition $definition, array $files): void

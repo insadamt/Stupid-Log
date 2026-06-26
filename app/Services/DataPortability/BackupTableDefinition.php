@@ -10,5 +10,6 @@ final readonly class BackupTableDefinition
         public string $path,
         public array $columns,
         public bool $partitioned = false,
+        public bool $canBeMissingFromReleasedBackups = false,
     ) {}
 }
