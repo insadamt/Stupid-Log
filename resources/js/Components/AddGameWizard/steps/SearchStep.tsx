@@ -55,7 +55,7 @@ export default function SearchStep({
                                 void runSearch(searchQuery, providerMode);
                             }
                         }}
-                        placeholder={`Search ${providerMode === "igdb" ? "IGDB" : "Steam"}...`}
+                        placeholder={providerMode === "steam" ? "Search Steam title, app ID, or store URL..." : "Search IGDB..."}
                         className="min-w-0 flex-1 bg-transparent text-2xl font-black outline-none placeholder:text-black/25 md:text-[30px]"
                         autoFocus
                     />

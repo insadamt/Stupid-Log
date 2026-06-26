@@ -26,6 +26,7 @@ class PublicSteamEnrichmentService
         $price = $this->price($data);
 
         return $this->response([
+            'title' => $data['name'] ?? null,
             'publisher' => $data['publishers'][0] ?? null,
             'release_date' => $this->releaseDate($data),
             'description' => $data['short_description'] ?? null,
@@ -256,6 +257,7 @@ class PublicSteamEnrichmentService
     private function emptyMetadata(): array
     {
         return [
+            'title' => null,
             'publisher' => null,
             'release_date' => null,
             'description' => null,

@@ -39,7 +39,7 @@ class ProviderController extends Controller
             'query' => ['required', 'string', 'min:2'],
             'provider' => ['nullable', 'string', Rule::in(['igdb', 'steam'])],
             'enrich' => ['nullable', 'boolean'],
-            'steam_app_id' => ['nullable', 'string', 'max:255'],
+            'steam_app_id' => ['nullable', 'string', 'regex:/^[1-9][0-9]*$/', 'max:20'],
         ]);
 
         return response()->json($providers->search(

@@ -129,6 +129,97 @@ class ProviderSearchContractTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_direct_steam_app_id_search_returns_enriched_store_result(): void
+    {
+        Http::fake(function ($request) {
+            $url = $request->url();
+
+            if (str_contains($url, 'store.steampowered.com/api/appdetails')) {
+                parse_str(parse_url($url, PHP_URL_QUERY) ?? '', $query);
+                $appId = (string) ($query['appids'] ?? '');
+
+                return Http::response([
+                    $appId => [
+                        'success' => true,
+                        'data' => match ($appId) {
+                            '730' => [
+                                'name' => 'Counter-Strike 2',
+                                'publishers' => ['Valve'],
+                                'release_date' => ['date' => 'Aug 21, 2012'],
+                                'short_description' => 'A tactical team shooter.',
+                                'price_overview' => ['initial' => 0],
+                                'dlc' => [1001, 1002],
+                            ],
+                            '1001' => [
+                                'name' => 'Prime Status Upgrade',
+                                'price_overview' => ['initial' => 1499],
+                            ],
+                            '1002' => [
+                                'name' => 'CS2 Music Kit',
+                                'is_free' => true,
+                            ],
+                            default => [],
+                        },
+                    ],
+                ]);
+            }
+
+            if (str_contains($url, 'api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/')) {
+                return Http::response([
+                    'achievementpercentages' => [
+                        'achievements' => [
+                            ['name' => 'first_win', 'percent' => 70],
+                            ['name' => 'veteran', 'percent' => 20],
+                        ],
+                    ],
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $this->getJson('/provider-search?query=730&provider=steam&enrich=1&steam_app_id=730')
+            ->assertOk()
+            ->assertJsonPath('results.0.source', 'steam')
+            ->assertJsonPath('results.0.external_id', '730')
+            ->assertJsonPath('results.0.title', 'Counter-Strike 2')
+            ->assertJsonPath('results.0.cover_url_original', 'https://cdn.cloudflare.steamstatic.com/steam/apps/730/library_600x900.jpg')
+            ->assertJsonPath('results.0.publisher', 'Valve')
+            ->assertJsonPath('results.0.release_date', '2012-08-21')
+            ->assertJsonPath('results.0.description', 'A tactical team shooter.')
+            ->assertJsonPath('results.0.base_price_default', 0)
+            ->assertJsonPath('results.0.base_price_source', 'steam')
+            ->assertJsonPath('results.0.total_achievements', 2)
+            ->assertJsonPath('results.0.total_achievements_source', 'steam')
+            ->assertJsonPath('results.0.dlcs.0.steam_app_id', '1001')
+            ->assertJsonPath('results.0.dlcs.0.title', 'Prime Status Upgrade')
+            ->assertJsonPath('results.0.dlcs.0.base_price', 14.99)
+            ->assertJsonPath('results.0.dlcs.1.steam_app_id', '1002')
+            ->assertJsonPath('results.0.dlcs.1.title', 'CS2 Music Kit')
+            ->assertJsonPath('results.0.dlcs.1.base_price', 0)
+            ->assertJsonCount(0, 'warnings');
+
+        $this->assertNoKeyedSteamRequestWasSent();
+    }
+
+    public function test_invalid_id_like_steam_query_uses_normal_store_search(): void
+    {
+        Http::fake([
+            'store.steampowered.com/api/storesearch*' => Http::response([
+                'items' => [['id' => 123, 'name' => 'Leading Zero Search Result']],
+            ]),
+        ]);
+
+        $this->getJson('/provider-search?query=0123&provider=steam')
+            ->assertOk()
+            ->assertJsonPath('results.0.title', 'Leading Zero Search Result')
+            ->assertJsonPath('results.0.steam_app_id', '123')
+            ->assertJsonPath('results.0.base_price_default', null)
+            ->assertJsonCount(0, 'warnings');
+
+        Http::assertSentCount(1);
+    }
+
     public function test_public_store_search_failure_returns_a_non_blocking_warning(): void
     {
         Http::fake([

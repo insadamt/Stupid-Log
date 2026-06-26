@@ -15,7 +15,7 @@ import CompletionDateModal from "./modals/CompletionDateModal";
 import DuplicateCandidatesModal from "./modals/DuplicateCandidatesModal";
 import { Draft, ManualDuplicate, OwnedDlcDraft, OwnershipCopyDraft, ProviderMode, SteamOriginal, StepKey, WizardSearchResult } from "./types";
 import { useProgressiveSteamEnrichment } from "./useProgressiveSteamEnrichment";
-import { dlcCatalogFromResult, firstByName, importDraftResultFromDraft, integerOrNull, localId, numberOrNull, preferredResultCover, toDateInput, today } from "./utils";
+import { dlcCatalogFromResult, extractSteamAppId, firstByName, importDraftResultFromDraft, integerOrNull, localId, numberOrNull, preferredResultCover, toDateInput, today } from "./utils";
 
 export default function AddGameWizard({
     references,
@@ -338,7 +338,9 @@ export default function AddGameWizard({
 
     async function runSearch(queryInput = searchQuery, provider = providerMode) {
         const query = queryInput.trim();
-        if (query.length < 2) {
+        const steamAppId = provider === "steam" ? extractSteamAppId(query) : null;
+
+        if (!steamAppId && query.length < 2) {
             setResults([]);
             setWarnings([]);
             setNotice("");
@@ -352,7 +354,9 @@ export default function AddGameWizard({
         setServerErrors({});
 
         try {
-            const data = await providerSearch(query, provider);
+            const data = steamAppId
+                ? await providerSearch(query, "steam", true, steamAppId)
+                : await providerSearch(query, provider);
             if (requestId !== searchId.current) return;
             setResults(data.results);
             setWarnings(data.warnings);

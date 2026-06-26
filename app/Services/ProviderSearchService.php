@@ -221,7 +221,9 @@ class ProviderSearchService
             $source = $result['source'] ?? null;
 
             return array_merge($result, [
-                'title' => $result['title'] ?: 'Untitled',
+                'title' => $source === 'steam' && $includeDlcCatalog && $metadata['data']['title']
+                    ? $metadata['data']['title']
+                    : ($result['title'] ?: 'Untitled'),
                 'cover_url_original' => $source === 'steam'
                     ? ($this->steamPortraitCoverUrl($steamAppId) ?? $result['cover_url_original'] ?? null)
                     : ($result['cover_url_original'] ?? null),

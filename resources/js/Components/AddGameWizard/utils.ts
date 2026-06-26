@@ -47,6 +47,15 @@ export function firstByName<T extends { id: number; name: string }>(items: T[], 
     return items.find((item) => item.name === name) ?? items[0];
 }
 
+export function extractSteamAppId(input: string): string | null {
+    const value = input.trim();
+    const appId = value.match(/^(?:https?:\/\/)?store\.steampowered\.com\/app\/([0-9]+)(?:\/|$)/i)?.[1]
+        ?? value.match(/^steam:\/\/store\/([0-9]+)(?:\/|$)/i)?.[1]
+        ?? value;
+
+    return /^[1-9][0-9]*$/.test(appId) && appId.length <= 20 ? appId : null;
+}
+
 export function steamPortraitUrl(appId: string | null | undefined) {
     return appId ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg` : "";
 }

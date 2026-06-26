@@ -28,6 +28,7 @@ class ProgressiveSteamEnrichmentTest extends TestCase
                     'success' => true,
                     'data' => [
                         'publishers' => ['Valve'],
+                        'name' => 'Portal 2',
                         'release_date' => ['date' => 'Apr 18, 2011'],
                         'short_description' => 'A cooperative puzzle game.',
                         'price_overview' => ['initial' => 999],
@@ -40,6 +41,7 @@ class ProgressiveSteamEnrichmentTest extends TestCase
             ->assertOk()
             ->assertExactJson([
                 'data' => [
+                    'title' => 'Portal 2',
                     'publisher' => 'Valve',
                     'release_date' => '2011-04-18',
                     'description' => 'A cooperative puzzle game.',
