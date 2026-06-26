@@ -110,7 +110,7 @@ export default function Donut({
     const revealDelay = useStatsRevealDelay();
     const radius = 72;
     const strokeWidth = 24;
-    const centerTextSize = total.length > 8 ? 'text-4xl' : total.length > 5 ? 'text-5xl' : 'text-6xl';
+    const centerValueSize = total.length > 8 ? 'text-3xl' : total.length > 5 ? 'text-4xl' : 'text-5xl';
     const dataKey = animationKey(data.map((slice) => `${slice.label}:${slice.value}:${slice.color}`));
     const stableOrder = useMemo(() => data.map((slice) => slice.label).sort((a, b) => a.localeCompare(b)), [dataKey]);
     const targetLayout = useMemo(() => donutLayout(data, stableOrder), [dataKey]);
@@ -180,6 +180,8 @@ export default function Donut({
     const focusedLabel = activeArc ? activeLabel : null;
     const renderedTotal = renderLayout.reduce((sum, arc) => sum + arc.value, 0);
     const activePercent = activeArc && renderedTotal > 0 ? (activeArc.value / renderedTotal) * 100 : 0;
+    const activeValue = activeArc ? format(activeArc.value) : null;
+    const activeValueSize = activeValue && activeValue.length > 10 ? 'text-xl' : activeValue && activeValue.length > 7 ? 'text-2xl' : 'text-3xl';
     const visiblePositiveArcs = renderLayout.filter((arc) => arc.value > 0 && arc.end - arc.start > minimumVisibleSpanDegrees);
     const singleVisibleArc = visiblePositiveArcs.length === 1 ? visiblePositiveArcs[0] : null;
     const circumference = 2 * Math.PI * radius;
@@ -226,13 +228,29 @@ export default function Donut({
                 })}
             </svg>
             <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-                <div data-donut-center className="max-w-[62%]">
-                    <div className={`${activeArc ? 'text-2xl' : centerTextSize} truncate font-black leading-none text-white`} title={activeArc?.label ?? total}>
-                        {activeArc?.label ?? total}
-                    </div>
-                    <div className="mt-2 text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: activeArc?.color ?? 'rgb(255 255 255 / 0.32)' }}>
-                        {activeArc ? `${format(activeArc.value)} · ${percentLabel(activePercent)}` : center}
-                    </div>
+                <div data-donut-center className="grid w-[42%] max-w-[138px] justify-items-center overflow-hidden">
+                    {activeArc ? (
+                        <>
+                            <div className="line-clamp-2 max-w-full break-words text-xl font-black leading-[0.95] text-white" title={activeArc.label}>
+                                {activeArc.label}
+                            </div>
+                            <div className={`${activeValueSize} mt-1 max-w-full truncate font-black leading-none text-white`} title={activeValue ?? undefined}>
+                                {activeValue}
+                            </div>
+                            <div className="mt-1 max-w-full truncate text-[10px] font-black uppercase tracking-[0.12em]" style={{ color: activeArc.color }}>
+                                {percentLabel(activePercent)}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className={`${centerValueSize} max-w-full truncate font-black leading-none text-white`} title={total}>
+                                {total}
+                            </div>
+                            <div className="mt-2 line-clamp-2 max-w-full break-words text-[10px] font-black uppercase leading-tight tracking-[0.12em] text-white/35" title={center}>
+                                {center}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
