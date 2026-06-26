@@ -1,0 +1,122 @@
+/* Stupid Log v1.3 Add Game Wizard skin loaded after wizard.css. */
+
+.sl-wizard-modal {
+    --sl-lime: #b7ff63;
+    --sl-ink: #050807;
+    --sl-card: #101815;
+    --sl-line: rgb(255 255 255 / 0.1);
+    --sl-paper: #eef4ed;
+    background:
+        radial-gradient(circle at 18% 12%, rgb(183 255 99 / 0.12), transparent 30%),
+        radial-gradient(circle at 80% 84%, rgb(183 255 99 / 0.08), transparent 34%),
+        linear-gradient(140deg, rgb(0 0 0 / 0.86), rgb(2 8 7 / 0.92)) !important;
+}
+
+.sl-wizard-panel {
+    max-width: 1400px !important;
+    border-radius: 30px !important;
+    border: 1px solid rgb(255 255 255 / 0.14) !important;
+    background: var(--sl-ink) !important;
+    box-shadow: 0 52px 160px rgb(0 0 0 / 0.72) !important;
+}
+
+.sl-wizard-header,
+.sl-wizard-footer {
+    background: #050807 !important;
+    color: white !important;
+}
+
+.sl-wizard-header {
+    border-bottom: 1px solid var(--sl-line) !important;
+}
+
+.sl-wizard-header h2,
+.sl-wizard-step-content h3,
+.sl-wizard-step-content h4 {
+    color: white !important;
+    text-shadow: none !important;
+}
+
+.sl-wizard-main {
+    background:
+        linear-gradient(rgb(183 255 99 / 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(183 255 99 / 0.025) 1px, transparent 1px),
+        #070c0a !important;
+    background-size: 34px 34px, 34px 34px, auto !important;
+    color: white !important;
+}
+
+.sl-wizard-sidebar {
+    background: #080d0b !important;
+    border-right: 1px solid var(--sl-line) !important;
+    color: white !important;
+    box-shadow: none !important;
+}
+
+.sl-wizard-step-content {
+    color: white !important;
+}
+
+.sl-wizard-step-content label > span,
+.sl-wizard-step-content .font-black.uppercase {
+    color: rgb(183 255 99 / 0.58) !important;
+}
+
+.sl-wizard-step-content .bg-white,
+.sl-wizard-step-content .bg-white\/70,
+.sl-wizard-step-content .bg-\[\#dfe5df\],
+.sl-wizard-step-content .bg-\[\#eef2ed\] {
+    border-color: var(--sl-line) !important;
+    background: var(--sl-card) !important;
+    color: white !important;
+    box-shadow: 0 18px 42px rgb(0 0 0 / 0.22) !important;
+}
+
+.sl-wizard-step-content input,
+.sl-wizard-step-content textarea,
+.sl-wizard-step-content select {
+    border: 1px solid rgb(255 255 255 / 0.12) !important;
+    background: var(--sl-paper) !important;
+    color: var(--sl-ink) !important;
+    box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.56) !important;
+}
+
+.sl-wizard-step-content input:focus,
+.sl-wizard-step-content textarea:focus,
+.sl-wizard-step-content select:focus {
+    border-color: var(--sl-lime) !important;
+    box-shadow: 0 0 0 4px rgb(183 255 99 / 0.2) !important;
+}
+
+.sl-wizard-step-content .bg-\[\#b7ff63\],
+.sl-wizard-footer .bg-\[\#b7ff63\] {
+    background: var(--sl-lime) !important;
+    color: var(--sl-ink) !important;
+}
+
+.sl-wizard-step-content button.group {
+    border-color: var(--sl-line) !important;
+    background: rgb(255 255 255 / 0.06) !important;
+    color: white !important;
+}
+
+.sl-wizard-step-content button.group:hover {
+    border-color: rgb(183 255 99 / 0.38) !important;
+    background: rgb(255 255 255 / 0.09) !important;
+}
+
+.sl-wizard-footer {
+    border-top: 1px solid var(--sl-line) !important;
+    box-shadow: 0 -22px 54px rgb(0 0 0 / 0.32) !important;
+}
+
+.sl-wizard-footer button:first-child {
+    border: 1px solid rgb(255 255 255 / 0.12) !important;
+    background: rgb(255 255 255 / 0.06) !important;
+    color: white !important;
+}
+
+.sl-wizard-footer button:last-child {
+    background: var(--sl-lime) !important;
+    color: var(--sl-ink) !important;
+}
