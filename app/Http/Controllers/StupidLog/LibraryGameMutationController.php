@@ -10,6 +10,7 @@ use App\Models\StupidLog\Status;
 use App\Services\DuplicateDetectionService;
 use App\Services\FinancialSnapshotRefreshService;
 use App\Services\LibraryGameCreator;
+use App\Services\LinkedProgressService;
 use App\Services\LocalUserService;
 use App\Services\SteamEnrichmentService;
 use App\Services\SubscriptionMutationService;
@@ -43,8 +44,12 @@ class LibraryGameMutationController extends Controller
         return back();
     }
 
-    public function updateLibraryGame(Request $request, LibraryGame $libraryGame, TitleNormalizer $normalizer): RedirectResponse
-    {
+    public function updateLibraryGame(
+        Request $request,
+        LibraryGame $libraryGame,
+        TitleNormalizer $normalizer,
+        LinkedProgressService $linkedProgress,
+    ): RedirectResponse {
         $libraryGame->load('game');
 
         $rules = [
@@ -71,13 +76,23 @@ class LibraryGameMutationController extends Controller
         }
 
         $validated = $request->validate($rules);
+        $syncedProgressFields = $linkedProgress->syncedProgressFields($libraryGame);
+        $progress = $this->withoutSyncedProgressFields($validated['progress'], $syncedProgressFields);
 
-        $status = Status::findOrFail($validated['progress']['status_id']);
+        $status = Status::findOrFail($progress['status_id'] ?? $libraryGame->status_id);
         $gameData = $validated['game'] ?? null;
-        $totalAchievements = $gameData === null
-            ? $libraryGame->game->total_achievements
-            : ($gameData['total_achievements'] ?? null);
-        $earnedAchievements = $validated['progress']['earned_achievements'] ?? null;
+        if (($syncedProgressFields['earned_achievements'] ?? false) && $gameData !== null) {
+            unset($gameData['total_achievements']);
+        }
+        $totalAchievements = $gameData !== null && array_key_exists('total_achievements', $gameData)
+            ? $gameData['total_achievements']
+            : $libraryGame->game->total_achievements;
+        $earnedAchievements = array_key_exists('earned_achievements', $progress)
+            ? $progress['earned_achievements']
+            : $libraryGame->earned_achievements;
+        $completedAt = array_key_exists('completed_at', $progress)
+            ? $progress['completed_at']
+            : $libraryGame->completed_at?->format('Y-m-d');
 
         if ($totalAchievements !== null && $earnedAchievements !== null && $earnedAchievements > $totalAchievements) {
             throw ValidationException::withMessages(['progress.earned_achievements' => 'Earned achievements cannot exceed total achievements.']);
@@ -87,11 +102,11 @@ class LibraryGameMutationController extends Controller
             throw ValidationException::withMessages(['progress.status_id' => '100% requires earned achievements to equal total achievements.']);
         }
 
-        if (in_array($status->name, ['Completed', '100%'], true) && empty($validated['progress']['completed_at'])) {
+        if (in_array($status->name, ['Completed', '100%'], true) && empty($completedAt)) {
             throw ValidationException::withMessages(['progress.completed_at' => 'Completed date is required for Completed and 100%.']);
         }
 
-        DB::transaction(function () use ($libraryGame, $normalizer, $gameData, $totalAchievements, $status, $validated, $earnedAchievements) {
+        DB::transaction(function () use ($libraryGame, $normalizer, $gameData, $totalAchievements, $status, $progress, $earnedAchievements, $completedAt, $syncedProgressFields, $linkedProgress) {
             if ($gameData !== null) {
                 $previousBaseValue = $libraryGame->game->base_price_default;
                 $nextBaseValue = $gameData['base_price_default'] ?? null;
@@ -114,17 +129,30 @@ class LibraryGameMutationController extends Controller
 
             $libraryGame->update([
                 'status_id' => $status->id,
-                'playtime_hours' => $validated['progress']['playtime_hours'] ?? 0,
+                'playtime_hours' => array_key_exists('playtime_hours', $progress) ? ($progress['playtime_hours'] ?? 0) : $libraryGame->playtime_hours,
                 'earned_achievements' => $earnedAchievements,
-                'first_played_at' => $validated['progress']['first_played_at'] ?? null,
-                'last_played_at' => $validated['progress']['last_played_at'] ?? null,
-                'completed_at' => in_array($status->name, ['Completed', '100%'], true)
-                    ? $validated['progress']['completed_at']
-                    : null,
+                'first_played_at' => array_key_exists('first_played_at', $progress) ? ($progress['first_played_at'] ?? null) : $libraryGame->first_played_at,
+                'last_played_at' => array_key_exists('last_played_at', $progress) ? ($progress['last_played_at'] ?? null) : $libraryGame->last_played_at,
+                'completed_at' => ($syncedProgressFields['completed_at'] ?? false)
+                    ? $libraryGame->completed_at
+                    : (in_array($status->name, ['Completed', '100%'], true) ? $completedAt : null),
             ]);
+
+            $linkedProgress->propagateSourceProgress($libraryGame->refresh());
         });
 
         return back();
+    }
+
+    private function withoutSyncedProgressFields(array $progress, array $syncedFields): array
+    {
+        foreach ($syncedFields as $field => $isSynced) {
+            if ($isSynced) {
+                unset($progress[$field]);
+            }
+        }
+
+        return $progress;
     }
 
     private function updateInheritedOwnershipCopyBaseValues(LibraryGame $libraryGame, mixed $previousBaseValue, mixed $nextBaseValue): void
@@ -158,8 +186,7 @@ class LibraryGameMutationController extends Controller
         LibraryGame $libraryGame,
         SubscriptionMutationService $mutations,
         FinancialSnapshotRefreshService $refresh,
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
         $mutations->assertLibraryGameDeletionAllowed($libraryGame);
         $libraryGame->load('ownershipCopies.subscriptionEntries');
         $subscriptions = $libraryGame->ownershipCopies
@@ -271,5 +298,4 @@ class LibraryGameMutationController extends Controller
             'url' => asset('storage/'.$path),
         ], 201);
     }
-
 }

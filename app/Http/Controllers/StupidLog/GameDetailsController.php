@@ -23,7 +23,19 @@ class GameDetailsController extends Controller
         ClosedFinancialYearService $closedYears,
     ): Response {
         $user = $localUser->get();
-        $libraryGame->load(['game.dlcs', 'platform.ownershipTypes', 'status', 'devices', 'ownershipCopies.ownershipType', 'ownershipCopies.physicalStatus', 'ownedDlcs.dlc', 'inAppPurchases.lockedBySnapshotRun']);
+        $libraryGame->load([
+            'game.dlcs',
+            'platform.ownershipTypes',
+            'status',
+            'devices',
+            'ownershipCopies.ownershipType',
+            'ownershipCopies.physicalStatus',
+            'ownedDlcs.dlc',
+            'inAppPurchases.lockedBySnapshotRun',
+            'progressLink.sourceLibraryGame.game',
+            'progressLink.sourceLibraryGame.platform',
+            'progressLink.sourceLibraryGame.status',
+        ]);
 
         return Inertia::render('GameDetails', [
             'libraryGame' => $presenter->card($libraryGame),

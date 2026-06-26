@@ -121,7 +121,16 @@ class LibraryGameListService
     public function query(User $user)
     {
         return LibraryGame::where('user_id', $user->id)
-            ->with(['game', 'platform', 'status', 'devices', 'ownershipCopies.ownershipType']);
+            ->with([
+                'game',
+                'platform',
+                'status',
+                'devices',
+                'ownershipCopies.ownershipType',
+                'progressLink.sourceLibraryGame.game',
+                'progressLink.sourceLibraryGame.platform',
+                'progressLink.sourceLibraryGame.status',
+            ]);
     }
 
     private function applyAdvancedFilters($builder, array $filters): void

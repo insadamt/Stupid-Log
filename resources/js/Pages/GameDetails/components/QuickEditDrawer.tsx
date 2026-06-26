@@ -2,7 +2,7 @@ import { Check, Save, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { gsap, motion, prefersReducedMotion } from '../../../animation';
 import { statusPillStyle } from '../../../statusColors';
-import { ReferenceData } from '../../../types';
+import { LinkedProgressFieldSources, ReferenceData } from '../../../types';
 import { QuickEditForm } from '../types';
 import { Field, Select, TextInput } from './FormControls';
 
@@ -23,6 +23,7 @@ export default function QuickEditDrawer({
     gameHasAchievements,
     saving,
     saved,
+    fieldSources,
     updateForm,
     updateStatus,
     submit,
@@ -35,6 +36,7 @@ export default function QuickEditDrawer({
     gameHasAchievements: boolean;
     saving: boolean;
     saved: boolean;
+    fieldSources: LinkedProgressFieldSources;
     updateForm: (patch: Partial<QuickEditForm>) => void;
     updateStatus: (statusId: string) => void;
     submit: () => void;
@@ -45,6 +47,10 @@ export default function QuickEditDrawer({
     const closeButtonRef = useRef<HTMLButtonElement>(null);
     const closingRef = useRef(false);
     const unrecognizedErrors = Object.entries(errors).filter(([key]) => !knownErrorKeys.has(key));
+    const statusSynced = fieldSources.status === 'source';
+    const playtimeSynced = fieldSources.playtime === 'source';
+    const achievementsSynced = fieldSources.achievements === 'source';
+    const datesSynced = fieldSources.dates === 'source';
 
     useEffect(() => {
         const backdrop = backdropRef.current;
@@ -127,7 +133,7 @@ export default function QuickEditDrawer({
                 <div className="overflow-y-auto px-7 py-6">
                     <div className="grid gap-5">
                         <Field label="Status" error={errors['progress.status_id']}>
-                            <Select value={form.status_id} onChange={(event) => updateStatus(event.target.value)}>
+                            <Select value={form.status_id} disabled={statusSynced} onChange={(event) => updateStatus(event.target.value)}>
                                 {references.statuses
                                     .filter((status) => gameHasAchievements || status.name !== '100%')
                                     .map((status) => <option key={status.id} value={status.id} className="text-black">{status.name}</option>)}
@@ -144,23 +150,29 @@ export default function QuickEditDrawer({
 
                         <div className="grid gap-5 sm:grid-cols-2">
                             <Field label="Playtime Hours" error={errors['progress.playtime_hours']}>
-                                <TextInput type="number" min="0" step="0.1" value={form.playtime_hours} onChange={(event) => updateForm({ playtime_hours: event.target.value })} />
+                                <TextInput type="number" min="0" step="0.1" value={form.playtime_hours} disabled={playtimeSynced} onChange={(event) => updateForm({ playtime_hours: event.target.value })} />
                             </Field>
                             <Field label="Earned Achievements" error={errors['progress.earned_achievements']}>
-                                <TextInput type="number" min="0" value={form.earned_achievements} onChange={(event) => updateForm({ earned_achievements: event.target.value })} />
+                                <TextInput type="number" min="0" value={form.earned_achievements} disabled={achievementsSynced} onChange={(event) => updateForm({ earned_achievements: event.target.value })} />
                             </Field>
                             <Field label="First Played Date" error={errors['progress.first_played_at']}>
-                                <TextInput type="date" value={form.first_played_at} onChange={(event) => updateForm({ first_played_at: event.target.value })} />
+                                <TextInput type="date" value={form.first_played_at} disabled={datesSynced} onChange={(event) => updateForm({ first_played_at: event.target.value })} />
                             </Field>
                             <Field label="Last Played Date" error={errors['progress.last_played_at']}>
-                                <TextInput type="date" value={form.last_played_at} onChange={(event) => updateForm({ last_played_at: event.target.value })} />
+                                <TextInput type="date" value={form.last_played_at} disabled={datesSynced} onChange={(event) => updateForm({ last_played_at: event.target.value })} />
                             </Field>
                         </div>
 
                         {(selectedStatus?.name === 'Completed' || selectedStatus?.name === '100%') && (
                             <Field label="Completed Date" error={errors['progress.completed_at']}>
-                                <TextInput type="date" value={form.completed_at} onChange={(event) => updateForm({ completed_at: event.target.value })} />
+                                <TextInput type="date" value={form.completed_at} disabled={datesSynced} onChange={(event) => updateForm({ completed_at: event.target.value })} />
                             </Field>
+                        )}
+
+                        {(statusSynced || playtimeSynced || achievementsSynced || datesSynced) && (
+                            <div className="rounded-2xl border border-[#b7ff63]/25 bg-[#b7ff63]/10 px-4 py-3 text-sm font-black text-[#d8ff9f]">
+                                Linked Progress controls synced fields from the source game.
+                            </div>
                         )}
 
                         {!gameHasAchievements && (

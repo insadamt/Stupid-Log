@@ -8,7 +8,7 @@ export type Dlc = {
     purchased_at: string | null;
 };
 
-export type Mode = 'overview' | 'ownership' | 'dlcs' | 'purchases';
+export type Mode = 'overview' | 'linked-progress' | 'ownership' | 'dlcs' | 'purchases';
 export type EditTab = 'basics' | 'progress' | 'platform' | 'description';
 
 export type OwnershipCopyDetails = {
@@ -26,8 +26,20 @@ export type OwnershipCopyDetails = {
 export type Details = {
     platform_id: number;
     device_ids: number[];
+    linked_progress: import('../../types').LinkedProgressData | null;
+    effective_progress: import('../../types').EffectiveProgressData;
     ownership_copies: OwnershipCopyDetails[];
     platform_ownership_types: Array<{ id: number; name: string }>;
+};
+
+export type LinkedProgressCandidate = import('../../types').LinkedProgressSourceData;
+
+export type LinkedProgressForm = {
+    source_library_game_id: string;
+    sync_playtime: boolean;
+    sync_achievements: boolean;
+    sync_dates: boolean;
+    sync_status: boolean;
 };
 
 export type OwnershipForm = {

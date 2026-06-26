@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { gsap, motion, prefersReducedMotion } from '../../animation';
 import AppLayout from '../../Components/AppLayout';
 import { GameCardData, ReferenceData } from '../../types';
@@ -9,6 +9,7 @@ import DlcsPanel from './components/DlcsPanel';
 import GameEditModal from './components/GameEditModal';
 import GameStage from './components/GameStage';
 import InAppPurchaseDialogs from './components/InAppPurchaseDialogs';
+import LinkedProgressPanel from './components/LinkedProgressPanel';
 import OverviewMetrics from './components/OverviewMetrics';
 import OverviewPanel from './components/OverviewPanel';
 import OwnershipCopyModal from './components/OwnershipCopyModal';
@@ -17,7 +18,7 @@ import PurchasesPanel from './components/PurchasesPanel';
 import QuickEditDrawer from './components/QuickEditDrawer';
 import { ModeButton } from './components/SharedUi';
 import { formFromCopy, gameEditFormFromGame } from './forms';
-import { Details, Dlc, DlcForm, EditTab, GameEditForm, Mode, OwnershipCopyDetails, OwnershipForm, PaidBreakdown } from './types';
+import { Details, Dlc, DlcForm, EditTab, GameEditForm, LinkedProgressCandidate, LinkedProgressForm, Mode, OwnershipCopyDetails, OwnershipForm, PaidBreakdown } from './types';
 import { useGameDetailsAnimations } from './useGameDetailsAnimations';
 import { useInAppPurchaseActions } from './useInAppPurchaseActions';
 import { useQuickEdit } from './useQuickEdit';
@@ -59,6 +60,12 @@ export default function GameDetails({
     const [editTab, setEditTab] = useState<EditTab>('basics');
     const [gameErrors, setGameErrors] = useState<Record<string, string>>({});
     const [savingGame, setSavingGame] = useState(false);
+    const [linkedProgressQuery, setLinkedProgressQuery] = useState('');
+    const [linkedProgressCandidates, setLinkedProgressCandidates] = useState<LinkedProgressCandidate[]>([]);
+    const [linkedProgressErrors, setLinkedProgressErrors] = useState<Record<string, string>>({});
+    const [loadingLinkedProgressCandidates, setLoadingLinkedProgressCandidates] = useState(false);
+    const [savingLinkedProgress, setSavingLinkedProgress] = useState(false);
+    const [linkedProgressForm, setLinkedProgressForm] = useState<LinkedProgressForm>(() => linkedProgressFormFromDetails(details));
     const [pendingGameStatusId, setPendingGameStatusId] = useState<string | null>(null);
     const [gameCompletionDateDraft, setGameCompletionDateDraft] = useState(new Date().toISOString().slice(0, 10));
     const [gameForm, setGameForm] = useState<GameEditForm>(() => gameEditFormFromGame(libraryGame, references));
@@ -96,6 +103,7 @@ export default function GameDetails({
     const filteredDevices = (selectedPlatform?.devices ?? []).filter((device) =>
         device.name.toLowerCase().includes(deviceQuery.toLowerCase().trim()),
     );
+    const linkedFieldSources = libraryGame.effective_progress?.field_sources ?? details.effective_progress.field_sources;
 
     useGameDetailsAnimations({
         pageRef,
@@ -106,6 +114,94 @@ export default function GameDetails({
         libraryGameId: libraryGame.id,
         mode,
     });
+
+    useEffect(() => {
+        setLinkedProgressForm(linkedProgressFormFromDetails(details));
+    }, [details.linked_progress?.id, details.linked_progress?.source_library_game_id, details.linked_progress?.sync_playtime, details.linked_progress?.sync_achievements, details.linked_progress?.sync_dates, details.linked_progress?.sync_status]);
+
+    useEffect(() => {
+        if (mode !== 'linked-progress') return;
+
+        const controller = new AbortController();
+        const params = new URLSearchParams();
+        if (linkedProgressQuery.trim() !== '') params.set('query', linkedProgressQuery.trim());
+
+        setLoadingLinkedProgressCandidates(true);
+        fetch(`/games/${libraryGame.id}/linked-progress/candidates?${params.toString()}`, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+            signal: controller.signal,
+        })
+            .then((response) => response.ok ? response.json() : Promise.reject(new Error('Linked Progress candidate search failed.')))
+            .then((data: { candidates: LinkedProgressCandidate[] }) => setLinkedProgressCandidates(data.candidates))
+            .catch((error) => {
+                if (error instanceof DOMException && error.name === 'AbortError') return;
+                setLinkedProgressErrors({ candidates: error instanceof Error ? error.message : 'Linked Progress candidate search failed.' });
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoadingLinkedProgressCandidates(false);
+            });
+
+        return () => controller.abort();
+    }, [libraryGame.id, linkedProgressQuery, mode]);
+
+    function linkedProgressFormFromDetails(currentDetails: Details): LinkedProgressForm {
+        const link = currentDetails.linked_progress;
+
+        return {
+            source_library_game_id: link ? String(link.source_library_game_id) : '',
+            sync_playtime: link?.sync_playtime ?? false,
+            sync_achievements: link?.sync_achievements ?? false,
+            sync_dates: link?.sync_dates ?? false,
+            sync_status: link?.sync_status ?? false,
+        };
+    }
+
+    function updateLinkedProgressForm(patch: Partial<LinkedProgressForm>) {
+        setLinkedProgressForm((current) => ({ ...current, ...patch }));
+        setLinkedProgressErrors({});
+    }
+
+    function linkedProgressPayload() {
+        return {
+            source_library_game_id: Number(linkedProgressForm.source_library_game_id),
+            sync_playtime: linkedProgressForm.sync_playtime,
+            sync_achievements: linkedProgressForm.sync_achievements,
+            sync_dates: linkedProgressForm.sync_dates,
+            sync_status: linkedProgressForm.sync_status,
+        };
+    }
+
+    function submitLinkedProgress() {
+        const options = {
+            preserveScroll: true,
+            onStart: () => setSavingLinkedProgress(true),
+            onFinish: () => setSavingLinkedProgress(false),
+            onSuccess: () => setLinkedProgressErrors({}),
+            onError: (errors: Record<string, string>) => setLinkedProgressErrors(errors),
+        };
+
+        if (details.linked_progress) {
+            router.patch(`/games/${libraryGame.id}/linked-progress`, linkedProgressPayload(), options);
+            return;
+        }
+
+        router.post(`/games/${libraryGame.id}/linked-progress`, linkedProgressPayload(), options);
+    }
+
+    function removeLinkedProgress() {
+        router.delete(`/games/${libraryGame.id}/linked-progress`, {
+            preserveScroll: true,
+            onStart: () => setSavingLinkedProgress(true),
+            onFinish: () => setSavingLinkedProgress(false),
+            onSuccess: () => setLinkedProgressErrors({}),
+            onError: (errors: Record<string, string>) => setLinkedProgressErrors(errors),
+        });
+    }
+
+    function isProgressFieldSynced(field: keyof typeof linkedFieldSources) {
+        return linkedFieldSources[field] === 'source';
+    }
     function changeMode(nextMode: Mode) {
         if (nextMode === mode) return;
         previousStageRect.current = stageRef.current?.getBoundingClientRect() ?? null;
@@ -244,15 +340,28 @@ export default function GameDetails({
     }
 
     function submitGameEdit() {
+        const gamePayload: {
+            title: string;
+            publisher: string | null;
+            description: string | null;
+            cover_path: string | null;
+            base_price_default: number | null;
+            total_achievements?: number | null;
+        } = {
+            title: gameForm.title,
+            publisher: gameForm.publisher || null,
+            description: gameForm.description || null,
+            cover_path: gameForm.cover_path || null,
+            base_price_default: gameForm.base_price_default === '' ? null : Number(gameForm.base_price_default),
+            total_achievements: gameForm.total_achievements === '' ? null : Number(gameForm.total_achievements),
+        };
+
+        if (isProgressFieldSynced('achievements')) {
+            delete gamePayload.total_achievements;
+        }
+
         router.patch(`/games/${libraryGame.id}`, {
-            game: {
-                title: gameForm.title,
-                publisher: gameForm.publisher || null,
-                description: gameForm.description || null,
-                cover_path: gameForm.cover_path || null,
-                base_price_default: gameForm.base_price_default === '' ? null : Number(gameForm.base_price_default),
-                total_achievements: gameForm.total_achievements === '' ? null : Number(gameForm.total_achievements),
-            },
+            game: gamePayload,
             progress: {
                 status_id: Number(gameForm.status_id),
                 playtime_hours: gameForm.playtime_hours === '' ? 0 : Number(gameForm.playtime_hours),
@@ -374,6 +483,22 @@ export default function GameDetails({
                     <GameStage stageRef={stageRef} libraryGame={libraryGame} />
                     <section data-details-panel ref={detailsPanelRef} className="relative z-10 min-w-0 self-center">
                         {mode === 'overview' && <OverviewPanel libraryGame={libraryGame} details={details} />}
+                        {mode === 'linked-progress' && (
+                            <LinkedProgressPanel
+                                form={linkedProgressForm}
+                                query={linkedProgressQuery}
+                                candidates={linkedProgressCandidates}
+                                errors={linkedProgressErrors}
+                                loading={loadingLinkedProgressCandidates}
+                                saving={savingLinkedProgress}
+                                hasLink={Boolean(details.linked_progress)}
+                                source={details.linked_progress?.source ?? null}
+                                setQuery={setLinkedProgressQuery}
+                                updateForm={updateLinkedProgressForm}
+                                submit={submitLinkedProgress}
+                                remove={removeLinkedProgress}
+                            />
+                        )}
                         {mode === 'ownership' && <OwnershipPanel details={details} startAddCopy={startAddCopy} startEditCopy={startEditCopy} deleteCopy={deleteCopy} />}
                         {mode === 'dlcs' && (
                             <DlcsPanel
@@ -407,6 +532,7 @@ export default function GameDetails({
                     <ModeButton active={mode === 'ownership'} onClick={() => changeMode('ownership')}>Ownership</ModeButton>
                     <ModeButton active={mode === 'dlcs'} onClick={() => changeMode('dlcs')}>DLCs Page</ModeButton>
                     <ModeButton active={mode === 'purchases'} onClick={() => changeMode('purchases')}>In-App Purchases</ModeButton>
+                    <ModeButton active={mode === 'linked-progress'} onClick={() => changeMode('linked-progress')}>Linked Progress</ModeButton>
                 </div>
 
                 {editingCopyId && (
@@ -451,6 +577,7 @@ export default function GameDetails({
                         gameHasAchievements={libraryGame.total_achievements > 0}
                         saving={quickEdit.isSaving}
                         saved={quickEdit.isSaved}
+                        fieldSources={linkedFieldSources}
                         updateForm={quickEdit.updateForm}
                         updateStatus={quickEdit.updateStatus}
                         submit={quickEdit.save}
@@ -469,6 +596,7 @@ export default function GameDetails({
                         references={references}
                         selectedGameStatus={selectedGameStatus}
                         gameHasAchievements={gameHasAchievements}
+                        fieldSources={linkedFieldSources}
                         platformQuery={platformQuery}
                         setPlatformQuery={setPlatformQuery}
                         deviceQuery={deviceQuery}

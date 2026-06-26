@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'user_id',
@@ -70,5 +71,15 @@ class LibraryGame extends Model
     public function inAppPurchases(): HasMany
     {
         return $this->hasMany(InAppPurchase::class);
+    }
+
+    public function progressLink(): HasOne
+    {
+        return $this->hasOne(LibraryGameProgressLink::class, 'target_library_game_id');
+    }
+
+    public function progressLinksAsSource(): HasMany
+    {
+        return $this->hasMany(LibraryGameProgressLink::class, 'source_library_game_id');
     }
 }

@@ -74,16 +74,17 @@ class StatsService
         $libraryQuery = DB::table('library_games')
             ->join('games', 'games.id', '=', 'library_games.game_id')
             ->join('statuses', 'statuses.id', '=', 'library_games.status_id')
+            ->leftJoin('library_game_progress_links as progress_links', 'progress_links.target_library_game_id', '=', 'library_games.id')
             ->where('library_games.user_id', $user->id);
 
         $totals = (clone $libraryQuery)
             ->selectRaw('count(*) as library_games')
             ->selectRaw('count(distinct library_games.game_id) as unique_titles')
-            ->selectRaw("sum(case when statuses.name in ('Completed', '100%') then 1 else 0 end) as completed")
-            ->selectRaw("sum(case when statuses.name = '100%' then 1 else 0 end) as hundred_percent")
-            ->selectRaw('sum(library_games.playtime_hours) as playtime_hours')
-            ->selectRaw('sum(coalesce(library_games.earned_achievements, 0)) as earned_achievements')
-            ->selectRaw('sum(coalesce(games.total_achievements, 0)) as total_achievements')
+            ->selectRaw("sum(case when coalesce(progress_links.sync_status, 0) = 1 or coalesce(progress_links.sync_dates, 0) = 1 then 0 when statuses.name in ('Completed', '100%') then 1 else 0 end) as completed")
+            ->selectRaw("sum(case when coalesce(progress_links.sync_status, 0) = 1 or coalesce(progress_links.sync_dates, 0) = 1 then 0 when statuses.name = '100%' then 1 else 0 end) as hundred_percent")
+            ->selectRaw('sum(case when coalesce(progress_links.sync_playtime, 0) = 1 then 0 else library_games.playtime_hours end) as playtime_hours')
+            ->selectRaw('sum(case when coalesce(progress_links.sync_achievements, 0) = 1 then 0 else coalesce(library_games.earned_achievements, 0) end) as earned_achievements')
+            ->selectRaw('sum(case when coalesce(progress_links.sync_achievements, 0) = 1 then 0 else coalesce(games.total_achievements, 0) end) as total_achievements')
             ->first();
 
         $totalAchievements = (int) ($totals?->total_achievements ?? 0);
@@ -292,11 +293,16 @@ class StatsService
 
     private function buildSnapshotSummary(SnapshotRun $snapshot): array
     {
-        $libraryQuery = DB::table('library_game_snapshots')->where('snapshot_run_id', $snapshot->id);
+        $libraryQuery = DB::table('library_game_snapshots')
+            ->leftJoin('library_game_progress_link_snapshots as progress_link_snapshots', function ($join) {
+                $join->on('progress_link_snapshots.snapshot_run_id', '=', 'library_game_snapshots.snapshot_run_id')
+                    ->on('progress_link_snapshots.target_library_game_id', '=', 'library_game_snapshots.library_game_id');
+            })
+            ->where('library_game_snapshots.snapshot_run_id', $snapshot->id);
         $copyQuery = DB::table('ownership_copy_snapshots')->where('snapshot_run_id', $snapshot->id);
         $dlcQuery = DB::table('owned_dlc_snapshots')->where('snapshot_run_id', $snapshot->id);
-        $totalAchievements = (int) (clone $libraryQuery)->sum('total_achievements');
-        $earnedAchievements = (int) (clone $libraryQuery)->sum('earned_achievements');
+        $totalAchievements = (int) (clone $libraryQuery)->sum(DB::raw('case when coalesce(progress_link_snapshots.sync_achievements, 0) = 1 then 0 else coalesce(library_game_snapshots.total_achievements, 0) end'));
+        $earnedAchievements = (int) (clone $libraryQuery)->sum(DB::raw('case when coalesce(progress_link_snapshots.sync_achievements, 0) = 1 then 0 else coalesce(library_game_snapshots.earned_achievements, 0) end'));
         $copyBaseValue = $this->snapshotEligibleCopyValue($snapshot, 'base_price');
         $copyPurchasedValue = $this->snapshotEligibleCopyValue($snapshot, 'purchased_price');
         $dlcBaseValue = $this->snapshotOwnedDlcValue($snapshot, 'base_price');
@@ -311,19 +317,23 @@ class StatsService
             'status' => $snapshot->status,
             'created_at' => $snapshot->created_at?->toIso8601String(),
             'confirmed_at' => $snapshot->confirmed_at?->toIso8601String(),
-            'unique_titles' => (clone $libraryQuery)->distinct('game_id')->count('game_id'),
-            'library_games' => (clone $libraryQuery)->count(),
+            'unique_titles' => (clone $libraryQuery)->distinct('library_game_snapshots.game_id')->count('library_game_snapshots.game_id'),
+            'library_games' => (clone $libraryQuery)->count('library_game_snapshots.id'),
             'ownership_copies' => (clone $copyQuery)->count(),
             'owned_dlcs' => (clone $dlcQuery)->count(),
             'completed' => (clone $libraryQuery)
                 ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
+                ->whereRaw('coalesce(progress_link_snapshots.sync_status, 0) = 0')
+                ->whereRaw('coalesce(progress_link_snapshots.sync_dates, 0) = 0')
                 ->whereIn('statuses.name', ['Completed', '100%'])
                 ->count(),
             'hundred_percent' => (clone $libraryQuery)
                 ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
+                ->whereRaw('coalesce(progress_link_snapshots.sync_status, 0) = 0')
+                ->whereRaw('coalesce(progress_link_snapshots.sync_dates, 0) = 0')
                 ->where('statuses.name', '100%')
                 ->count(),
-            'playtime_hours' => round((float) (clone $libraryQuery)->sum('playtime_hours'), 1),
+            'playtime_hours' => round((float) (clone $libraryQuery)->sum(DB::raw('case when coalesce(progress_link_snapshots.sync_playtime, 0) = 1 then 0 else library_game_snapshots.playtime_hours end')), 1),
             'earned_achievements' => $earnedAchievements,
             'total_achievements' => $totalAchievements,
             'achievement_progress' => $totalAchievements > 0 ? round(($earnedAchievements / $totalAchievements) * 100, 1) : 0,
@@ -377,16 +387,16 @@ class StatsService
             ->skip($offset)
             ->take($limit + 1)
             ->select([
-            'library_game_snapshots.library_game_id',
-            'games.title',
-            'platforms.name as platform',
-            'statuses.name as status',
-            'statuses.color_key as status_color_key',
-            'statuses.color_hex as status_color_hex',
-            'library_game_snapshots.playtime_hours',
-            'library_game_snapshots.earned_achievements',
-            'library_game_snapshots.total_achievements',
-        ])
+                'library_game_snapshots.library_game_id',
+                'games.title',
+                'platforms.name as platform',
+                'statuses.name as status',
+                'statuses.color_key as status_color_key',
+                'statuses.color_hex as status_color_hex',
+                'library_game_snapshots.playtime_hours',
+                'library_game_snapshots.earned_achievements',
+                'library_game_snapshots.total_achievements',
+            ])
             ->get();
 
         return [
@@ -401,8 +411,8 @@ class StatsService
                 'earned_achievements' => (int) $row->earned_achievements,
                 'total_achievements' => (int) $row->total_achievements,
             ])
-            ->values()
-            ->all(),
+                ->values()
+                ->all(),
             'next_cursor' => $rows->count() > $limit ? $this->encodeOffsetCursor($offset + $limit) : null,
             'has_more' => $rows->count() > $limit,
         ];
@@ -514,7 +524,7 @@ class StatsService
                 ->map(fn (Collection $statusGames, string $statusLabel) => $this->statusBreakdownFromLive($statusLabel, $statusGames))
                 ->sortByDesc('library_games')
                 ->values()
-            ->all(),
+                ->all(),
         ];
     }
 
@@ -556,10 +566,14 @@ class StatsService
             ->join('games', 'games.id', '=', 'library_games.game_id')
             ->join('platforms', 'platforms.id', '=', 'library_games.platform_id')
             ->join('statuses', 'statuses.id', '=', 'library_games.status_id')
+            ->leftJoin('library_game_progress_links as progress_links', 'progress_links.target_library_game_id', '=', 'library_games.id')
             ->where('library_games.user_id', $user->id)
             ->groupBy('platforms.id', 'platforms.name', 'platforms.color_key', 'platforms.color_hex')
-            ->selectRaw('platforms.id, platforms.name as label, platforms.color_key, platforms.color_hex, count(*) as library_games, sum(library_games.playtime_hours) as playtime_hours, sum(coalesce(library_games.earned_achievements, 0)) as earned_achievements, sum(coalesce(games.total_achievements, 0)) as total_achievements')
-            ->selectRaw("sum(case when statuses.name in ('Completed', '100%') then 1 else 0 end) as completed")
+            ->selectRaw('platforms.id, platforms.name as label, platforms.color_key, platforms.color_hex, count(*) as library_games')
+            ->selectRaw('sum(case when coalesce(progress_links.sync_playtime, 0) = 1 then 0 else library_games.playtime_hours end) as playtime_hours')
+            ->selectRaw('sum(case when coalesce(progress_links.sync_achievements, 0) = 1 then 0 else coalesce(library_games.earned_achievements, 0) end) as earned_achievements')
+            ->selectRaw('sum(case when coalesce(progress_links.sync_achievements, 0) = 1 then 0 else coalesce(games.total_achievements, 0) end) as total_achievements')
+            ->selectRaw("sum(case when coalesce(progress_links.sync_status, 0) = 1 or coalesce(progress_links.sync_dates, 0) = 1 then 0 when statuses.name in ('Completed', '100%') then 1 else 0 end) as completed")
             ->get()
             ->keyBy('id');
 
@@ -585,9 +599,10 @@ class StatsService
 
         $statusesByPlatform = DB::table('library_games')
             ->join('statuses', 'statuses.id', '=', 'library_games.status_id')
+            ->leftJoin('library_game_progress_links as progress_links', 'progress_links.target_library_game_id', '=', 'library_games.id')
             ->where('library_games.user_id', $user->id)
             ->groupBy('library_games.platform_id', 'statuses.name', 'statuses.color_key', 'statuses.color_hex')
-            ->selectRaw('library_games.platform_id, statuses.name as label, statuses.color_key, statuses.color_hex, count(*) as library_games, sum(library_games.playtime_hours) as playtime_hours')
+            ->selectRaw('library_games.platform_id, statuses.name as label, statuses.color_key, statuses.color_hex, count(*) as library_games, sum(case when coalesce(progress_links.sync_playtime, 0) = 1 then 0 else library_games.playtime_hours end) as playtime_hours')
             ->get()
             ->groupBy('platform_id');
 
@@ -602,6 +617,7 @@ class StatsService
                 $copyPaid = (float) ($copy?->purchased_value ?? 0);
                 $dlcBase = (float) ($dlc?->base_value ?? 0);
                 $dlcPaid = (float) ($dlc?->purchased_value ?? 0);
+
                 return [
                     'platform_id' => (int) $row->id,
                     'label' => $row->label,
@@ -654,9 +670,10 @@ class StatsService
     {
         return DB::table('library_games')
             ->join('statuses', 'statuses.id', '=', 'library_games.status_id')
+            ->leftJoin('library_game_progress_links as progress_links', 'progress_links.target_library_game_id', '=', 'library_games.id')
             ->where('library_games.user_id', $user->id)
             ->groupBy('statuses.name', 'statuses.color_key', 'statuses.color_hex')
-            ->selectRaw('statuses.name as label, statuses.color_key, statuses.color_hex, count(*) as library_games, sum(library_games.playtime_hours) as playtime_hours')
+            ->selectRaw('statuses.name as label, statuses.color_key, statuses.color_hex, count(*) as library_games, sum(case when coalesce(progress_links.sync_playtime, 0) = 1 then 0 else library_games.playtime_hours end) as playtime_hours')
             ->get()
             ->map(fn ($row) => [
                 'label' => $row->label,
@@ -725,10 +742,17 @@ class StatsService
         $platforms = DB::table('library_game_snapshots')
             ->join('platforms', 'platforms.id', '=', 'library_game_snapshots.platform_id')
             ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
-            ->where('snapshot_run_id', $snapshot->id)
+            ->leftJoin('library_game_progress_link_snapshots as progress_link_snapshots', function ($join) {
+                $join->on('progress_link_snapshots.snapshot_run_id', '=', 'library_game_snapshots.snapshot_run_id')
+                    ->on('progress_link_snapshots.target_library_game_id', '=', 'library_game_snapshots.library_game_id');
+            })
+            ->where('library_game_snapshots.snapshot_run_id', $snapshot->id)
             ->groupBy('platforms.id', 'platforms.name', 'platforms.color_key', 'platforms.color_hex')
-            ->selectRaw('platforms.id, platforms.name as label, platforms.color_key, platforms.color_hex, count(*) as library_games, sum(playtime_hours) as playtime_hours, sum(earned_achievements) as earned_achievements, sum(total_achievements) as total_achievements')
-            ->selectRaw("sum(case when statuses.name in ('Completed', '100%') then 1 else 0 end) as completed")
+            ->selectRaw('platforms.id, platforms.name as label, platforms.color_key, platforms.color_hex, count(*) as library_games')
+            ->selectRaw('sum(case when coalesce(progress_link_snapshots.sync_playtime, 0) = 1 then 0 else library_game_snapshots.playtime_hours end) as playtime_hours')
+            ->selectRaw('sum(case when coalesce(progress_link_snapshots.sync_achievements, 0) = 1 then 0 else coalesce(library_game_snapshots.earned_achievements, 0) end) as earned_achievements')
+            ->selectRaw('sum(case when coalesce(progress_link_snapshots.sync_achievements, 0) = 1 then 0 else coalesce(library_game_snapshots.total_achievements, 0) end) as total_achievements')
+            ->selectRaw("sum(case when coalesce(progress_link_snapshots.sync_status, 0) = 1 or coalesce(progress_link_snapshots.sync_dates, 0) = 1 then 0 when statuses.name in ('Completed', '100%') then 1 else 0 end) as completed")
             ->get()
             ->keyBy('id');
 
@@ -759,9 +783,13 @@ class StatsService
 
         $statusesByPlatform = DB::table('library_game_snapshots')
             ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
-            ->where('snapshot_run_id', $snapshot->id)
+            ->leftJoin('library_game_progress_link_snapshots as progress_link_snapshots', function ($join) {
+                $join->on('progress_link_snapshots.snapshot_run_id', '=', 'library_game_snapshots.snapshot_run_id')
+                    ->on('progress_link_snapshots.target_library_game_id', '=', 'library_game_snapshots.library_game_id');
+            })
+            ->where('library_game_snapshots.snapshot_run_id', $snapshot->id)
             ->groupBy('library_game_snapshots.platform_id', 'statuses.name', 'statuses.color_key', 'statuses.color_hex')
-            ->selectRaw('library_game_snapshots.platform_id, statuses.name as label, statuses.color_key, statuses.color_hex, count(*) as library_games, sum(playtime_hours) as playtime_hours')
+            ->selectRaw('library_game_snapshots.platform_id, statuses.name as label, statuses.color_key, statuses.color_hex, count(*) as library_games, sum(case when coalesce(progress_link_snapshots.sync_playtime, 0) = 1 then 0 else library_game_snapshots.playtime_hours end) as playtime_hours')
             ->get()
             ->groupBy('platform_id');
 
@@ -776,6 +804,7 @@ class StatsService
                 $copyPaid = (float) ($copy?->purchased_value ?? 0);
                 $dlcBase = (float) ($dlc?->base_value ?? 0);
                 $dlcPaid = (float) ($dlc?->purchased_value ?? 0);
+
                 return [
                     'platform_id' => (int) $row->id,
                     'label' => $row->label,
@@ -828,9 +857,13 @@ class StatsService
     {
         return DB::table('library_game_snapshots')
             ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
-            ->where('snapshot_run_id', $snapshot->id)
+            ->leftJoin('library_game_progress_link_snapshots as progress_link_snapshots', function ($join) {
+                $join->on('progress_link_snapshots.snapshot_run_id', '=', 'library_game_snapshots.snapshot_run_id')
+                    ->on('progress_link_snapshots.target_library_game_id', '=', 'library_game_snapshots.library_game_id');
+            })
+            ->where('library_game_snapshots.snapshot_run_id', $snapshot->id)
             ->groupBy('statuses.name', 'statuses.color_key', 'statuses.color_hex')
-            ->selectRaw('statuses.name as label, statuses.color_key, statuses.color_hex, count(*) as library_games, sum(playtime_hours) as playtime_hours')
+            ->selectRaw('statuses.name as label, statuses.color_key, statuses.color_hex, count(*) as library_games, sum(case when coalesce(progress_link_snapshots.sync_playtime, 0) = 1 then 0 else library_game_snapshots.playtime_hours end) as playtime_hours')
             ->get()
             ->map(fn ($row) => [
                 'label' => $row->label,
@@ -908,7 +941,7 @@ class StatsService
     private function liveArchiveSql(User $user): array
     {
         $totals = $this->financialValues->calculateLiveFinancialValuesForUser($user);
-        $playtimeRankings = $this->liveArchiveRows($user, 'library_games.playtime_hours', false, null);
+        $playtimeRankings = $this->liveArchiveRows($user, 'playtime_hours', false, null);
 
         return [
             'most_played' => array_slice($playtimeRankings, 0, 8),
@@ -949,6 +982,7 @@ class StatsService
 
         $baseValueSql = '(coalesce(copy_values.base_value, 0) + coalesce(dlc_values.base_value, 0))';
         $purchasedValueSql = '(coalesce(copy_values.purchased_value, 0) + coalesce(dlc_values.purchased_value, 0) + coalesce(subscription_values.allocated_value, 0) + coalesce(iap_values.allocated_value, 0))';
+        $playtimeSql = '(case when coalesce(progress_links.sync_playtime, 0) = 1 then 0 else library_games.playtime_hours end)';
 
         $builder = DB::table('library_games')
             ->join('games', 'games.id', '=', 'library_games.game_id')
@@ -958,6 +992,9 @@ class StatsService
             ->leftJoinSub($dlcValues, 'dlc_values', fn ($join) => $join->on('dlc_values.library_game_id', '=', 'library_games.id'))
             ->leftJoinSub($subscriptionValues, 'subscription_values', fn ($join) => $join->on('subscription_values.library_game_id', '=', 'library_games.id'))
             ->leftJoinSub($iapValues, 'iap_values', fn ($join) => $join->on('iap_values.library_game_id', '=', 'library_games.id'))
+            ->leftJoin('library_game_progress_links as progress_links', 'progress_links.target_library_game_id', '=', 'library_games.id')
+            ->leftJoin('library_games as progress_source_games', 'progress_source_games.id', '=', 'progress_links.source_library_game_id')
+            ->leftJoin('statuses as progress_source_statuses', 'progress_source_statuses.id', '=', 'progress_source_games.status_id')
             ->where('library_games.user_id', $user->id)
             ->select([
                 'library_games.id as library_game_id',
@@ -966,11 +1003,11 @@ class StatsService
                 'games.cover_url_original',
                 'games.cover_path',
                 'platforms.name as platform',
-                'statuses.name as status',
-                'statuses.color_key as status_color_key',
-                'statuses.color_hex as status_color_hex',
-                'library_games.playtime_hours',
             ])
+            ->selectRaw("{$playtimeSql} as playtime_hours")
+            ->selectRaw('case when coalesce(progress_links.sync_status, 0) = 1 then progress_source_statuses.name else statuses.name end as status')
+            ->selectRaw('case when coalesce(progress_links.sync_status, 0) = 1 then progress_source_statuses.color_key else statuses.color_key end as status_color_key')
+            ->selectRaw('case when coalesce(progress_links.sync_status, 0) = 1 then progress_source_statuses.color_hex else statuses.color_hex end as status_color_hex')
             ->selectRaw('coalesce(copy_values.base_value, 0) as copy_base_value')
             ->selectRaw('coalesce(copy_values.purchased_value, 0) as copy_purchased_value')
             ->selectRaw('coalesce(dlc_values.base_value, 0) as dlc_base_value')
@@ -1048,7 +1085,16 @@ class StatsService
             ->join('games', 'games.id', '=', 'library_game_snapshots.game_id')
             ->join('platforms', 'platforms.id', '=', 'library_game_snapshots.platform_id')
             ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
-            ->where('snapshot_run_id', $snapshot->id)
+            ->leftJoin('library_game_progress_link_snapshots as progress_link_snapshots', function ($join) {
+                $join->on('progress_link_snapshots.snapshot_run_id', '=', 'library_game_snapshots.snapshot_run_id')
+                    ->on('progress_link_snapshots.target_library_game_id', '=', 'library_game_snapshots.library_game_id');
+            })
+            ->leftJoin('library_game_snapshots as progress_source_snapshots', function ($join) {
+                $join->on('progress_source_snapshots.snapshot_run_id', '=', 'library_game_snapshots.snapshot_run_id')
+                    ->on('progress_source_snapshots.library_game_id', '=', 'progress_link_snapshots.source_library_game_id');
+            })
+            ->leftJoin('statuses as progress_source_statuses', 'progress_source_statuses.id', '=', 'progress_source_snapshots.status_id')
+            ->where('library_game_snapshots.snapshot_run_id', $snapshot->id)
             ->select([
                 'library_game_snapshots.library_game_id',
                 'library_game_snapshots.game_id',
@@ -1056,11 +1102,11 @@ class StatsService
                 'games.cover_url_original',
                 'games.cover_path',
                 'platforms.name as platform',
-                'statuses.name as status',
-                'statuses.color_key as status_color_key',
-                'statuses.color_hex as status_color_hex',
-                'library_game_snapshots.playtime_hours',
             ])
+            ->selectRaw('case when coalesce(progress_link_snapshots.sync_playtime, 0) = 1 then 0 else library_game_snapshots.playtime_hours end as playtime_hours')
+            ->selectRaw('case when coalesce(progress_link_snapshots.sync_status, 0) = 1 then progress_source_statuses.name else statuses.name end as status')
+            ->selectRaw('case when coalesce(progress_link_snapshots.sync_status, 0) = 1 then progress_source_statuses.color_key else statuses.color_key end as status_color_key')
+            ->selectRaw('case when coalesce(progress_link_snapshots.sync_status, 0) = 1 then progress_source_statuses.color_hex else statuses.color_hex end as status_color_hex')
             ->get();
 
         $copyValues = DB::table('ownership_copy_snapshots')
@@ -1088,6 +1134,7 @@ class StatsService
             $copyPaid = (float) ($copy?->purchased_value ?? 0);
             $dlcBase = (float) ($dlc?->base_value ?? 0);
             $dlcPaid = (float) ($dlc?->purchased_value ?? 0);
+
             return [
                 'library_game_id' => (int) $row->library_game_id,
                 'game_id' => (int) $row->game_id,
@@ -1133,21 +1180,31 @@ class StatsService
             ->join('games', 'games.id', '=', 'library_game_snapshots.game_id')
             ->join('platforms', 'platforms.id', '=', 'library_game_snapshots.platform_id')
             ->join('statuses', 'statuses.id', '=', 'library_game_snapshots.status_id')
-            ->where('snapshot_run_id', $snapshot->id)
-            ->orderByDesc('library_game_snapshots.playtime_hours')
+            ->leftJoin('library_game_progress_link_snapshots as progress_link_snapshots', function ($join) {
+                $join->on('progress_link_snapshots.snapshot_run_id', '=', 'library_game_snapshots.snapshot_run_id')
+                    ->on('progress_link_snapshots.target_library_game_id', '=', 'library_game_snapshots.library_game_id');
+            })
+            ->leftJoin('library_game_snapshots as progress_source_snapshots', function ($join) {
+                $join->on('progress_source_snapshots.snapshot_run_id', '=', 'library_game_snapshots.snapshot_run_id')
+                    ->on('progress_source_snapshots.library_game_id', '=', 'progress_link_snapshots.source_library_game_id');
+            })
+            ->leftJoin('statuses as progress_source_statuses', 'progress_source_statuses.id', '=', 'progress_source_snapshots.status_id')
+            ->where('library_game_snapshots.snapshot_run_id', $snapshot->id)
+            ->orderByDesc('playtime_hours')
             ->orderBy('library_game_snapshots.library_game_id')
-            ->get([
+            ->select([
                 'library_game_snapshots.library_game_id',
                 'library_game_snapshots.game_id',
                 'games.title',
                 'games.cover_url_original',
                 'games.cover_path',
                 'platforms.name as platform',
-                'statuses.name as status',
-                'statuses.color_key as status_color_key',
-                'statuses.color_hex as status_color_hex',
-                'library_game_snapshots.playtime_hours',
             ])
+            ->selectRaw('case when coalesce(progress_link_snapshots.sync_playtime, 0) = 1 then 0 else library_game_snapshots.playtime_hours end as playtime_hours')
+            ->selectRaw('case when coalesce(progress_link_snapshots.sync_status, 0) = 1 then progress_source_statuses.name else statuses.name end as status')
+            ->selectRaw('case when coalesce(progress_link_snapshots.sync_status, 0) = 1 then progress_source_statuses.color_key else statuses.color_key end as status_color_key')
+            ->selectRaw('case when coalesce(progress_link_snapshots.sync_status, 0) = 1 then progress_source_statuses.color_hex else statuses.color_hex end as status_color_hex')
+            ->get()
             ->map(fn ($row) => [
                 'library_game_id' => (int) $row->library_game_id,
                 'game_id' => (int) $row->game_id,

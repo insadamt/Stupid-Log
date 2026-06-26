@@ -21,9 +21,62 @@ export type GameCardData = {
     last_played_at?: string | null;
     completed_at?: string | null;
     progress: number;
+    effective_progress?: EffectiveProgressData;
+    local_progress?: LocalProgressData;
+    linked_progress?: LinkedProgressData | null;
     ownership: string[];
     devices: string[];
     base_price_default?: string | number | null;
+};
+
+export type LinkedProgressFieldSources = {
+    playtime: 'local' | 'source';
+    achievements: 'local' | 'source';
+    dates: 'local' | 'source';
+    status: 'local' | 'source';
+};
+
+export type EffectiveProgressData = {
+    status_id: number;
+    status: string;
+    status_color_key?: string | null;
+    status_color_hex?: string | null;
+    playtime_hours: number;
+    earned_achievements: number;
+    total_achievements: number;
+    first_played_at?: string | null;
+    last_played_at?: string | null;
+    completed_at?: string | null;
+    progress: number;
+    field_sources: LinkedProgressFieldSources;
+};
+
+export type LocalProgressData = Omit<EffectiveProgressData, 'progress' | 'field_sources'>;
+
+export type LinkedProgressSourceData = {
+    id: number;
+    title: string;
+    platform: string;
+    status: string;
+    status_color_key?: string | null;
+    status_color_hex?: string | null;
+    playtime_hours: number;
+    earned_achievements: number;
+    total_achievements: number;
+    first_played_at?: string | null;
+    last_played_at?: string | null;
+    completed_at?: string | null;
+};
+
+export type LinkedProgressData = {
+    id: number;
+    target_library_game_id: number;
+    source_library_game_id: number;
+    sync_playtime: boolean;
+    sync_achievements: boolean;
+    sync_dates: boolean;
+    sync_status: boolean;
+    source: LinkedProgressSourceData;
 };
 
 export type StatsData = {

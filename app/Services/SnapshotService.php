@@ -58,6 +58,7 @@ class SnapshotService
 
         return DB::transaction(function () use ($snapshot) {
             DB::table('snapshot_best_games')->where('snapshot_run_id', $snapshot->id)->delete();
+            DB::table('library_game_progress_link_snapshots')->where('snapshot_run_id', $snapshot->id)->delete();
             DB::table('owned_dlc_snapshots')->where('snapshot_run_id', $snapshot->id)->delete();
             DB::table('ownership_copy_snapshots')->where('snapshot_run_id', $snapshot->id)->delete();
             DB::table('library_game_snapshots')->where('snapshot_run_id', $snapshot->id)->delete();
@@ -247,6 +248,34 @@ class SnapshotService
                     DB::table('owned_dlc_snapshots')->insert($dlcRows);
                 }
             });
+
+        $this->captureCurrentProgressLinks($run, $user);
+    }
+
+    private function captureCurrentProgressLinks(SnapshotRun $run, User $user): void
+    {
+        $timestamp = now();
+        $rows = DB::table('library_game_progress_links')
+            ->where('user_id', $user->id)
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($link) => [
+                'snapshot_run_id' => $run->id,
+                'library_game_progress_link_id' => $link->id,
+                'target_library_game_id' => $link->target_library_game_id,
+                'source_library_game_id' => $link->source_library_game_id,
+                'sync_playtime' => $link->sync_playtime,
+                'sync_achievements' => $link->sync_achievements,
+                'sync_dates' => $link->sync_dates,
+                'sync_status' => $link->sync_status,
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ])
+            ->all();
+
+        if ($rows) {
+            DB::table('library_game_progress_link_snapshots')->insert($rows);
+        }
     }
 
     private function refreshSummary(SnapshotRun $snapshot): void
@@ -330,8 +359,8 @@ class SnapshotService
                 'earned_achievements' => (int) $row->earned_achievements,
                 'total_achievements' => (int) $row->total_achievements,
             ])
-            ->values()
-            ->all(),
+                ->values()
+                ->all(),
             'next_cursor' => (! $all && $rows->count() > $limit) ? $this->encodeOffsetCursor($offset + $limit) : null,
             'has_more' => ! $all && $rows->count() > $limit,
         ];

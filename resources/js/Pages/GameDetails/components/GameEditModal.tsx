@@ -3,7 +3,7 @@ import { ChangeEvent, useState } from 'react';
 import { uploadCover } from '../../../Components/AddGameWizard/api';
 import PlatformIcon from '../../../Components/PlatformIcon';
 import { statusPillStyle } from '../../../statusColors';
-import { GameCardData, ReferenceData } from '../../../types';
+import { GameCardData, LinkedProgressFieldSources, ReferenceData } from '../../../types';
 import { Details, EditTab, GameEditForm } from '../types';
 import { Field, Select, TextArea, TextInput } from './FormControls';
 import { Chip } from './SharedUi';
@@ -18,6 +18,7 @@ export default function GameEditModal({
     references,
     selectedGameStatus,
     gameHasAchievements,
+    fieldSources,
     platformQuery,
     setPlatformQuery,
     deviceQuery,
@@ -50,6 +51,7 @@ export default function GameEditModal({
     references: ReferenceData;
     selectedGameStatus: ReferenceData['statuses'][number] | undefined;
     gameHasAchievements: boolean;
+    fieldSources: LinkedProgressFieldSources;
     platformQuery: string;
     setPlatformQuery: (query: string) => void;
     deviceQuery: string;
@@ -75,6 +77,10 @@ export default function GameEditModal({
 }) {
     const [uploadingCover, setUploadingCover] = useState(false);
     const [coverError, setCoverError] = useState('');
+    const statusSynced = fieldSources.status === 'source';
+    const playtimeSynced = fieldSources.playtime === 'source';
+    const achievementsSynced = fieldSources.achievements === 'source';
+    const datesSynced = fieldSources.dates === 'source';
 
     async function changeCover(event: ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0];
@@ -191,7 +197,7 @@ export default function GameEditModal({
                                 </Field>
 
                                 <Field label="Total Achievements" error={gameErrors['game.total_achievements']}>
-                                    <TextInput type="number" value={gameForm.total_achievements} onChange={(event) => updateGameForm({ total_achievements: event.target.value })} />
+                                    <TextInput type="number" value={gameForm.total_achievements} disabled={achievementsSynced} onChange={(event) => updateGameForm({ total_achievements: event.target.value })} />
                                 </Field>
                             </div>
                         )}
@@ -204,7 +210,7 @@ export default function GameEditModal({
                                 </div>
 
                                 <Field label="Status" error={gameErrors['progress.status_id']}>
-                                    <Select value={gameForm.status_id} onChange={(event) => updateGameStatus(event.target.value)}>
+                                    <Select value={gameForm.status_id} disabled={statusSynced} onChange={(event) => updateGameStatus(event.target.value)}>
                                         {references.statuses
                                             .filter((status) => gameHasAchievements || status.name !== '100%')
                                             .map((status) => <option key={status.id} value={status.id} className="text-black">{status.name}</option>)}
@@ -217,25 +223,31 @@ export default function GameEditModal({
                                 </Field>
 
                                 <Field label="Playtime Hours" error={gameErrors['progress.playtime_hours']}>
-                                    <TextInput type="number" step="0.1" value={gameForm.playtime_hours} onChange={(event) => updateGameForm({ playtime_hours: event.target.value })} />
+                                    <TextInput type="number" step="0.1" value={gameForm.playtime_hours} disabled={playtimeSynced} onChange={(event) => updateGameForm({ playtime_hours: event.target.value })} />
                                 </Field>
 
                                 <Field label="Earned Achievements" error={gameErrors['progress.earned_achievements']}>
-                                    <TextInput type="number" value={gameForm.earned_achievements} onChange={(event) => updateGameForm({ earned_achievements: event.target.value })} />
+                                    <TextInput type="number" value={gameForm.earned_achievements} disabled={achievementsSynced} onChange={(event) => updateGameForm({ earned_achievements: event.target.value })} />
                                 </Field>
 
                                 <Field label="First Played Date" error={gameErrors['progress.first_played_at']}>
-                                    <TextInput type="date" value={gameForm.first_played_at} onChange={(event) => updateGameForm({ first_played_at: event.target.value })} />
+                                    <TextInput type="date" value={gameForm.first_played_at} disabled={datesSynced} onChange={(event) => updateGameForm({ first_played_at: event.target.value })} />
                                 </Field>
 
                                 <Field label="Last Played Date" error={gameErrors['progress.last_played_at']}>
-                                    <TextInput type="date" value={gameForm.last_played_at} onChange={(event) => updateGameForm({ last_played_at: event.target.value })} />
+                                    <TextInput type="date" value={gameForm.last_played_at} disabled={datesSynced} onChange={(event) => updateGameForm({ last_played_at: event.target.value })} />
                                 </Field>
 
                                 {(selectedGameStatus?.name === 'Completed' || selectedGameStatus?.name === '100%') && (
                                     <Field label="Completed Date" error={gameErrors['progress.completed_at']}>
-                                        <TextInput type="date" value={gameForm.completed_at} onChange={(event) => updateGameForm({ completed_at: event.target.value })} />
+                                        <TextInput type="date" value={gameForm.completed_at} disabled={datesSynced} onChange={(event) => updateGameForm({ completed_at: event.target.value })} />
                                     </Field>
+                                )}
+
+                                {(statusSynced || playtimeSynced || achievementsSynced || datesSynced) && (
+                                    <div className="rounded-2xl border border-[#b7ff63]/25 bg-[#b7ff63]/10 px-4 py-3 text-sm font-black text-[#d8ff9f] md:col-span-2">
+                                        Linked Progress controls synced fields from the source game.
+                                    </div>
                                 )}
 
                                 {!gameHasAchievements && (

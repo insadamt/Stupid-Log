@@ -305,10 +305,10 @@ final class BackupRestorer
     {
         return [
             'platform_devices', 'platform_ownership_types', 'games', 'external_game_ids',
-            'library_games', 'library_game_devices', 'ownership_copies', 'dlcs', 'owned_dlcs',
+            'library_games', 'library_game_progress_links', 'library_game_devices', 'ownership_copies', 'dlcs', 'owned_dlcs',
             'snapshot_runs', 'subscription_entries', 'subscription_entry_ownership_copies',
             'subscription_entry_years', 'subscription_entry_year_ownership_copies',
-            'in_app_purchases', 'library_game_snapshots', 'ownership_copy_snapshots',
+            'in_app_purchases', 'library_game_snapshots', 'library_game_progress_link_snapshots', 'ownership_copy_snapshots',
             'owned_dlc_snapshots', 'snapshot_best_games',
         ];
     }
@@ -321,6 +321,7 @@ final class BackupRestorer
             'games' => ['source_provider_id' => 'providers'],
             'external_game_ids' => ['game_id' => 'games', 'provider_id' => 'providers'],
             'library_games' => ['game_id' => 'games', 'platform_id' => 'platforms', 'status_id' => 'statuses'],
+            'library_game_progress_links' => ['target_library_game_id' => 'library_games', 'source_library_game_id' => 'library_games'],
             'library_game_devices' => ['library_game_id' => 'library_games', 'device_id' => 'devices'],
             'ownership_copies' => ['library_game_id' => 'library_games', 'ownership_type_id' => 'ownership_types', 'physical_status_id' => 'physical_statuses'],
             'dlcs' => ['game_id' => 'games', 'source_provider_id' => 'providers'],
@@ -332,6 +333,7 @@ final class BackupRestorer
             'subscription_entry_year_ownership_copies' => ['subscription_entry_year_id' => 'subscription_entry_years', 'ownership_copy_id' => 'ownership_copies'],
             'in_app_purchases' => ['library_game_id' => 'library_games', 'locked_by_snapshot_run_id' => 'snapshot_runs'],
             'library_game_snapshots' => ['snapshot_run_id' => 'snapshot_runs', 'library_game_id' => 'library_games', 'game_id' => 'games', 'platform_id' => 'platforms', 'status_id' => 'statuses'],
+            'library_game_progress_link_snapshots' => ['snapshot_run_id' => 'snapshot_runs', 'library_game_progress_link_id' => 'library_game_progress_links', 'target_library_game_id' => 'library_games', 'source_library_game_id' => 'library_games'],
             'ownership_copy_snapshots' => ['snapshot_run_id' => 'snapshot_runs', 'ownership_copy_id' => 'ownership_copies', 'library_game_id' => 'library_games', 'ownership_type_id' => 'ownership_types'],
             'owned_dlc_snapshots' => ['snapshot_run_id' => 'snapshot_runs', 'owned_dlc_id' => 'owned_dlcs', 'library_game_id' => 'library_games', 'dlc_id' => 'dlcs'],
             'snapshot_best_games' => ['snapshot_run_id' => 'snapshot_runs', 'library_game_id' => 'library_games', 'game_id' => 'games'],

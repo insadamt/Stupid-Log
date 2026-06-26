@@ -6,6 +6,7 @@ use App\Http\Controllers\StupidLog\HomeController;
 use App\Http\Controllers\StupidLog\InAppPurchaseController;
 use App\Http\Controllers\StupidLog\LibraryController;
 use App\Http\Controllers\StupidLog\LibraryGameMutationController;
+use App\Http\Controllers\StupidLog\LinkedProgressController;
 use App\Http\Controllers\StupidLog\OwnedDlcController;
 use App\Http\Controllers\StupidLog\OwnershipCopyController;
 use App\Http\Controllers\StupidLog\ProviderController;
@@ -43,6 +44,10 @@ Route::middleware('installation.complete')->group(function (): void {
     Route::get('/games/{libraryGame}', [GameDetailsController::class, 'gameDetails'])->name('games.show');
     Route::patch('/games/{libraryGame}', [LibraryGameMutationController::class, 'updateLibraryGame'])->name('games.update');
     Route::delete('/games/{libraryGame}', [LibraryGameMutationController::class, 'destroyLibraryGame'])->name('games.destroy');
+    Route::get('/games/{libraryGame}/linked-progress/candidates', [LinkedProgressController::class, 'candidates'])->name('games.linked-progress.candidates');
+    Route::post('/games/{libraryGame}/linked-progress', [LinkedProgressController::class, 'store'])->name('games.linked-progress.store');
+    Route::patch('/games/{libraryGame}/linked-progress', [LinkedProgressController::class, 'update'])->name('games.linked-progress.update');
+    Route::delete('/games/{libraryGame}/linked-progress', [LinkedProgressController::class, 'destroy'])->name('games.linked-progress.destroy');
     Route::patch('/games/{libraryGame}/platform-devices', [LibraryGameMutationController::class, 'updatePlatformDevices'])->name('games.platform-devices.update');
     Route::post('/games/{libraryGame}/ownership-copies', [OwnershipCopyController::class, 'storeOwnershipCopy'])->name('games.ownership-copies.store');
     Route::patch('/ownership-copies/{ownershipCopy}', [OwnershipCopyController::class, 'updateOwnershipCopy'])->name('ownership-copies.update');

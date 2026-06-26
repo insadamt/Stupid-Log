@@ -14,7 +14,7 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
     return (
         <input
             {...props}
-            className={`h-12 w-full min-w-0 rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-black text-white outline-none placeholder:text-white/28 focus:border-[#b7ff63] ${props.className ?? ''}`}
+            className={`h-12 w-full min-w-0 rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-black text-white outline-none placeholder:text-white/28 focus:border-[#b7ff63] disabled:cursor-not-allowed disabled:border-white/5 disabled:bg-white/[0.045] disabled:text-white/30 ${props.className ?? ''}`}
         />
     );
 }
@@ -32,7 +32,7 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
     return (
         <select
             {...props}
-            className={`h-12 w-full min-w-0 rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-black text-white outline-none focus:border-[#b7ff63] ${props.className ?? ''}`}
+            className={`h-12 w-full min-w-0 rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-black text-white outline-none focus:border-[#b7ff63] disabled:cursor-not-allowed disabled:border-white/5 disabled:bg-white/[0.045] disabled:text-white/30 ${props.className ?? ''}`}
         />
     );
 }
