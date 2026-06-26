@@ -51,19 +51,21 @@ export default function DlcsPanel({
             {dlcErrors.dlcs && <div className="mt-3 rounded-[18px] border border-[#ff6068]/40 bg-[#ff6068]/10 px-4 py-3 text-sm font-black text-[#ff858b]">{dlcErrors.dlcs}</div>}
 
             <div className="min-h-0 overflow-auto pr-1">
-                <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_150px_112px_88px] gap-3 rounded-[18px] bg-[#b7ff63] px-3 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-black">
+                <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_150px_128px_128px_88px] gap-3 rounded-[18px] bg-[#b7ff63] px-3 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-black">
                     <span>Title</span>
                     <span>Status</span>
-                    <span>Value</span>
+                    <span>Base Value</span>
+                    <span>Paid Value</span>
                     <span className="text-right">Actions</span>
                 </div>
                 <div className="mt-3 grid gap-2">
                 {filteredDlcs.map((dlc) => (
                     <div key={dlc.id} className="rounded-[20px] border border-white/10 bg-white/[0.06] p-3 text-sm font-black">
-                        <div className="grid grid-cols-[minmax(0,1fr)_150px_112px_88px] items-center gap-3">
+                        <div className="grid grid-cols-[minmax(0,1fr)_150px_128px_128px_88px] items-center gap-3">
                             <span className="truncate text-base">{dlc.title}</span>
                             <span className={`rounded-full px-4 py-2 text-center text-xs uppercase tracking-[0.12em] ring-1 ${statusTone(dlc.state)}`}>{dlc.state}</span>
-                            <span className="text-right text-white/72">{formatMoney(dlc.purchased_price ?? dlc.base_price)}</span>
+                            <span className="truncate text-right text-[#b7ff63]">{formatMoney(dlc.base_price)}</span>
+                            <span className="truncate text-right text-white/72">{formatMoney(dlc.purchased_price)}</span>
                             <div className="flex justify-end gap-2">
                                 <button type="button" onClick={() => startEditDlc(dlc)} className="grid size-10 place-items-center rounded-2xl bg-white/10 text-white/70 hover:text-white"><Edit3 size={17} /></button>
                                 <button type="button" onClick={() => removeDlc(dlc)} disabled={!dlc.owned_dlc_id} className="grid size-10 place-items-center rounded-2xl bg-[#d72835]/90 text-white disabled:opacity-30"><Trash2 size={17} /></button>

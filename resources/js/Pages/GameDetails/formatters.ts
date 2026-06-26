@@ -1,11 +1,13 @@
 export function formatMoney(value: string | number | null | undefined) {
-    if (value === null || value === undefined || value === '') return 'Unknown';
+    if (value === null || value === undefined || value === '') return 'Free';
 
     const parsed = Number(value);
-    return Number.isFinite(parsed) ? `$${parsed.toFixed(2)}` : String(value);
+    if (!Number.isFinite(parsed)) return String(value);
+
+    return parsed === 0 ? 'Free' : `$${parsed.toFixed(2)}`;
 }
 
-export function formatHours(value: number) {
+export function formatHours(value: number | null | undefined) {
     if (!Number.isFinite(value)) return '0H';
     if (Number.isInteger(value)) return `${value}H`;
     return `${value.toFixed(1)}H`;

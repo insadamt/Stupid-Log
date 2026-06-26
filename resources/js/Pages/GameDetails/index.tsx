@@ -91,7 +91,7 @@ export default function GameDetails({
         [dlcs, filter, query],
     );
     const devices = libraryGame.devices.length ? libraryGame.devices : ['Unknown device'];
-    const achievements = `${libraryGame.earned_achievements} / ${libraryGame.total_achievements || 0}`;
+    const achievements = `${libraryGame.earned_achievements ?? 0} / ${libraryGame.total_achievements ?? 0}`;
     const selectedPlatform = references.platforms.find((platform) => String(platform.id) === platformDeviceForm.platform_id);
     const selectedGameStatus = references.statuses.find((status) => String(status.id) === gameForm.status_id);
     const gameHasAchievements = Number(gameForm.total_achievements || 0) > 0;
