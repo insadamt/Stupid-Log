@@ -134,6 +134,58 @@ class LinkedProgressTest extends TestCase
         $this->assertSame(10, (int) $target->game->refresh()->total_achievements);
     }
 
+    public function test_presenter_marks_linked_targets_and_sync_sources(): void
+    {
+        $source = $this->libraryGame('Shared Progress Source', 'Steam');
+        $target = $this->libraryGame('Shared Progress Target', 'Xbox');
+        $otherTarget = $this->libraryGame('Shared Progress Target PS', 'PS Network');
+
+        app(LinkedProgressService::class)->create($target, [
+            'source_library_game_id' => $source->id,
+            'sync_playtime' => true,
+        ]);
+        app(LinkedProgressService::class)->create($otherTarget, [
+            'source_library_game_id' => $source->id,
+            'sync_status' => true,
+        ]);
+
+        $presenter = app(LibraryGamePresenter::class);
+        $sourceCard = $presenter->card($source->refresh()->load(['game', 'platform', 'status', 'devices', 'ownershipCopies']));
+        $targetCard = $presenter->card($target->refresh()->load(['game', 'platform', 'status', 'devices', 'ownershipCopies', 'progressLink']));
+
+        $this->assertFalse($sourceCard['linked_progress_summary']['is_target']);
+        $this->assertSame(2, $sourceCard['linked_progress_summary']['source_count']);
+        $this->assertTrue($targetCard['linked_progress_summary']['is_target']);
+        $this->assertSame(0, $targetCard['linked_progress_summary']['source_count']);
+        $this->assertSame('Shared Progress Source', $targetCard['linked_progress']['source']['title']);
+    }
+
+    public function test_game_details_exposes_linked_progress_indicator_data_with_return_query(): void
+    {
+        $source = $this->libraryGame('Details Source', 'Steam');
+        $target = $this->libraryGame('Details Target', 'Xbox');
+
+        app(LinkedProgressService::class)->create($target, [
+            'source_library_game_id' => $source->id,
+            'sync_playtime' => true,
+            'sync_achievements' => true,
+            'sync_dates' => true,
+            'sync_status' => true,
+        ]);
+
+        $page = $this->get("/games/{$target->id}?query=details&sort=playtime&status=In%20Progress")
+            ->assertOk()
+            ->viewData('page');
+
+        $this->assertSame('GameDetails', $page['component']);
+        $this->assertTrue($page['props']['libraryGame']['linked_progress_summary']['is_target']);
+        $this->assertSame('Details Source', $page['props']['details']['linked_progress']['source']['title']);
+        $this->assertTrue($page['props']['details']['linked_progress']['sync_playtime']);
+        $this->assertTrue($page['props']['details']['linked_progress']['sync_achievements']);
+        $this->assertTrue($page['props']['details']['linked_progress']['sync_dates']);
+        $this->assertTrue($page['props']['details']['linked_progress']['sync_status']);
+    }
+
     public function test_source_updates_are_propagated_to_linked_targets(): void
     {
         $source = $this->libraryGame('Steam Source', 'Steam', $this->user, [

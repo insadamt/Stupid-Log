@@ -24,6 +24,7 @@ export type GameCardData = {
     effective_progress?: EffectiveProgressData;
     local_progress?: LocalProgressData;
     linked_progress?: LinkedProgressData | null;
+    linked_progress_summary?: LinkedProgressSummaryData;
     ownership: string[];
     devices: string[];
     base_price_default?: string | number | null;
@@ -77,6 +78,11 @@ export type LinkedProgressData = {
     sync_dates: boolean;
     sync_status: boolean;
     source: LinkedProgressSourceData;
+};
+
+export type LinkedProgressSummaryData = {
+    is_target: boolean;
+    source_count: number;
 };
 
 export type StatsData = {

@@ -1,6 +1,12 @@
 import { Link } from '@inertiajs/react';
 import { ChevronLeft, Edit3, Gauge, Trash2 } from 'lucide-react';
 
+function libraryHref() {
+    if (typeof window === 'undefined') return '/library';
+
+    return `/library${window.location.search}`;
+}
+
 export default function DetailsHeader({
     title,
     onQuickEdit,
@@ -14,7 +20,7 @@ export default function DetailsHeader({
 }) {
     return (
         <header data-details-header className="mx-auto grid h-[72px] w-full max-w-[1430px] grid-cols-[96px_1fr_auto_auto_auto] overflow-hidden rounded-full bg-[#b7ff63] shadow-[0_18px_52px_rgb(0_0_0/0.12)]">
-            <Link href="/library" className="grid place-items-center border-r border-black/15 transition hover:bg-black hover:text-[#b7ff63]" aria-label="Back to library">
+            <Link href={libraryHref()} className="grid place-items-center border-r border-black/15 transition hover:bg-black hover:text-[#b7ff63]" aria-label="Back to library">
                 <ChevronLeft size={36} strokeWidth={4} />
             </Link>
             <div className="flex min-w-0 items-center justify-center px-8 text-center">

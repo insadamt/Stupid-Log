@@ -130,6 +130,40 @@ class LibraryGameListSearchTest extends TestCase
         $this->assertSame(['Beta Portable Match', 'Alpha Portable Match'], $this->libraryGameTitles("/library-games?{$query}"));
     }
 
+    public function test_library_page_uses_query_params_for_initial_results(): void
+    {
+        $this->createLibraryGame('Alpha Portable Match', 'Xbox', 'Xbox Series X|S', 'Digital', options: [
+            'total_achievements' => 5,
+            'playtime_hours' => 4,
+            'first_played_at' => '2024-01-02',
+        ]);
+        $this->createLibraryGame('Beta Portable Match', 'Xbox', 'Xbox Series X|S', 'Digital', options: [
+            'total_achievements' => 5,
+            'playtime_hours' => 12,
+            'first_played_at' => '2024-05-02',
+        ]);
+        $this->createLibraryGame('Portable Wrong Device', 'Xbox', 'PC', 'Digital', options: [
+            'total_achievements' => 5,
+            'playtime_hours' => 99,
+            'first_played_at' => '2024-03-02',
+        ]);
+
+        $query = http_build_query([
+            'query' => 'portable',
+            'platform' => 'Xbox',
+            'ownership_type' => 'Digital',
+            'device' => 'Xbox Series X|S',
+            'achievements' => 'has',
+            'first_played_year' => '2024',
+            'sort' => 'playtime',
+        ]);
+
+        $page = $this->get("/library?{$query}")->assertOk()->viewData('page');
+
+        $this->assertSame('Library', $page['component']);
+        $this->assertSame(['Beta Portable Match', 'Alpha Portable Match'], collect($page['props']['libraryGames'])->pluck('title')->all());
+    }
+
     private function assertSearchReturnsSameTitles(array $queries, array $expectedTitles): void
     {
         foreach ($queries as $query) {

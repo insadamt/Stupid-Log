@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
-import { ArrowUpRight, Clock3, Gamepad2, ImageOff, Trophy } from 'lucide-react';
+import { ArrowUpRight, Clock3, Gamepad2, ImageOff, Link2, RadioTower, Trophy } from 'lucide-react';
+import { ReactNode } from 'react';
 import PlatformIcon from './PlatformIcon';
 import { GameCardData } from '../types';
 import { statusPillStyle } from '../statusColors';
@@ -14,6 +15,13 @@ function panelTitle(title: string) {
     const clean = title.trim();
 
     return clean.length > 52 ? `${clean.slice(0, 52)}...` : clean;
+}
+
+function gameDetailsHref(gameId: number) {
+    if (gameId <= 0) return '/library';
+    if (typeof window === 'undefined' || window.location.pathname !== '/library') return `/games/${gameId}`;
+
+    return `/games/${gameId}${window.location.search}`;
 }
 
 export function CoverArt({
@@ -69,10 +77,12 @@ export default function GameCard({
     compact?: boolean;
     panelSide?: 'left' | 'right';
 }) {
-    const href = game.id > 0 ? `/games/${game.id}` : '/library';
+    const href = gameDetailsHref(game.id);
 
     const progress = Math.min(Math.max(Number(game.progress ?? 0), 0), 100);
     const hasAchievements = Number(game.total_achievements ?? 0) > 0;
+    const isLinkedTarget = Boolean(game.linked_progress_summary?.is_target);
+    const isSyncSource = Number(game.linked_progress_summary?.source_count ?? 0) > 0;
 
     const shellWidth = featured ? 'w-[314px]' : homeSide ? 'w-[258px]' : compact ? 'w-[180px]' : 'w-[226px]';
     const cardHeight = featured ? 'h-[514px]' : homeSide ? 'h-[444px]' : compact ? 'h-[306px]' : 'h-[378px]';
@@ -106,6 +116,12 @@ export default function GameCard({
             >
                 <div className={`${coverHeight} relative z-0 overflow-hidden rounded-[18px] bg-[#d9dedb]`}>
                     <CoverArt game={game} titleSize={featured ? 'text-[32px]' : compact ? 'text-[24px]' : 'text-[24px]'} />
+                    {(isLinkedTarget || isSyncSource) && (
+                        <div className="absolute left-2.5 top-2.5 z-20 flex flex-wrap gap-1.5">
+                            {isLinkedTarget && <ProgressBadge icon={<Link2 size={11} strokeWidth={3} />} label="Linked" />}
+                            {isSyncSource && <ProgressBadge icon={<RadioTower size={11} strokeWidth={3} />} label="Source" />}
+                        </div>
+                    )}
                 </div>
 
                 <span
@@ -162,7 +178,14 @@ export default function GameCard({
                         {game.publisher || 'Unknown Publisher'}
                     </p>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3">
+                    {(isLinkedTarget || isSyncSource) && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {isLinkedTarget && <ProgressBadge icon={<Link2 size={11} strokeWidth={3} />} label="Linked" dark />}
+                            {isSyncSource && <ProgressBadge icon={<RadioTower size={11} strokeWidth={3} />} label="Source" dark />}
+                        </div>
+                    )}
+
+                    <div className={`${isLinkedTarget || isSyncSource ? 'mt-3' : 'mt-4'} grid grid-cols-2 gap-3`}>
                         <div className="rounded-[18px] bg-white/10 p-3 text-center ring-1 ring-white/10">
                             <Trophy className="mx-auto mb-1 text-[#b7ff63]" size={24} fill="currentColor" />
 
@@ -197,5 +220,19 @@ export default function GameCard({
                 </div>
             )}
         </article>
+    );
+}
+
+function ProgressBadge({ icon, label, dark = false }: { icon: ReactNode; label: string; dark?: boolean }) {
+    return (
+        <span
+            className={[
+                'inline-flex h-6 items-center gap-1 rounded-full px-2 text-[9px] font-black uppercase tracking-[0.12em] shadow-[0_8px_16px_rgb(0_0_0/0.16)]',
+                dark ? 'bg-[#b7ff63] text-black' : 'bg-black/84 text-[#b7ff63]',
+            ].join(' ')}
+        >
+            {icon}
+            {label}
+        </span>
     );
 }

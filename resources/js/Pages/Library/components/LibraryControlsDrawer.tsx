@@ -1,5 +1,5 @@
 import { Check, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { gsap, motion, prefersReducedMotion } from '../../../animation';
 import { statusDotStyle, statusPillStyle } from '../../../statusColors';
 import { LibraryFilters, SortMode, SortOption } from '../types';
@@ -38,6 +38,8 @@ export default function LibraryControlsDrawer({
     onClearFilters,
     loading,
     close,
+    activeTab,
+    onActiveTabChange,
 }: {
     filters: LibraryFilters;
     sort: SortMode;
@@ -60,8 +62,9 @@ export default function LibraryControlsDrawer({
     onClearFilters: () => void;
     loading: boolean;
     close: () => void;
+    activeTab: ControlsTab;
+    onActiveTabChange: (tab: ControlsTab) => void;
 }) {
-    const [activeTab, setActiveTab] = useState<ControlsTab>('filter');
     const backdropRef = useRef<HTMLDivElement>(null);
     const drawerRef = useRef<HTMLElement>(null);
     const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -151,7 +154,7 @@ export default function LibraryControlsDrawer({
                         <button
                             key={tab}
                             type="button"
-                            onClick={() => setActiveTab(tab)}
+                            onClick={() => onActiveTabChange(tab)}
                             className={[
                                 'h-11 rounded-[16px] text-sm font-black capitalize transition',
                                 activeTab === tab ? 'bg-[#b7ff63] text-black' : 'bg-white/10 text-white/55 hover:text-white',

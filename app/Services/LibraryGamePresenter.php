@@ -20,6 +20,9 @@ class LibraryGamePresenter
     {
         $game = $libraryGame->game;
         $libraryGame->loadMissing('progressLink.sourceLibraryGame.game', 'progressLink.sourceLibraryGame.platform', 'progressLink.sourceLibraryGame.status');
+        if (! array_key_exists('progress_links_as_source_count', $libraryGame->getAttributes())) {
+            $libraryGame->loadCount('progressLinksAsSource');
+        }
 
         return [
             'id' => $libraryGame->id,
@@ -42,6 +45,10 @@ class LibraryGamePresenter
             'effective_progress' => $this->storedProgress($libraryGame),
             'local_progress' => $this->storedProgress($libraryGame),
             'linked_progress' => $this->linkedProgress->linkPayload($libraryGame->progressLink),
+            'linked_progress_summary' => [
+                'is_target' => $libraryGame->progressLink !== null,
+                'source_count' => (int) $libraryGame->progress_links_as_source_count,
+            ],
             'ownership' => $libraryGame->ownershipCopies->map(fn ($copy) => $copy->ownershipType?->name ?? OwnershipType::find($copy->ownership_type_id)?->name)->filter()->values(),
             'devices' => $libraryGame->devices->pluck('name')->values(),
             'base_price_default' => $game->base_price_default,

@@ -27,11 +27,15 @@ const sortOptions = [
     { value: 'progress', label: 'Progress', icon: Trophy },
 ] satisfies Array<{ value: SortMode; label: string; icon: typeof ArrowDownAZ }>;
 
+type ControlsTab = 'filter' | 'sort';
+
 export default function Library({ libraryGames, libraryMeta, references }: { libraryGames: GameCardData[]; libraryMeta: LibraryMeta; references: ReferenceData }) {
-    const [query, setQuery] = useState('');
-    const [sort, setSort] = useState<SortMode>('title');
-    const [filters, setFilters] = useState<LibraryFilters>(defaultFilters);
+    const initialState = useMemo(readLibraryUrlState, []);
+    const [query, setQuery] = useState(initialState.query);
+    const [sort, setSort] = useState<SortMode>(initialState.sort);
+    const [filters, setFilters] = useState<LibraryFilters>(initialState.filters);
     const [controlsOpen, setControlsOpen] = useState(false);
+    const [activeControlsTab, setActiveControlsTab] = useState<ControlsTab>(initialState.controlsTab);
     const [games, setGames] = useState<GameCardData[]>(libraryGames);
     const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(libraryGames.length < libraryMeta.total);
@@ -100,6 +104,10 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
 
     const activeFilterChips = useMemo(() => activeFilters(filters), [filters]);
     const hasActiveFilters = activeFilterChips.length > 0;
+
+    useEffect(() => {
+        writeLibraryUrlState(query, filters, sort, activeControlsTab);
+    }, [activeControlsTab, filters, query, sort]);
 
     useEffect(() => {
         requestKeyRef.current = requestKey;
@@ -247,11 +255,49 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                         onClearFilters={clearFilters}
                         loading={refreshing}
                         close={() => setControlsOpen(false)}
+                        activeTab={activeControlsTab}
+                        onActiveTabChange={setActiveControlsTab}
                     />
                 )}
             </section>
         </AppLayout>
     );
+}
+
+function readLibraryUrlState() {
+    const params = typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search);
+
+    return {
+        query: params.get('query') ?? '',
+        sort: validSort(params.get('sort')),
+        controlsTab: validControlsTab(params.get('controls_tab')),
+        filters: {
+            status: params.get('status') ?? defaultFilters.status,
+            platform: params.get('platform') ?? defaultFilters.platform,
+            ownershipType: params.get('ownership_type') ?? defaultFilters.ownershipType,
+            device: params.get('device') ?? defaultFilters.device,
+            achievements: validOption(params.get('achievements'), ['all', 'has', 'none'], defaultFilters.achievements),
+            cover: validOption(params.get('cover'), ['all', 'has', 'missing'], defaultFilters.cover),
+            firstPlayedYear: params.get('first_played_year') ?? defaultFilters.firstPlayedYear,
+            completedYear: params.get('completed_year') ?? defaultFilters.completedYear,
+        },
+    };
+}
+
+function writeLibraryUrlState(query: string, filters: LibraryFilters, sort: SortMode, controlsTab: ControlsTab) {
+    if (typeof window === 'undefined' || window.location.pathname !== '/library') return;
+
+    const params = libraryRequestParams(query, filters, sort);
+    if (controlsTab !== 'filter') params.set('controls_tab', controlsTab);
+
+    removeDefaultParams(params);
+    const nextSearch = params.toString();
+    const nextUrl = nextSearch ? `/library?${nextSearch}` : '/library';
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+
+    if (nextUrl !== currentUrl) {
+        window.history.replaceState(window.history.state, '', nextUrl);
+    }
 }
 
 function libraryRequestParams(query: string, filters: LibraryFilters, sort: SortMode) {
@@ -267,6 +313,26 @@ function libraryRequestParams(query: string, filters: LibraryFilters, sort: Sort
         completed_year: filters.completedYear,
         sort,
     });
+}
+
+function removeDefaultParams(params: URLSearchParams) {
+    const defaults = libraryRequestParams('', defaultFilters, 'title');
+
+    defaults.forEach((value, key) => {
+        if (params.get(key) === value) params.delete(key);
+    });
+}
+
+function validSort(value: string | null): SortMode {
+    return sortOptions.some((option) => option.value === value) ? value as SortMode : 'title';
+}
+
+function validControlsTab(value: string | null): ControlsTab {
+    return value === 'sort' ? 'sort' : 'filter';
+}
+
+function validOption<T extends string>(value: string | null, options: T[], fallback: T): T {
+    return value !== null && options.includes(value as T) ? value as T : fallback;
 }
 
 function activeFilters(filters: LibraryFilters) {

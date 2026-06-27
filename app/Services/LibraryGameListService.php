@@ -130,7 +130,8 @@ class LibraryGameListService
                 'progressLink.sourceLibraryGame.game',
                 'progressLink.sourceLibraryGame.platform',
                 'progressLink.sourceLibraryGame.status',
-            ]);
+            ])
+            ->withCount('progressLinksAsSource');
     }
 
     private function applyAdvancedFilters($builder, array $filters): void

@@ -1,4 +1,4 @@
-import { Archive, CalendarDays, Layers3, ShieldCheck } from 'lucide-react';
+import { Archive, CalendarDays, Layers3, Link2, RadioTower, ShieldCheck } from 'lucide-react';
 import { GameCardData } from '../../../types';
 import { Details } from '../types';
 import { BlackTile } from './SharedUi';
@@ -10,6 +10,9 @@ export default function OverviewPanel({
     libraryGame: GameCardData;
     details: Details;
 }) {
+    const linkedFields = syncedFieldLabels(details.linked_progress);
+    const sourceCount = libraryGame.linked_progress_summary?.source_count ?? 0;
+
     return (
         <article className="overflow-hidden rounded-[40px] bg-black text-white shadow-[0_34px_90px_rgb(0_0_0/0.24)]">
             <div className="p-7">
@@ -26,6 +29,41 @@ export default function OverviewPanel({
                 <p className="mt-7 min-h-[210px] max-w-[780px] text-[21px] font-black leading-tight tracking-[-0.025em] text-white/84">
                     {libraryGame.description || 'No description.'}
                 </p>
+
+                {(details.linked_progress || sourceCount > 0) && (
+                    <div className="mt-5 grid gap-2">
+                        {details.linked_progress && (
+                            <div className="rounded-[22px] border border-[#b7ff63]/24 bg-[#b7ff63]/10 p-4">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#b7ff63] px-3 text-[10px] font-black uppercase tracking-[0.16em] text-black">
+                                        <Link2 size={13} strokeWidth={3} />
+                                        Progress Linked
+                                    </span>
+                                    <span className="text-sm font-black text-white">
+                                        {details.linked_progress.source.title} · {details.linked_progress.source.platform}
+                                    </span>
+                                </div>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {linkedFields.map((field) => (
+                                        <span key={field} className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#b7ff63]">
+                                            {field}
+                                        </span>
+                                    ))}
+                                </div>
+                                <p className="mt-3 text-[11px] font-black uppercase tracking-[0.13em] text-white/42">
+                                    Local values stay separate; synced fields are copied from the source.
+                                </p>
+                            </div>
+                        )}
+
+                        {sourceCount > 0 && (
+                            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-[#b7ff63]">
+                                <RadioTower size={14} strokeWidth={3} />
+                                Sync Source · {sourceCount} linked {sourceCount === 1 ? 'game' : 'games'}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div className="grid gap-3 border-t border-white/10 p-5 md:grid-cols-2">
@@ -36,4 +74,15 @@ export default function OverviewPanel({
             </div>
         </article>
     );
+}
+
+function syncedFieldLabels(link: Details['linked_progress']) {
+    if (!link) return [];
+
+    return [
+        link.sync_playtime ? 'Playtime' : null,
+        link.sync_achievements ? 'Achievements' : null,
+        link.sync_dates ? 'Dates' : null,
+        link.sync_status ? 'Status' : null,
+    ].filter((field): field is string => field !== null);
 }
