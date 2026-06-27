@@ -69,6 +69,7 @@ export default function GameCard({
     homeSide = false,
     compact = false,
     panelSide = 'right',
+    onDetailsNavigation,
 }: {
     game: GameCardData;
     expanded?: boolean;
@@ -76,6 +77,7 @@ export default function GameCard({
     homeSide?: boolean;
     compact?: boolean;
     panelSide?: 'left' | 'right';
+    onDetailsNavigation?: () => void;
 }) {
     const href = gameDetailsHref(game.id);
 
@@ -106,6 +108,7 @@ export default function GameCard({
         >
             <Link
                 href={href}
+                onClick={onDetailsNavigation}
                 className={[
                     'sl-card-shell relative z-10 flex h-full shrink-0 flex-col overflow-hidden bg-[#b7ff63] focus:outline-none',
                     shellWidth,
@@ -211,6 +214,7 @@ export default function GameCard({
 
                     <Link
                         href={href}
+                        onClick={onDetailsNavigation}
                         className="mt-auto flex h-[52px] items-center justify-center gap-3 rounded-[18px] bg-[#b7ff63] text-xl font-black text-black shadow-[inset_0_-5px_0_rgb(0_0_0/0.14)] transition hover:-translate-y-0.5"
                     >
                         Details <ArrowUpRight size={23} strokeWidth={3} />

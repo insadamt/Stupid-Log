@@ -11,8 +11,12 @@ export default function VirtualCardGrid({
     hasMore,
     refreshing,
     loadingMore,
+    restoreScrollTop,
     empty,
     onNearEnd,
+    onOpenGame,
+    onScrollPositionChange,
+    onScrollRestored,
 }: {
     items: GameCardData[];
     columns: number;
@@ -20,8 +24,12 @@ export default function VirtualCardGrid({
     hasMore: boolean;
     refreshing: boolean;
     loadingMore: boolean;
+    restoreScrollTop: number | null;
     empty: ReactNode;
     onNearEnd: () => void;
+    onOpenGame: () => void;
+    onScrollPositionChange: (scrollTop: number) => void;
+    onScrollRestored: () => void;
 }) {
     const ref = useRef<HTMLDivElement>(null);
     const clearActiveGameTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,12 +73,30 @@ export default function VirtualCardGrid({
         }
 
         setActiveGameId(null);
-        setScrollTop(0);
+        if (restoreScrollTop !== null) return;
 
+        setScrollTop(0);
         if (ref.current) {
             ref.current.scrollTop = 0;
         }
+        onScrollPositionChange(0);
     }, [resultSetKey]);
+
+    useEffect(() => {
+        const node = ref.current;
+        if (!node || restoreScrollTop === null || refreshing || viewportHeight <= 0) return;
+
+        const maxScrollTop = Math.max(0, totalHeight - viewportHeight);
+        const targetScrollTop = Math.min(restoreScrollTop, maxScrollTop);
+        const restoreFrame = requestAnimationFrame(() => {
+            node.scrollTop = targetScrollTop;
+            setScrollTop(targetScrollTop);
+            onScrollPositionChange(targetScrollTop);
+            onScrollRestored();
+        });
+
+        return () => cancelAnimationFrame(restoreFrame);
+    }, [onScrollPositionChange, onScrollRestored, refreshing, restoreScrollTop, totalHeight, viewportHeight]);
 
     function activateGame(gameId: number) {
         if (clearActiveGameTimeoutRef.current) {
@@ -95,6 +121,7 @@ export default function VirtualCardGrid({
     function handleScroll(event: UIEvent<HTMLDivElement>) {
         const node = event.currentTarget;
         setScrollTop(node.scrollTop);
+        onScrollPositionChange(node.scrollTop);
 
         if (node.scrollTop + node.clientHeight > node.scrollHeight - 700) {
             onNearEnd();
@@ -144,7 +171,7 @@ export default function VirtualCardGrid({
                                 zIndex: activeGameId === game.id ? 50 : undefined,
                             }}
                         >
-                            <GameCard game={game} compact panelSide={column === columns - 1 ? 'left' : 'right'} />
+                            <GameCard game={game} compact panelSide={column === columns - 1 ? 'left' : 'right'} onDetailsNavigation={onOpenGame} />
                         </div>
                     );
                 })}

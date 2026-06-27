@@ -1,5 +1,5 @@
 import { ArrowDownAZ, Clock3, Trophy, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AppLayout from '../../Components/AppLayout';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { GameCardData, ReferenceData } from '../../types';
@@ -28,23 +28,42 @@ const sortOptions = [
 ] satisfies Array<{ value: SortMode; label: string; icon: typeof ArrowDownAZ }>;
 
 type ControlsTab = 'filter' | 'sort';
+type LibraryScrollSnapshot = {
+    queryKey: string;
+    url: string;
+    scrollTop: number;
+    games: GameCardData[];
+    nextCursor: string | null;
+    hasMore: boolean;
+};
 
 export default function Library({ libraryGames, libraryMeta, references }: { libraryGames: GameCardData[]; libraryMeta: LibraryMeta; references: ReferenceData }) {
     const initialState = useMemo(readLibraryUrlState, []);
+    const initialRequestKey = useMemo(() => libraryQueryKey(initialState.query, initialState.filters, initialState.sort), [initialState]);
+    const initialScrollSnapshot = useMemo(() => readLibraryScrollSnapshot(initialRequestKey), [initialRequestKey]);
     const [query, setQuery] = useState(initialState.query);
     const [sort, setSort] = useState<SortMode>(initialState.sort);
     const [filters, setFilters] = useState<LibraryFilters>(initialState.filters);
     const [controlsOpen, setControlsOpen] = useState(false);
     const [activeControlsTab, setActiveControlsTab] = useState<ControlsTab>(initialState.controlsTab);
-    const [games, setGames] = useState<GameCardData[]>(libraryGames);
-    const [nextCursor, setNextCursor] = useState<string | null>(null);
-    const [hasMore, setHasMore] = useState(libraryGames.length < libraryMeta.total);
+    const [games, setGames] = useState<GameCardData[]>(initialScrollSnapshot?.games ?? libraryGames);
+    const [nextCursor, setNextCursor] = useState<string | null>(initialScrollSnapshot?.nextCursor ?? null);
+    const [hasMore, setHasMore] = useState(initialScrollSnapshot?.hasMore ?? libraryGames.length < libraryMeta.total);
     const [refreshing, setRefreshing] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
+    const [restoreScrollTop, setRestoreScrollTop] = useState<number | null>(initialScrollSnapshot?.scrollTop ?? null);
     const cardsPerRow = 6;
     const debouncedQuery = useDebouncedValue(query);
-    const requestKey = JSON.stringify({ query: debouncedQuery, filters, sort });
+    const requestKey = libraryQueryKey(debouncedQuery, filters, sort);
     const requestKeyRef = useRef(requestKey);
+    const skipInitialRefreshRef = useRef(Boolean(initialScrollSnapshot));
+    const latestLibraryStateRef = useRef({
+        requestKey,
+        games: initialScrollSnapshot?.games ?? libraryGames,
+        nextCursor: initialScrollSnapshot?.nextCursor ?? null,
+        hasMore: initialScrollSnapshot?.hasMore ?? libraryGames.length < libraryMeta.total,
+        scrollTop: initialScrollSnapshot?.scrollTop ?? 0,
+    });
 
     const statusOptions = useMemo(() => {
         const merged = [...preferredStatuses, ...Object.keys(libraryMeta.statuses)];
@@ -110,7 +129,24 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
     }, [activeControlsTab, filters, query, sort]);
 
     useEffect(() => {
+        latestLibraryStateRef.current = {
+            ...latestLibraryStateRef.current,
+            requestKey,
+            games,
+            nextCursor,
+            hasMore,
+        };
+    }, [games, hasMore, nextCursor, requestKey]);
+
+    useEffect(() => {
         requestKeyRef.current = requestKey;
+        if (skipInitialRefreshRef.current) {
+            skipInitialRefreshRef.current = false;
+            return;
+        }
+
+        clearLibraryScrollSnapshot();
+        setRestoreScrollTop(null);
         let canceled = false;
         const params = libraryRequestParams(debouncedQuery, filters, sort);
         params.set('limit', '40');
@@ -133,6 +169,29 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
             canceled = true;
         };
     }, [requestKey]);
+
+    const updateGridScrollPosition = useCallback((scrollTop: number) => {
+        latestLibraryStateRef.current = {
+            ...latestLibraryStateRef.current,
+            scrollTop,
+        };
+    }, []);
+
+    const saveLibraryScrollBeforeOpeningGame = useCallback(() => {
+        const latestState = latestLibraryStateRef.current;
+        writeLibraryScrollSnapshot({
+            queryKey: latestState.requestKey,
+            url: currentLibraryUrl(),
+            scrollTop: latestState.scrollTop,
+            games: latestState.games,
+            nextCursor: latestState.nextCursor,
+            hasMore: latestState.hasMore,
+        });
+    }, []);
+
+    const finishScrollRestore = useCallback(() => {
+        setRestoreScrollTop(null);
+    }, []);
 
     function loadMore() {
         if (!hasMore || refreshing || loadingMore || !nextCursor) return;
@@ -160,16 +219,34 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
     }
 
     function updateFilters(updates: Partial<LibraryFilters>) {
+        clearLibraryScrollSnapshot();
+        setRestoreScrollTop(null);
         setFilters((current) => ({ ...current, ...updates }));
+    }
+
+    function updateQuery(value: string) {
+        clearLibraryScrollSnapshot();
+        setRestoreScrollTop(null);
+        setQuery(value);
+    }
+
+    function updateSort(value: SortMode) {
+        clearLibraryScrollSnapshot();
+        setRestoreScrollTop(null);
+        setSort(value);
     }
 
     function clearFilters() {
         if (refreshing) return;
+        clearLibraryScrollSnapshot();
+        setRestoreScrollTop(null);
         setFilters(defaultFilters);
     }
 
     function removeFilter(key: keyof LibraryFilters) {
         if (refreshing) return;
+        clearLibraryScrollSnapshot();
+        setRestoreScrollTop(null);
         setFilters((current) => ({ ...current, [key]: defaultFilters[key] }));
     }
 
@@ -182,7 +259,7 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                     query={query}
                     controlsOpen={controlsOpen}
                     references={references}
-                    onQueryChange={setQuery}
+                    onQueryChange={updateQuery}
                     onToggleControls={() => setControlsOpen(true)}
                     loading={refreshing}
                 />
@@ -228,7 +305,11 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                                 hasMore={hasMore}
                                 refreshing={refreshing}
                                 loadingMore={loadingMore}
+                                restoreScrollTop={restoreScrollTop}
                                 onNearEnd={loadMore}
+                                onOpenGame={saveLibraryScrollBeforeOpeningGame}
+                                onScrollPositionChange={updateGridScrollPosition}
+                                onScrollRestored={finishScrollRestore}
                                 empty={
                                     <div className="max-w-md rounded-[30px] bg-black p-8 text-center text-white shadow-[0_24px_55px_rgb(0_0_0/0.22)]">
                                         <h3 className="text-3xl font-black tracking-[-0.04em]">No games.</h3>
@@ -251,7 +332,7 @@ export default function Library({ libraryGames, libraryMeta, references }: { lib
                         completedYearOptions={completedYearOptions}
                         sortOptions={sortOptions}
                         onFiltersChange={updateFilters}
-                        onSortChange={setSort}
+                        onSortChange={updateSort}
                         onClearFilters={clearFilters}
                         loading={refreshing}
                         close={() => setControlsOpen(false)}
@@ -300,6 +381,13 @@ function writeLibraryUrlState(query: string, filters: LibraryFilters, sort: Sort
     }
 }
 
+function libraryQueryKey(query: string, filters: LibraryFilters, sort: SortMode) {
+    const params = libraryRequestParams(query, filters, sort);
+    removeDefaultParams(params);
+
+    return params.toString();
+}
+
 function libraryRequestParams(query: string, filters: LibraryFilters, sort: SortMode) {
     return new URLSearchParams({
         query,
@@ -313,6 +401,60 @@ function libraryRequestParams(query: string, filters: LibraryFilters, sort: Sort
         completed_year: filters.completedYear,
         sort,
     });
+}
+
+function readLibraryScrollSnapshot(queryKey: string): LibraryScrollSnapshot | null {
+    if (typeof window === 'undefined' || isReloadNavigation()) return null;
+
+    const snapshot = window.history.state?.slLibraryScrollSnapshot;
+    if (!isLibraryScrollSnapshot(snapshot) || snapshot.queryKey !== queryKey) return null;
+
+    return snapshot;
+}
+
+function writeLibraryScrollSnapshot(snapshot: LibraryScrollSnapshot) {
+    if (typeof window === 'undefined') return;
+
+    window.history.replaceState({
+        ...window.history.state,
+        slLibraryScrollSnapshot: snapshot,
+    }, '', snapshot.url);
+}
+
+function clearLibraryScrollSnapshot() {
+    if (typeof window === 'undefined') return;
+
+    const state = window.history.state;
+    if (!state?.slLibraryScrollSnapshot) return;
+
+    const nextState = { ...state };
+    delete nextState.slLibraryScrollSnapshot;
+    window.history.replaceState(nextState, '', currentLibraryUrl());
+}
+
+function currentLibraryUrl() {
+    if (typeof window === 'undefined') return '/library';
+
+    return `${window.location.pathname}${window.location.search}`;
+}
+
+function isReloadNavigation() {
+    const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+
+    return navigation?.type === 'reload';
+}
+
+function isLibraryScrollSnapshot(value: unknown): value is LibraryScrollSnapshot {
+    if (!value || typeof value !== 'object') return false;
+
+    const snapshot = value as Partial<LibraryScrollSnapshot>;
+
+    return typeof snapshot.queryKey === 'string'
+        && typeof snapshot.url === 'string'
+        && typeof snapshot.scrollTop === 'number'
+        && Array.isArray(snapshot.games)
+        && (typeof snapshot.nextCursor === 'string' || snapshot.nextCursor === null)
+        && typeof snapshot.hasMore === 'boolean';
 }
 
 function removeDefaultParams(params: URLSearchParams) {

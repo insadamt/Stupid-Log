@@ -189,7 +189,6 @@ export default function Donut({
     const renderedTotal = renderLayout.reduce((sum, arc) => sum + arc.value, 0);
     const activePercent = activeArc && renderedTotal > 0 ? (activeArc.value / renderedTotal) * 100 : 0;
     const activeValue = activeArc ? format(activeArc.value) : null;
-    const activeValueSize = activeValue && activeValue.length > 10 ? 'text-xl' : activeValue && activeValue.length > 7 ? 'text-2xl' : 'text-3xl';
     const visiblePositiveArcs = renderLayout.filter((arc) => arc.value > 0 && arc.end - arc.start > minimumVisibleSpanDegrees);
     const singleVisibleArc = visiblePositiveArcs.length === 1 ? visiblePositiveArcs[0] : null;
     const circumference = 2 * Math.PI * radius;
@@ -236,22 +235,19 @@ export default function Donut({
                 })}
             </svg>
             <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-                <div data-donut-center className="grid w-[50%] max-w-[170px] justify-items-center">
+                <div data-donut-center className="grid w-[42%] max-w-[138px] justify-items-center overflow-hidden">
                     {activeArc ? (
                         <>
                             <div className="line-clamp-2 max-w-full break-words text-xl font-black leading-[0.95] text-white" title={activeArc.label}>
                                 {activeArc.label}
                             </div>
-                            <div className={`${activeValueSize} mt-1 max-w-full truncate font-black leading-none text-white`} title={activeValue ?? undefined}>
-                                {activeValue}
-                            </div>
-                            <div className="mt-1 max-w-full truncate text-[10px] font-black uppercase tracking-[0.12em]" style={{ color: activeArc.color }}>
-                                {percentLabel(activePercent)}
+                            <div className="mt-2 max-w-full truncate text-[10px] font-black uppercase tracking-[0.12em]" style={{ color: activeArc.color }} title={activeValue ? `${activeValue} · ${percentLabel(activePercent)}` : percentLabel(activePercent)}>
+                                {activeValue ? `${activeValue} · ${percentLabel(activePercent)}` : percentLabel(activePercent)}
                             </div>
                         </>
                     ) : (
                         <>
-                            <div className={`${centerValueSize} max-w-full whitespace-nowrap font-black leading-none text-white tabular-nums`} title={total}>
+                            <div className={`${centerValueSize} max-w-full truncate font-black leading-none text-white`} title={total}>
                                 {total}
                             </div>
                             <div className="mt-2 line-clamp-2 max-w-full break-words text-[10px] font-black uppercase leading-tight tracking-[0.12em] text-white/35" title={center}>
