@@ -82,7 +82,7 @@ class LinkedProgressService
             ->with(['game', 'platform', 'status'])
             ->where('user_id', $user->id)
             ->whereKeyNot($target->id)
-            ->whereNotIn('id', $blockedSourceIds)
+            ->whereNotIn('library_games.id', $blockedSourceIds)
             ->whereDoesntHave('progressLink');
 
         if ($query !== null && trim($query) !== '') {

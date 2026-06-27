@@ -160,6 +160,27 @@ class LinkedProgressTest extends TestCase
         $this->assertSame('Shared Progress Source', $targetCard['linked_progress']['source']['title']);
     }
 
+    public function test_candidate_picker_still_lists_eligible_games_after_another_link_is_created(): void
+    {
+        $source = $this->libraryGame('Shared Source', 'Steam');
+        $target = $this->libraryGame('First Target', 'Xbox');
+        $otherTarget = $this->libraryGame('Second Target', 'PS Network');
+
+        app(LinkedProgressService::class)->create($target, [
+            'source_library_game_id' => $source->id,
+            'sync_playtime' => true,
+        ]);
+
+        $response = $this->getJson(route('games.linked-progress.candidates', [
+            'libraryGame' => $otherTarget,
+        ]))->assertOk();
+
+        $this->assertContains(
+            $source->id,
+            collect($response->json('candidates'))->pluck('id')->all(),
+        );
+    }
+
     public function test_game_details_exposes_linked_progress_indicator_data_with_return_query(): void
     {
         $source = $this->libraryGame('Details Source', 'Steam');

@@ -108,6 +108,7 @@ export default function LinkedProgressPanel({
                                 );
                             })}
                         </div>
+                        {errors.candidates && <div className="mt-2 text-xs font-black text-[#ff6068]">{errors.candidates}</div>}
                         {errors.source_library_game_id && <div className="mt-2 text-xs font-black text-[#ff6068]">{errors.source_library_game_id}</div>}
                     </section>
 
